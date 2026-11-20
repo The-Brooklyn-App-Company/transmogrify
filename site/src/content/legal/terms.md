@@ -19,7 +19,7 @@ static pages describing an open-source project. There is no account to create,
 no service to subscribe to, no data to submit, and no transaction to make.
 
 These terms do **not** govern the Transmogrify software. The software is
-distributed under the [MIT License](https://github.com/<org>/transmogrify/blob/main/LICENSE),
+distributed under the [MIT License](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/LICENSE),
 and that license — not this page — states your rights and the disclaimers that
 apply when you use, copy, modify, or distribute the code. Where this page and
 the MIT License could be read to conflict about the software, the MIT License
@@ -32,11 +32,11 @@ open-source project. It is a personal open-source project, not a company, and
 nothing on this site should be read as an offer of commercial services, a
 support agreement, or a service-level commitment.
 
-Use [GitHub issues](https://github.com/<org>/transmogrify/issues) for
+Use [GitHub issues](https://github.com/The-Brooklyn-App-Company/transmogrify/issues) for
 public bug reports, or email
 [support@thebkapp.co](mailto:support@thebkapp.co) for private support, privacy,
 or conduct matters. Use the project's
-[private vulnerability reporting form](https://github.com/<org>/transmogrify/security/advisories/new)
+[private vulnerability reporting form](https://github.com/The-Brooklyn-App-Company/transmogrify/security/advisories/new)
 for security defects. Please do not put secrets, credentials, private
 transcripts, or session identifiers in a public issue or ordinary support
 email.
@@ -92,7 +92,7 @@ sponsored by OpenAI, Anthropic, Cloudflare, GitHub, or Google.
 ## 6. Intellectual property
 
 The Transmogrify source code, including the documentation in the repository, is
-licensed under the [MIT License](https://github.com/<org>/transmogrify/blob/main/LICENSE).
+licensed under the [MIT License](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/LICENSE).
 The source for this website is part of the same repository and under the same
 license, so you are free to reuse it on the terms that license sets out.
 

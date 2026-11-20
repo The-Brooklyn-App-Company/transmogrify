@@ -171,9 +171,9 @@ security and retention risks of the email provider that carries it; send only
 the information needed to resolve the matter.
 
 Security defects in the Transmogrify project should be reported through its
-[private vulnerability reporting form](https://github.com/<org>/transmogrify/security/advisories/new),
+[private vulnerability reporting form](https://github.com/The-Brooklyn-App-Company/transmogrify/security/advisories/new),
 never in a public issue. The project's full
-[Security policy](https://github.com/<org>/transmogrify/blob/main/SECURITY.md)
+[Security policy](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/SECURITY.md)
 describes the trust boundaries of the software itself.
 
 ## 9. Changes to this policy

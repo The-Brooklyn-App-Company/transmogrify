@@ -10,10 +10,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<org>/transmogrify.git"
+    "url": "git+https://github.com/The-Brooklyn-App-Company/transmogrify.git"
   },
   "bugs": {
-    "url": "https://github.com/<org>/transmogrify/issues"
+    "url": "https://github.com/The-Brooklyn-App-Company/transmogrify/issues"
   },
   "homepage": "https://transmogrify.sh",
   "keywords": [

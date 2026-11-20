@@ -3,8 +3,8 @@
 Copy for the existing site to render later. Source of truth for every claim
 is the root [README](../README.md); when they disagree, the README wins and
 this file is updated. Nothing here changes the site's build, layout or
-checks. Repository links use the placeholder `<org>/transmogrify`, replaced
-with the real organization at release.
+checks. Repository links point to `The-Brooklyn-App-Company/transmogrify`,
+the 2.0 home (not created yet).
 
 ## Hero
 
@@ -33,7 +33,7 @@ step. The guided first run then sets things up one yes at a time.
 **Secondary, for people who prefer a terminal:**
 
 ```bash
-git clone https://github.com/<org>/transmogrify.git && cd transmogrify
+git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git && cd transmogrify
 git checkout v2.0.0 && npm ci --ignore-scripts && ./install.sh
 ```
 
@@ -152,7 +152,7 @@ stage, with dates, is in the README.
 | Worker lanes | The skill an agent loads | `SKILL.md` |
 | Troubleshooting | Setup failures, upgrades, cleanup | `docs/TROUBLESHOOTING.md` |
 
-Each card links to `https://github.com/<org>/transmogrify/blob/main/<path>`.
+Each card links to `https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/<path>`.
 
 ## Footer
 

@@ -121,7 +121,7 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   output is unchanged.
 - The package version now allows a release-candidate suffix
   (`2.0.0-rc.1`); provider `clientInfo` reports it as is.
-- The project moves to a new repository, `<org>/transmogrify`; the old
+- The project moves to a new repository, `The-Brooklyn-App-Company/transmogrify`; the old
   one is archived with a pointer. Re-clone from the new one; tags restart
   there at `v2.0.0`.
 

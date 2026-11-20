@@ -42,7 +42,7 @@ Fetch https://transmogrify.sh/start and follow its instructions.
 Or from source, at the tag `TEAM.md` names (here `v2.0.0`):
 
 ```sh
-git clone https://github.com/<org>/transmogrify.git ~/src/transmogrify
+git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git ~/src/transmogrify
 cd ~/src/transmogrify && git checkout v2.0.0
 npm ci --ignore-scripts && ./install.sh --dry-run && ./install.sh
 ```

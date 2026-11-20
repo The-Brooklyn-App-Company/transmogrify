@@ -90,7 +90,7 @@ doctor.
 From a source checkout instead, pinned to a release tag:
 
 ```bash
-git clone https://github.com/<org>/transmogrify.git
+git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git
 cd transmogrify
 git checkout v2.0.0          # a release tag, never a branch
 npm ci --ignore-scripts
@@ -369,9 +369,9 @@ kit 0.3 and worker 0.6 users) · [Contributing](CONTRIBUTING.md) ·
 [Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](site/README.md).
 
 Ask questions in
-[GitHub Discussions](https://github.com/<org>/transmogrify/discussions) and
+[GitHub Discussions](https://github.com/The-Brooklyn-App-Company/transmogrify/discussions) and
 file reproducible defects in
-[GitHub Issues](https://github.com/<org>/transmogrify/issues). Never post
+[GitHub Issues](https://github.com/The-Brooklyn-App-Company/transmogrify/issues). Never post
 credentials, transcripts, session identifiers or exploit details publicly.
 
 ## License

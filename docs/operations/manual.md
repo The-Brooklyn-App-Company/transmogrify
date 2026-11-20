@@ -42,7 +42,7 @@ that require JSON validation. Linux units exist but remain untested. Existing
 account setup is an owner action; installation never initiates sign-in.
 
 ```sh
-git clone https://github.com/<org>/transmogrify.git ~/src/transmogrify
+git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git ~/src/transmogrify
 cd ~/src/transmogrify
 git checkout <reviewed-release-tag>
 npm ci --ignore-scripts && ./install.sh      # or the start prompt

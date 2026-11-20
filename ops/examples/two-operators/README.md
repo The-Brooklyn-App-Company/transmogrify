@@ -12,7 +12,7 @@ here is fictional.
 ## Setup
 
 ```sh
-git clone https://github.com/<org>/transmogrify.git ~/src/transmogrify && cd ~/src/transmogrify
+git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git ~/src/transmogrify && cd ~/src/transmogrify
 git checkout v2.0.0
 ops/install.sh --dry-run oracle ~/ops/oracle
 ops/install.sh oracle ~/ops/oracle

@@ -7,6 +7,7 @@
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { TextDecoder } = require('node:util');
@@ -51,16 +52,43 @@ function exchangePaths(seatPath) {
   };
 }
 
+// Agents act as the authorized user: a child's commit carries no agent or
+// model attribution unless the operations profile opts in with
+// `attribution=disclose` (kit rule K-30; TRANSMOGRIFY_ATTRIBUTION overrides
+// the profile). The profile is parsed literally, later lines winning, as
+// the sh tools parse it.
+function attributionDisclosed(env = process.env) {
+  if (env.TRANSMOGRIFY_ATTRIBUTION !== undefined) return env.TRANSMOGRIFY_ATTRIBUTION === 'disclose';
+  const file = env.AO_PROFILE || path.join(env.XDG_CONFIG_HOME || path.join(env.HOME || os.homedir(), '.config'),
+    'agent-operations', 'profile');
+  let value;
+  try {
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      const match = /^\s*attribution\s*=\s*(.*?)\s*$/.exec(line);
+      if (match) value = match[1];
+    }
+  } catch {
+    return false;
+  }
+  return value === 'disclose';
+}
+
+function trailerLine(provider, disclose) {
+  return disclose
+    ? `Add this commit trailer: Co-Authored-By: ${providerAttribution({ target: provider, backend: provider })}`
+    : 'Add no Co-Authored-By trailer and no AI, agent or model attribution to the commit.';
+}
+
 // This is deliberately the only child-facing contract injected by adapters.
 // JSON quoting keeps even an unusual absolute path on one inert text line.
-function exchangePreamble(seatPath, provider = 'codex') {
+function exchangePreamble(seatPath, provider = 'codex', env = process.env) {
   const paths = exchangePaths(seatPath);
   return `# Transmogrify lane exchange
 
 Your assigned worktree is ${JSON.stringify(seatPath)}.
 Write only inside this directory and /tmp.
 Commit your work on the current branch with a clear title and body.
-Add this commit trailer: Co-Authored-By: ${providerAttribution({ target: provider, backend: provider })}
+${trailerLine(provider, attributionDisclosed(env))}
 Never push. Never change branches.
 In a managed clone seat, your own .git directory is writable.
 Ordinary git add, git commit, git log, and git status work in this seat.
@@ -89,8 +117,8 @@ End your final message with DONE, or BLOCKED and the reason.
 ---`;
 }
 
-function prependExchangePreamble(seatPath, input, provider) {
-  return `${exchangePreamble(seatPath, provider)}\n\n${input}`;
+function prependExchangePreamble(seatPath, input, provider, env = process.env) {
+  return `${exchangePreamble(seatPath, provider, env)}\n\n${input}`;
 }
 
 function writePacket(repoRoot, seat, packet) {
@@ -280,8 +308,9 @@ function providerAttribution(lane) {
   return 'Codex <noreply@openai.com>';
 }
 
-function commitMessage(handback, lane) {
-  return `${handback.title}\n\n${handback.body}\n\nCo-Authored-By: ${providerAttribution(lane)}\n`;
+function commitMessage(handback, lane, env = process.env) {
+  const trailer = attributionDisclosed(env) ? `\n\nCo-Authored-By: ${providerAttribution(lane)}` : '';
+  return `${handback.title}\n\n${handback.body}${trailer}\n`;
 }
 
 function sha256(value) {
@@ -531,7 +560,7 @@ async function harvestLane(options, env = process.env, dependencies = {}) {
           throw coded('HARVEST_MISMATCH', 'clone has uncommitted changes; the child commits them and reports the SHA, or use --commit');
         }
       }
-      const message = commitMessage(handback, lane);
+      const message = commitMessage(handback, lane, env);
       operation = beginLaneOperation(options.repoRoot, lane.laneId, {
         type: 'harvest',
         providerId: lane.providerId,
@@ -584,7 +613,7 @@ async function harvestLane(options, env = process.env, dependencies = {}) {
               state: 'commitDispatching', details: operation.details,
             }, env);
           }
-          const message = commitMessage(handback, lane);
+          const message = commitMessage(handback, lane, env);
           createCommit(options.repoRoot, seat, message);
           if (dependencies.afterCommit) await dependencies.afterCommit();
           observed = commitMatches(seat, operation.details);
@@ -663,6 +692,7 @@ async function harvestLane(options, env = process.env, dependencies = {}) {
 
 module.exports = {
   MAX_HANDBACK_BYTES,
+  attributionDisclosed,
   REQUIRED_SECTIONS,
   changedFiles,
   copyHandback,

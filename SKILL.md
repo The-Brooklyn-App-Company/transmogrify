@@ -446,8 +446,8 @@ Harvest refuses an active newest turn, validates the bounded handback as
 untrusted text, verifies that the supplied SHA is the clone HEAD, and fetches
 the branch under the repository lock. A non-fast-forward update is refused.
 Use `--commit` when a child left uncommitted changes; it commits those changes
-in the seat with the handed-back title, body, and provider attribution before
-fetching. Harvest copies the handback owner-only under the
+in the seat with the handed-back title and body (provider attribution only
+with `attribution=disclose`) before fetching. Harvest copies the handback owner-only under the
 state root, and removes recorded provisions by default. Use
 `--no-provisioned-cleanup` only to defer that exact cleanup. A pending harvest
 is resumed by rerunning the same command; do not use provider reconciliation

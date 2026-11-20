@@ -3,11 +3,13 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const test = require('node:test');
 const {
   MAX_HANDBACK_BYTES,
+  attributionDisclosed,
   exchangePaths,
   exchangePreamble,
   harvestLane,
@@ -91,8 +93,13 @@ test('exchange preamble names the seat, child boundary, handback, and commit con
   assert.match(preamble, /Write only inside this directory and \/tmp\./);
   assert.match(preamble, /Commit your work on the current branch/);
   assert.match(preamble, /Never push\. Never change branches\./);
-  assert.match(preamble, /Co-Authored-By: Codex <noreply@openai\.com>/);
-  assert.match(exchangePreamble(seat, 'claude'), /Co-Authored-By: Claude Code <noreply@anthropic\.com>/);
+  // Agents act as the authorized user: no attribution unless the profile opts in (K-30).
+  assert.doesNotMatch(exchangePreamble(seat, 'codex', { TRANSMOGRIFY_ATTRIBUTION: '' }), /Co-Authored-By: Codex/);
+  assert.match(exchangePreamble(seat, 'codex', { TRANSMOGRIFY_ATTRIBUTION: '' }),
+    /Add no Co-Authored-By trailer and no AI, agent or model attribution/);
+  const disclose = { TRANSMOGRIFY_ATTRIBUTION: 'disclose' };
+  assert.match(exchangePreamble(seat, 'codex', disclose), /Co-Authored-By: Codex <noreply@openai\.com>/);
+  assert.match(exchangePreamble(seat, 'claude', disclose), /Co-Authored-By: Claude Code <noreply@anthropic\.com>/);
   assert.match(preamble, /SHA: <the full commit SHA you made>/);
   assert.match(preamble, /In a managed clone seat, your own \.git directory is writable/);
   assert.match(preamble, /Ordinary git add, git commit, git log, and git status work/);
@@ -211,7 +218,7 @@ test('harvest commits reviewed changes, excludes provisions, and copies a matchi
     encoding: 'utf8',
   });
   assert.match(message, /^Implement portable lane harvest\n/);
-  assert.match(message, /Co-Authored-By: Codex <noreply@openai\.com>/);
+  assert.doesNotMatch(message, /Co-Authored-By:/);
   assert.equal(execFileSync('git', ['-C', fixture.seat.path, 'ls-tree', '-r', '--name-only', 'HEAD'], {
     encoding: 'utf8',
   }).includes('node_modules'), false);
@@ -610,4 +617,17 @@ test('operator harvest disables child-configured hooks and fsmonitor and fetches
     }
   }
   assert.ok(calls.find((args) => args.includes('fetch')).includes('--no-recurse-submodules'));
+});
+
+test('attribution follows the operations profile, later lines winning, the environment first', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tm-attr-'));
+  const profile = path.join(dir, 'profile');
+  fs.writeFileSync(profile, 'attribution=disclose\n# a comment\nattribution=none\n');
+  assert.equal(attributionDisclosed({ AO_PROFILE: profile }), false);
+  fs.writeFileSync(profile, 'attribution=none\nattribution = disclose\n');
+  assert.equal(attributionDisclosed({ AO_PROFILE: profile }), true);
+  assert.equal(attributionDisclosed({ AO_PROFILE: profile, TRANSMOGRIFY_ATTRIBUTION: 'off' }), false);
+  assert.equal(attributionDisclosed({ AO_PROFILE: path.join(dir, 'missing') }), false);
+  assert.equal(attributionDisclosed({ HOME: dir }), false);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

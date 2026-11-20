@@ -86,7 +86,7 @@ surfaces it touches.
 **K-12 Log commitments first, state only checked facts.** A commitment to
 the human goes into the owning backlog before the reply that makes it.
 Decisions, grants and deliveries go into the journal when they happen.
-Nothing is stated outward as fact unless it is in the facts file or freshly
+Nothing is stated outward as fact unless in the facts file or freshly
 checked. Report times in the owner's timezone, not UTC.
 
 **K-35 Daily oversight.** Daily, the Oracle checks each operator's product
@@ -143,8 +143,7 @@ reviews each operator's last seven days adversarially (commits, notes,
 mandate, leftover worktrees and branches), the Oracle's home included;
 findings are triaged within a working day. After a move to the other
 client, the incoming family audits what the outgoing one left; the switch
-is done only once that report is committed. Recurring findings become rule
-or mandate changes. On by default (`cross_review=on`).
+is done only once that report is committed. Recurring findings become rule or mandate changes.
 
 ## Scheduled work and model runs
 
@@ -178,15 +177,16 @@ the acting principal from the execution route itself. After an ambiguous
 result, repeat only once the target's own record confirms absence.
 
 **K-29 Keep churn out of backups; preserve sole-copy state.** Replaceable
-logs, caches, build output, worktrees and virtual machines stay out of git,
+logs, caches, build output, worktrees and VMs stay out of git,
 backups and search indexing. Back up irreplaceable state, unique commits
 and dirty work before excluding or removing their only copy; finished
 worktrees become local bundles, not pushed branches.
 
 ## Records and privacy
 
-**K-30 No AI attribution by default.** Commits, pull requests, comments and
-messages carry none unless the profile sets `attribution=disclose`.
+**K-30 Agents act as the authorized user.** What an agent does on the
+human's authority (commits, PRs, comments, messages) carries no
+agent or model tag unless the profile sets `attribution=disclose`.
 
 **K-31 Three audiences.** Public repositories get nothing identifying;
 team systems get team material only; everything else stays personal. Never

@@ -216,10 +216,11 @@ applies the same host steps from the Node side.
 - **Exact ownership for workers:** every lane mutation is journaled before
   dispatch and confirmed by an exact receipt; nothing adopts a session by
   name or replays an unknown outcome.
-- **No AI attribution** from the operations layer in commits or messages
-  unless you turn it on (K-30). One exception for now: a worker lane's
-  commit carries its provider's `Co-Authored-By` trailer
-  ([Dispatch](docs/DISPATCH.md)).
+- **Agents act as you** (K-30): where you have authorized an agent to act
+  for you (commits, pull requests, comments, messages on GitHub, a tracker or
+  chat), the result carries no agent or model tag, trailer or signature.
+  Worker lanes follow the same rule. Set `attribution=disclose` in the
+  profile to opt in.
 
 ## Support matrix
 

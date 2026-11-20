@@ -134,7 +134,7 @@ Unknown keys warn; keys starting with `x_` are free for local hooks.
 | `drift_rules`, `drift_files`, `drift_repo_files`, `drift_min_words`, `drift_prompt`, `drift_prompt_extra`, `drift_workdir`, `drift_to` | see `drift-check.sh --help` | Drift audit inputs |
 | `secrets` | `os` | Secrets slot: `os` (macOS keychain; libsecret on Linux), `none`, or an adapter path called as `<adapter> get <name>` |
 | `tracker`, `chat`, `githost`, `ci` | `none` | Integration slots, recorded for agents and adapters; the scripts do not read them yet |
-| `attribution` | `none` | AI attribution in commits: `none` or `disclose`; read by agents, not scripts |
+| `attribution` | `none` | Agent or model attribution in commits, pull requests, comments and messages: `none` (agents act as the authorized user) or `disclose`; read by agents and by the worker-lane tools (`scripts/`, which also take `TRANSMOGRIFY_ATTRIBUTION`) |
 | `lease_stale`, `doorbell_codex`, `doorbell_rering_min` | `4h`, `off`, `60` | Experimental lease layer (see [handoff](../docs/operations/handoff.md)) |
 | `relay_bridge` | `on` | Experimental [mailroom](../docs/operations/mailroom.md): `on` rings the in-app bridges for claude and codex rows with a session id, with the transports as timed fallbacks; `off` delivers through the transports directly |
 | `bridge_dir` | `<inbox_dir>/.mailroom` | Ring folders |

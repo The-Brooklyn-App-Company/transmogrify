@@ -73,9 +73,9 @@ Overlays hold deltas only: a parameter, an added rule, or
   observed on an existing macOS account/machine (versions and limits below);
   resume is not guaranteed. `doorbell_codex=queue` is a separate opt-in,
   still fakes only; live unrun.
-- **No AI attribution** in commits or messages unless you turn it on; a
-  worker lane's commit still carries its provider's `Co-Authored-By`
-  trailer ([Dispatch](../DISPATCH.md)).
+- **Agents act as the authorized user** ([K-30](../../kit/KIT.md)): no agent
+  or model attribution in commits, pull requests, comments or messages,
+  worker lanes included, unless the profile sets `attribution=disclose`.
 
 ## Quick start
 

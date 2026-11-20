@@ -11,7 +11,7 @@ const { verifyRecordedSeat } = require('../scripts/lib/worktree');
 const { createRepoWithSeat } = require('./helpers/repo-fixture');
 const { measuredReply } = require('./helpers/measured-codex');
 
-test('Codex clone spawn keeps provenance, attributed preamble, and packet order at the provider boundary', async (t) => {
+test('Codex clone spawn keeps provenance, the unattributed preamble, and packet order at the provider boundary', async (t) => {
   const fixture = createRepoWithSeat(t);
   const parentContext = createParentContext({
     hostProvider: 'claude', hostApp: 'claude-desktop', displayName: 'Clone operator',
@@ -79,7 +79,8 @@ test('Codex clone spawn keeps provenance, attributed preamble, and packet order 
   assert.equal(verifyRecordedSeat(fixture.repoRoot, lane.seat).path, cwd);
   assert.match(input, /^╭─ Transmogrify/);
   assert.ok(input.includes(`\n\n${exchangePreamble(cwd, 'codex')}\n\nImplement the clone packet.`));
-  assert.match(input, /Co-Authored-By: Codex <noreply@openai\.com>/);
+  assert.doesNotMatch(input, /Co-Authored-By:/);
+  assert.match(input, /Add no Co-Authored-By trailer and no AI, agent or model attribution/);
   assert.equal(fs.readFileSync(result.exchange.packet, 'utf8'), 'Implement the clone packet.');
   assert.equal(calls.filter((method) => method === 'turn/start').length, 1);
 });

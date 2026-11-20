@@ -52,6 +52,13 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   Codex pins from the app's own pinned list (an undocumented state file,
   read only). Marks remain only where a check cannot run, and for the
   Claude sidebar, which nothing on disk shows.
+- **K-30: agents act as the authorized user.** Commits, pull requests,
+  comments and messages made on the human's authority carry no agent or
+  model tag, trailer or signature unless the profile sets
+  `attribution=disclose`. Worker lanes now follow it: the exchange preamble
+  tells a child to add no attribution, and `harvest --commit` adds no
+  `Co-Authored-By` trailer, unless `attribution=disclose` (or
+  `TRANSMOGRIFY_ATTRIBUTION=disclose`) is set.
 - **Worker completions through the mailroom**, behind
   `TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`: a child's wake becomes a note in
   its parent's inbox. The default is unchanged until a live proof.
@@ -115,9 +122,14 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
 
 ### Migrating from Transmogrify 0.6.x (worker-lane users)
 
-- **Nothing to change for lanes.** `scripts/lane.js` and every other Node
-  tool keep their commands, options, exit codes, output contract and
-  records; the skill installs to the same folders.
+- **Commands unchanged.** `scripts/lane.js` and every other Node tool keep
+  their commands, options, exit codes, output contract and records; the
+  skill installs to the same folders.
+- **One behaviour change: no attribution by default.** Children are told to
+  add no `Co-Authored-By` trailer, and `harvest --commit` no longer adds
+  one. To keep the 0.6 behaviour, set `attribution=disclose` in the
+  operations profile (`~/.config/agent-operations/profile`) or export
+  `TRANSMOGRIFY_ATTRIBUTION=disclose`.
 - The install now also carries `ops/`, `kit/` and `skills/`. They do
   nothing until you run `bootstrap.sh`.
 - The doctor adds host checks only with `--operations`; without it, its

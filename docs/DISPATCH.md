@@ -300,8 +300,10 @@ parent provenance box, the exchange preamble, then the packet. Without a parent
 dispatch the preamble leads. It tells the child:
 
 - write only inside the seat and `/tmp`;
-- commit on the current branch with a clear title and body and the exact
-  provider `Co-Authored-By` trailer injected by spawn;
+- commit on the current branch with a clear title and body and no agent or
+  model attribution (with `attribution=disclose` in the operations profile,
+  or `TRANSMOGRIFY_ATTRIBUTION=disclose`, the exact provider
+  `Co-Authored-By` trailer instead);
 - use ordinary `git add`, `git commit`, `git log`, and `git status` with its own
   writable `.git` directory in a managed clone;
 - never push or change branches;
@@ -333,8 +335,9 @@ lock, refuses a non-fast-forward update, and verifies that the fetched branch
 is exactly that HEAD. It never pushes. A clone with uncommitted changes needs
 `--commit`; this fallback stages all
 tracked and untracked seat changes except the recorded provisions and
-`.transmogrify/`, then commits with the operator's Git identity and the
-provider's `Co-Authored-By` trailer, then fetches the new commit. The fallback
+`.transmogrify/`, then commits with the operator's Git identity (and the
+provider's `Co-Authored-By` trailer only with `attribution=disclose`), then
+fetches the new commit. The fallback
 accepts a title and body without a SHA. A SHA line containing anything other
 than one full 40-hex SHA is treated as absent. The result's `childReportedCommit`
 records whether the child supplied a valid commit SHA, even when the operator

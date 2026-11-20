@@ -112,13 +112,14 @@ ao_registry_session() {
     { print }' "$AO_REGISTRY" >"$_g_tmp" && ao_write_atomic "$AO_REGISTRY" <"$_g_tmp"
 }
 
-# ao_git_commit DIR MESSAGE PATH...  Commit PATHs in DIR's repository if it
-# is one; quiet when there is nothing to commit.
+# ao_git_commit DIR MESSAGE PATH...  Commit PATHs (and only them) in DIR's
+# repository if it is one; quiet when they have nothing to commit. Other
+# staged work stays staged and out of the commit.
 ao_git_commit() {
   _g_d=$1 _g_m=$2
   shift 2
   git -C "$_g_d" rev-parse --git-dir >/dev/null 2>&1 || return 0
   git -C "$_g_d" add -- "$@" >/dev/null 2>&1 || return 1
-  git -C "$_g_d" diff --cached --quiet 2>/dev/null && return 0
-  git -C "$_g_d" commit -q -m "$_g_m" >/dev/null 2>&1
+  git -C "$_g_d" diff --cached --quiet -- "$@" 2>/dev/null && return 0
+  git -C "$_g_d" commit -q -m "$_g_m" --only -- "$@" >/dev/null 2>&1
 }

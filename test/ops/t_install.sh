@@ -507,7 +507,13 @@ test_host_apply_is_turnkey_and_ends_with_the_in_app_steps() {
   grep -Eq '^unit relay +updated and reloaded' "$T/out" || _fail "relay unit not updated"
   assert_has "$la/local.agent-operations.relay.plist" "<string>$T/ops/oracle/inbox/web</string>"
   grep -Eq '^bridge claude duty file +updated' "$T/out" || _fail "duty file not updated"
-  [ "$(find "$T/state/backup" -name 'AGENTS.md.*' | wc -l | tr -d ' ')" = 1 ] || _fail "no duty file backup"
+  [ "$(find "$T/state/backup" -name '*AGENTS.md.*' | wc -l | tr -d ' ')" = 1 ] || _fail "no duty file backup"
+  # Both duty files stale in one run: two backups, neither overwrites the other.
+  printf 'claude duty, edited\n' >"$T/ops/mailroom-claude/AGENTS.md"
+  printf 'codex duty, edited\n' >"$T/ops/mailroom-codex/AGENTS.md"
+  run install.sh host --apply
+  grep -rqx 'claude duty, edited' "$T/state/backup" || _fail "the Claude duty file backup was lost"
+  grep -rqx 'codex duty, edited' "$T/state/backup" || _fail "the Codex duty file backup was lost"
   # A dry run never loads a unit, even with --apply.
   rm -f "$T/loaded/local.agent-operations.relay"
   n=$(grep -c bootstrap "$T/launchctl.log")

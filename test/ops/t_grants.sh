@@ -382,7 +382,9 @@ test_an_interrupted_render_rolls_back() {
     sleep 0.1
     n=$((n + 1))
   done
-  pid=$(ps -axo pid=,command= | awk -v f="$SCRIPTS/lib/grants.py" 'index($0, f) && /render-codex/ { print $1; exit }')
+  # Only the renderer this test started: a child of $bg (or $bg itself), never another render on the machine.
+  pid=$(ps -axo pid=,ppid=,command= | awk -v f="$SCRIPTS/lib/grants.py" -v bg="$bg" \
+    '($1 == bg || $2 == bg) && index($0, f) && /render-codex/ { print $1; exit }')
   [ -n "$pid" ] || _fail "no render process found"
   [ -z "$pid" ] || kill -TERM "$pid"
   wait "$bg"
@@ -426,6 +428,28 @@ test_registry_homes_written_with_a_tilde_resolve() {
   assert_file "$T/user/ops/alpha/.codex/config.toml"
   run grants.sh check --gate alpha codex
   assert_rc 0
+}
+
+
+test_claude_render_keeps_every_other_byte() {
+  gsetup
+  printf '{\n  "model":"x",   "esc": "\\u00e9\\/",\n  "autoMode": {\n    "allow": [],\n    "deny": [ "a" ]\n  }\n}\n' \
+    >"$T/claude/settings.json"
+  run grants.sh render-claude
+  assert_rc 0
+  assert_has "$T/claude/settings.json" '"model":"x",   "esc": "\u00e9\/",'
+  assert_has "$T/claude/settings.json" '"deny": [ "a" ]'
+  assert_has "$T/claude/settings.json" '[grant:own-merges]'
+}
+
+test_codex_render_keeps_crlf_line_endings() {
+  gsetup
+  mkdir -p "$T/proj/alpha/.codex"
+  printf 'model = "m"\r\n[x]\r\ny = 1\r\n' >"$T/proj/alpha/.codex/config.toml"
+  cp "$T/proj/alpha/.codex/config.toml" "$T/before"
+  run grants.sh render-codex --actor alpha
+  assert_rc 0
+  head -c "$(wc -c <"$T/before")" "$T/proj/alpha/.codex/config.toml" | cmp -s - "$T/before" || _fail "CRLF text changed"
 }
 
 ao_test_main "$0"

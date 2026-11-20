@@ -291,4 +291,15 @@ test_registry_survives_stdin_readers() {
   assert_eq "$(grep -c '^row=' "$T/out")" 3
 }
 
+test_git_commit_takes_only_its_paths() {
+  r=$T/repo
+  git init -q "$r" && git -C "$r" config user.email t@example.invalid && git -C "$r" config user.name t
+  printf 'a\n' >"$r/ASKS.md" && printf 'draft\n' >"$r/draft.md"
+  git -C "$r" add draft.md
+  lib ". \"\$AO_SCRIPTS/lib/guide.sh\"; ao_git_commit '$r' 'asks: test' ASKS.md"
+  assert_rc 0
+  assert_eq "$(git -C "$r" show --name-only --format= HEAD)" ASKS.md
+  assert_eq "$(git -C "$r" diff --cached --name-only)" draft.md "the unrelated draft stays staged"
+}
+
 ao_test_main "$0"

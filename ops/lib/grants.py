@@ -112,7 +112,7 @@ def write_temp(path, content, mode):
     """Write content to a temporary file beside path and return its name."""
     fd, tmp = tempfile.mkstemp(prefix=".grants.", dir=os.path.dirname(path) or ".")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:  # newline="": write the bytes as given
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
@@ -124,8 +124,9 @@ def write_temp(path, content, mode):
 
 
 def current(path):
+    """The file's text exactly as stored (no newline translation), or None."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8", newline="") as f:
             return f.read()
     except FileNotFoundError:
         return None
@@ -369,7 +370,108 @@ def json_style(raw, data):
                 return indent, ea, ""
             if out + "\n" == raw:
                 return indent, ea, "\n"
-    return 2, False, "\n"
+    return 2, False, None
+
+
+# ---- Claude: splice autoMode.allow into the file's own text -------------------------------------------------------
+# The file is rewritten only inside the autoMode.allow value (or where that key is added); every other byte, its
+# formatting, key order, escapes and line endings, stays as it was. The scanner runs only on text json.loads accepted.
+def _ws(t, i):
+    while i < len(t) and t[i] in " \t\r\n":
+        i += 1
+    return i
+
+
+def _value_end(t, i):
+    """Index just after the JSON value that starts at t[i]."""
+    if t[i] == '"':
+        i += 1
+        while t[i] != '"':
+            i += 2 if t[i] == "\\" else 1
+        return i + 1
+    if t[i] in "[{":
+        depth = 0
+        while True:
+            c = t[i]
+            if c == '"':
+                i = _value_end(t, i)
+                continue
+            if c in "[{":
+                depth += 1
+            elif c in "]}":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+            i += 1
+    j = i
+    while j < len(t) and t[j] not in ",]} \t\r\n":
+        j += 1
+    return j
+
+
+def _members(t, i):
+    """t[i] is '{': ([(key, key_start, value_start, value_end)], index of its closing '}')."""
+    out = []
+    i = _ws(t, i + 1)
+    while t[i] != "}":
+        ks, ke = i, _value_end(t, i)
+        vs = _ws(t, _ws(t, ke) + 1)
+        ve = _value_end(t, vs)
+        out.append((json.loads(t[ks:ke]), ks, vs, ve))
+        i = _ws(t, ve)
+        if t[i] == ",":
+            i = _ws(t, i + 1)
+    return out, i
+
+
+def _line_indent(t, pos):
+    start = t.rfind("\n", 0, pos) + 1
+    return re.match(r"[ \t]*", t[start:]).group(0)
+
+
+def splice_allow(raw, data, new):
+    """The settings text with autoMode.allow set to new and nothing else changed."""
+    if raw is None:
+        return json.dumps({"autoMode": {"allow": new}}, indent=2, ensure_ascii=False) + "\n"
+    style = json_style(raw, data)
+    ea = style[1] if style[2] is not None else False
+    top = _ws(raw, 0)
+    members, close = _members(raw, top)
+    if style[2] is not None:
+        unit = "\t" if style[0] == "\t" else " " * style[0]
+    else:
+        first = _line_indent(raw, members[0][1]) if members else ""
+        unit = first if first and raw.rfind("\n", 0, members[0][1]) >= 0 else "  "
+    nl = "\r\n" if "\r\n" in raw else "\n"
+
+    def arr(level):
+        if not new:
+            return "[]"
+        inner = level + unit
+        return "[" + nl + ("," + nl).join(inner + json.dumps(e, ensure_ascii=ea) for e in new) + nl + level + "]"
+
+    def obj(level):
+        return "{" + nl + level + unit + '"allow": ' + arr(level + unit) + nl + level + "}"
+
+    auto = [m for m in members if m[0] == "autoMode"]
+    if auto:  # json.loads keeps the last of duplicate keys; so does this
+        _, ks, vs, ve = auto[-1]
+        level = _line_indent(raw, ks)
+        if raw[vs] != "{":
+            return raw[:vs] + obj(level) + raw[ve:]
+        sub, sclose = _members(raw, vs)
+        allow = [m for m in sub if m[0] == "allow"]
+        if allow:
+            _, aks, avs, ave = allow[-1]
+            return raw[:avs] + arr(_line_indent(raw, aks)) + raw[ave:]
+        if sub:
+            lv = _line_indent(raw, sub[0][1])
+            return raw[:sub[0][1]] + '"allow": ' + arr(lv) + "," + nl + lv + raw[sub[0][1]:]
+        return raw[:vs] + obj(level) + raw[ve:]
+    if members:
+        last, lv = members[-1][3], _line_indent(raw, members[0][1])
+        return raw[:last] + "," + nl + lv + '"autoMode": ' + obj(lv) + raw[last:]
+    return raw[:top] + "{" + nl + unit + '"autoMode": ' + obj(unit) + nl + "}" + raw[close + 1:]
 
 
 def claude_plan(src, data, prune=False):
@@ -422,7 +524,7 @@ def claude_plan(src, data, prune=False):
 
 def read_json(path):
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8", newline="") as f:
             raw = f.read()
     except FileNotFoundError:
         return None, {}
@@ -448,15 +550,14 @@ def render_claude(src, path, dry=False, prune=False):
     if dry:
         print("claude: dry run, nothing written")
         return E_OK
-    indent, ea, nl = json_style(raw, data) if raw is not None else (2, False, "\n")
-    nd = json.loads(raw) if raw is not None else {}
-    if not isinstance(nd.get("autoMode"), dict):
-        nd["autoMode"] = {}
-    nd["autoMode"]["allow"] = new
-    out = json.dumps(nd, indent=indent, ensure_ascii=ea) + nl
+    out = splice_allow(raw, data, new)
     # Everything except autoMode.allow must be identical, and so must the non-grant entries, in order.
     a, b = json.loads(raw) if raw is not None else {}, json.loads(out)
-    a.get("autoMode", {}).pop("allow", None)
+    if b.get("autoMode", {}).get("allow") != new:
+        raise Fail("claude: internal check failed (the spliced autoMode.allow differs); nothing written")
+    if not isinstance(a.get("autoMode"), dict):
+        a["autoMode"] = {}
+    a["autoMode"].pop("allow", None)
     b["autoMode"].pop("allow")
     if not a.get("autoMode") and not b["autoMode"]:
         a.pop("autoMode", None)

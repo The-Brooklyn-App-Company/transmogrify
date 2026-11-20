@@ -714,9 +714,16 @@ host_step() {
 }
 
 # host_backup FILE  Copy FILE into <state_dir>/backup/ before replacing it.
+# The backup name carries FILE's whole path (slashes as "%") so two files
+# with one basename (the two bridges' AGENTS.md) never share a name, and a
+# counter keeps an earlier backup from being overwritten in the same second.
 host_backup() {
   [ -f "$1" ] || return 0
-  mkdir -p "$AO_STATE/backup" && cp -p "$1" "$AO_STATE/backup/${1##*/}.$AO_T_STAMP"
+  mkdir -p "$AO_STATE/backup" || return 1
+  _hb=$AO_STATE/backup/$(printf '%s' "$1" | tr '/' '%').$AO_T_STAMP
+  _hb_n=$_hb _hb_i=1
+  while [ -e "$_hb_n" ]; do _hb_i=$((_hb_i + 1)); _hb_n=$_hb.$_hb_i; done
+  cp -p "$1" "$_hb_n"
 }
 
 # host_unit NAME  The launchd unit NAME (tick or relay): rendered from its

@@ -1,8 +1,8 @@
 # The kit rules
 
-Every Agent Operations instance follows these rules. Cite them by stable
-ID, never restate them; docs explain how to apply them. This file is the
-only place a rule is stated, within 11100 bytes (`check.sh kit`). No rule
+Every Transmogrify instance follows these rules. Cite them by stable
+ID, never restate them; docs explain how to apply them. Rules live only
+here, within 11100 bytes (`check.sh kit`). No rule
 overrides a client's platform instructions, its sandbox or a review.
 
 **Customizing.** A team (`TEAM.md`) or a person (`KIT.local.md`) adds rules
@@ -75,15 +75,19 @@ and green CI is not delivery. Every working or done claim names the
 mechanism and says whether it MATCHES or DEVIATES from the design the human
 agreed; a deviation is told to the human when it happens. **Fixed.**
 
-**K-11 The outcome stays fixed.** The human's intended, usable outcome is
-the acceptance test; milestones are progress, never substitutes. Only the
-human changes the goal.
+**K-11 The outcome stays fixed; done is end to end.** The human's usable
+outcome is the acceptance test; milestones never substitute, and only the
+human changes the goal. Done means the whole user-visible behavior works
+end to end in a staging or real environment, shown by a walk with
+screenshots (a browser walk for a web surface); half a feature or a
+backend without its UI is never done. Scope every build by the user
+surfaces it touches.
 
 **K-12 Log commitments first, state only checked facts.** A commitment to
 the human goes into the owning backlog before the reply that makes it.
 Decisions, grants and deliveries go into the journal when they happen.
 Nothing is stated outward as fact unless it is in the facts file or freshly
-checked. Report times in the owner's local timezone; convert UTC logs.
+checked. Report times in the owner's timezone, not UTC.
 
 **K-35 Daily oversight.** Daily, the Oracle checks each operator's product
 progress (not its machinery), redirects one stuck in plumbing or review
@@ -159,8 +163,8 @@ hard timeout, with stdin closed and effectful tool servers switched off.
 **K-26 No silent substitution.** A missing role, model or subscription is
 reported to the Oracle. Never switch models, plans or providers
 to keep going, and never fall back to paid API billing. An operator's model
-and effort are set at creation with the human; it never changes its own,
-and no model changes by a message to an idle session.
+and effort are set at creation with the human, never changed by itself or
+by a message to an idle session.
 
 ## Hosts and effects
 
@@ -193,9 +197,7 @@ mandates and scheduled prompts. Drop rules that no longer prevent a real
 mistake; replace rather than append near-duplicates; archive finished
 material. A rule derived from the human's words quotes them, dated, and is
 marked derived until the human confirms it. Clean as you go; a nightly
-model-free hygiene check lists stale holds, open switches and routines,
-uncommitted work, budget overruns, and standing grants that differ from
-the permission rules.
+model-free hygiene check lists what went stale.
 
 ## Opt-in
 
@@ -203,7 +205,7 @@ the permission rules.
 without the owner only where a mandate enables it and every gate in
 [the auto-ship example](../ops/examples/security-auto-ship.md) holds.
 
-**K-34 Lease checks (experimental since 0.2.1).** Once an operator
+**K-34 Lease checks (experimental).** Once an operator
 uses the advisory lease, a session that is not the holder does no work and
 redirects; see [handoff](../docs/operations/handoff.md).
 **Fixed** once enabled.

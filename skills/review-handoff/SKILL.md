@@ -10,7 +10,8 @@ Stop if it does not resolve.
 
 1. Read `<kit>/docs/operations/review-and-release.md#delegation` and `#review`.
 2. Build the packet from `<kit>/ops/templates/packets/delegation.md`: goal,
-   exact base commit, scope, acceptance, stop criteria.
+   the user surfaces it touches, exact base commit, scope, acceptance
+   (ending with an end-to-end walk, K-11), stop criteria.
 3. Implementer: work from the base commit on a scoped branch; return the
    implementer notes.
 4. Reviewer: verify the checkout and head, then review the neutral packet

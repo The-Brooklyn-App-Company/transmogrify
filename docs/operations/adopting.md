@@ -55,7 +55,9 @@ through a pin-bump pull request to the team repository
 
 ```sh
 export SKILL_ROOT="$HOME/.agents/skills/transmogrify"
-node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$PWD" --target all --operations --explain
+export REPO_ROOT=/absolute/path/to/a/repository/you/work/in
+node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$REPO_ROOT" --target all --operations --explain
+node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT"   # worker lanes, one consent at a time
 sh "$SKILL_ROOT/ops/bootstrap.sh" --example both
 ```
 

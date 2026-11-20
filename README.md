@@ -130,22 +130,28 @@ One guided first run sets up both layers, one consent at a time:
 
 ```bash
 export SKILL_ROOT="$HOME/.agents/skills/transmogrify"   # Claude-only: $HOME/.claude/skills/transmogrify
-node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$PWD" --target all --operations --explain
-sh "$SKILL_ROOT/ops/bootstrap.sh"
+export REPO_ROOT=/absolute/path/to/repository
+node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$REPO_ROOT" --target all --operations --explain
+node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT"   # workers
+sh "$SKILL_ROOT/ops/bootstrap.sh"                               # operations
 ```
 
 The doctor only reads: provider state, compatibility, and the host steps the
 operations layer would take (`ops/install.sh --dry-run host`). Its
-`setup.ownerActions` lists every step only you can take. `bootstrap.sh` then
-asks for the choices that are yours (the app you start the Oracle on, the
+`setup.ownerActions` lists every step only you can take. `setup.js` makes
+worker lanes ready (the CLIs, sign-in, the shared Codex runtime), asking
+before each step; in a non-interactive host, authorize one step at a time
+with its flag (`--install-claude-cli`, `--install-codex-cli`, `--sign-in`,
+`--start-runtime`, `--relaunch-desktop`, `--persist-attach`). `bootstrap.sh`
+then asks for the choices that are yours (the app you start the Oracle on, the
 Oracle home, your timezone, models, the Oracle lock), creates the Oracle
 home and profile, applies the host settings on your yes (App Nap off, both
 launchd units, both bridge homes), and, if you already have a grants file,
 shows the approvals it would write into each app's settings and writes them
 only on your yes. It ends with the short list of in-app steps no script can
 do (sign in, pin, title the two "Mailroom" sessions), each with the check
-that proves it. `node "$SKILL_ROOT/scripts/setup.js" --apply-host` applies
-the same host steps from the Node side.
+that proves it. `node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT" --apply-host`
+applies the same host steps from the Node side.
 
 ## Your first hour
 
@@ -165,6 +171,8 @@ the same host steps from the Node side.
    (`$transmogrify` in Codex, `/transmogrify` in Claude Code), or by hand:
 
    ```bash
+   export WORKTREES="$HOME/.local/share/transmogrify/worktrees/web"   # private, mode 700
+   install -d -m 700 "$WORKTREES"
    node "$SKILL_ROOT/scripts/lane.js" parent-init --repo-root "$REPO_ROOT" \
      --host-provider claude --host-app claude-code --name 'Web operator'
    printf '%s\n' 'Fix the failing date test and commit.' |
@@ -172,6 +180,8 @@ the same host steps from the Node side.
        --worktrees "$WORKTREES" --target codex --name 'tests: date fix' \
        --parent-context-file "$PARENT_CONTEXT" --intent balanced --input-file -
    ```
+
+   (`PARENT_CONTEXT` is the `contextFile` path that `parent-init` prints.)
 
    The lane runs in its own clone and hands back a commit; `lane.js harvest`
    fetches it into your repository and prints the exact `lane.js retire`
@@ -288,8 +298,11 @@ Workers layer, `scripts/` (Node.js; each takes `--help`):
 
 Node tools exit 0 for a confirmed result, 2 for a usage error or a safe
 refusal, 3 for a failure or an uncertain outcome, and 1 for an internal
-error ([Output contract](docs/OUTPUT.md)); the `sh` tools use the same
-codes.
+error ([Output contract](docs/OUTPUT.md)). The `sh` tools keep their own
+codes: 0 done, 1 a failure or findings, 2 a usage or configuration error,
+3 busy (another run holds the lock), 4 a missing role, 124 a timeout, and
+5 refused (`switch.sh`, `bootstrap.sh`, `operator.sh`); each tool's
+`--help` lists the ones it uses.
 
 ## Security model
 

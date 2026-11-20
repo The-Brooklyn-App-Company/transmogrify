@@ -24,6 +24,7 @@ const { AppServerClient, validateUrl } = require('./lib/app-server');
 const { VERSION } = require('./lib/version');
 const { processBirth, processMatches, processIdentity } = require('./lib/state');
 const { deliverWake, wakeMessage } = require('./lib/wake');
+const { completionRoute, deliverToMailroom } = require('./lib/mailroom-route');
 const { sleep } = require('./lib/async');
 const { EXIT, exitCodeForError, failureBody, usageError } = require('./lib/public-error');
 const { publicResult } = require('./lib/output-schema');
@@ -339,18 +340,24 @@ async function watchOnce(context, values, env, state, dependencies = {}) {
   const fresh = events.filter((event) => WAKE_KINDS.has(event.kind) && !event.wakeSuppressed && !state.wakedEventIds.includes(event.eventId));
   const results = [];
   const markWaked = (event) => { state.wakedEventIds.push(event.eventId); delete state.wakeAttempts[event.eventId]; };
+  // With TRANSMOGRIFY_COMPLETION_ROUTE=mailroom the wake becomes a note in
+  // the parent's inbox and the mailroom delivers it (docs/NOTIFICATIONS.md).
+  const viaMailroom = completionRoute(env) === 'mailroom';
   if (fresh.length > 0) {
-    if (context.parent.wake?.channel && context.parent.wake.channel !== 'none') {
+    if (viaMailroom || (context.parent.wake?.channel && context.parent.wake.channel !== 'none')) {
       try {
-        const receipt = await deliver({
-          channel: context.parent.wake.channel,
-          bridgeId: context.parent.wake.id,
-          threadId: context.parent.wake.id,
-          cwd: context.parent.wake.cwd,
-          runtime: context.parent.wake.runtime,
-        }, wakeMessage(fresh, { parentContextFile: context.file }), {
-          claudeBin: values['claude-bin'], url: values.url, clientUserMessageId: fresh[fresh.length - 1].eventId,
-        }, env);
+        const text = wakeMessage(fresh, { parentContextFile: context.file });
+        const receipt = viaMailroom
+          ? await (dependencies.deliverMailroom || deliverToMailroom)(text, env)
+          : await deliver({
+            channel: context.parent.wake.channel,
+            bridgeId: context.parent.wake.id,
+            threadId: context.parent.wake.id,
+            cwd: context.parent.wake.cwd,
+            runtime: context.parent.wake.runtime,
+          }, text, {
+            claudeBin: values['claude-bin'], url: values.url, clientUserMessageId: fresh[fresh.length - 1].eventId,
+          }, env);
         for (const event of fresh) {
           markWaked(event);
           results.push({

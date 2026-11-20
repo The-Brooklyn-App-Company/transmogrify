@@ -218,3 +218,20 @@ is a Codex host acting as the parent end to end, which needs a Codex-hosted
 session to run `parent-init` and `spawn`; its mechanisms (thread id, command
 receipt, `turn/start` and `turn/steer` into an owned thread) are each
 verified individually.
+
+## Completion through the mailroom (experimental, off by default)
+
+With the operations layer installed, a parent can take its child
+notifications through the mailroom instead of its own wake channel: set
+`TRANSMOGRIFY_COMPLETION_ROUTE=mailroom` and `TRANSMOGRIFY_OPS_KEY` (the
+parent's key in the operations registry) in the environment `spawn` starts
+the watcher with; `TRANSMOGRIFY_OPS_DIR` overrides the default `ops/` beside
+the skill, and `AO_PROFILE` points at the operations profile as usual. The
+watcher then writes each wake as one note through `ops/inbox-put.sh`, and
+the mailroom's degradation ladders deliver it like any other note (see
+[the mailroom](operations/mailroom.md)). A note that was not written is
+retried a bounded number of times; one that may have been written is never
+resent; a refused key or profile is reported, not retried. Events,
+acknowledgement and `wait` are unchanged. Proven against fakes and the real
+`inbox-put.sh` in a sandbox home only (2026-11-20); the per-parent wake stays
+the default until the mailroom route is proven live.

@@ -151,9 +151,12 @@ shows the approvals it would write into each app's settings and writes them
 only on your yes. It writes the Codex recovery hook on your yes and gives
 the exact steps to trust it in the Codex CLI (the desktop app has no
 `/hooks`), then confirms Codex's trust record and that a fresh run receives
-the digest. It ends with the short list of in-app steps no script can do
-(sign in, pin, title the two "Mailroom" sessions), each with exact
-instructions and the check that proves it. `node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT" --apply-host`
+the digest. It ends with the short list of steps only you can do (sign in, restart
+the apps, pin, start the two "Mailroom" sessions), each with exact
+instructions and an automatic check that it worked: the CLIs' sign-in
+status, the apps' start time, the Codex app's pinned list, registry ids.
+Only the Claude sidebar has nothing to read, so pins there are confirmed
+with `bootstrap.sh mark pins`. `node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT" --apply-host`
 applies the same host steps from the Node side.
 
 ## Your first hour

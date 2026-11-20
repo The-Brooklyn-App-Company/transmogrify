@@ -43,8 +43,12 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   digest arrives. The Claude hook is checked in its settings file, with the
   exact JSON printed when missing. The Codex CLI is found from the
   profile's new `codex_cli`, `PATH` or a desktop app bundle, and used only
-  if it answers `--version`. `bootstrap.sh mark hooks` remains for a Claude
-  hook registered where the checklist cannot read it.
+  if it answers `--version`. Sign-in is read from `claude auth status` and
+  `codex login status`; the app restart after the App Nap write from each
+  app's process start time (install.sh now records when it wrote App Nap);
+  Codex pins from the app's own pinned list (an undocumented state file,
+  read only). Marks remain only where a check cannot run, and for the
+  Claude sidebar, which nothing on disk shows.
 - **Worker completions through the mailroom**, behind
   `TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`: a child's wake becomes a note in
   its parent's inbox. The default is unchanged until a live proof.

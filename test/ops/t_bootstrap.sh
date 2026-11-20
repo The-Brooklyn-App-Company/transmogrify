@@ -83,6 +83,7 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   run operator.sh session mailroom-claude sid-bridge
   run operator.sh session mailroom-codex thread-bridge
   for m in sign-in restart-apps pins hooks; do run bootstrap.sh mark "$m"; assert_rc 0; done
+  echo none >"$T/apps/com.openai.codex" && echo none >"$T/apps/com.anthropic.claudefordesktop"
   # The Codex hook: written by the --yes run above, trusted in Codex's own
   # record, then checked by one read-only run (the fake quotes the digest).
   assert_has "$CODEX_HOME/hooks.json" "recover-context.sh"
@@ -194,6 +195,58 @@ test_codex_hook_is_written_on_consent_trusted_by_the_owner_then_checked() {
   run bootstrap.sh --yes --home "$T/ops/oracle"
   assert_eq "$(cat "$CODEX_HOME/hooks.json")" '{"hooks": {}}'
   assert_has "$T/out" "exists without the digest"
+}
+
+test_sign_in_restart_and_pins_are_checked_not_just_marked() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --yes --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  st=$(sed -n 's/^state_dir=//p' "$AO_PROFILE" | tail -n 1)
+  [ -n "$st" ] || st=$T/user/.local/state/agent-operations
+  # install.sh recorded when it turned App Nap off.
+  [ -f "$st/host/app-nap.com.openai.codex" ] || _fail "no App Nap stamp"
+  # Sign-in: each CLI is asked. Signed out first, then signed in.
+  mkdir -p "$T/fake"
+  cp "$TESTS_DIR/fakes/fake-agent" "$T/fake/claude"
+  cp "$TESTS_DIR/fakes/fake-agent" "$T/fake/codex"
+  printf '#!/bin/sh\nif [ "$1 $2" = "auth status" ]; then cat "%s"; exit 0; fi\nexec "%s" "$@"\n' "$T/claude-auth" "$T/fake/claude" >"$T/bin/claude"
+  printf '#!/bin/sh\nif [ "$1 $2" = "login status" ]; then cat "%s"; exit 0; fi\nexec "%s" "$@"\n' "$T/codex-login" "$T/fake/codex" >"$T/bin/codex"
+  chmod +x "$T/bin/claude" "$T/bin/codex"
+  printf '{"loggedIn": false}\n' >"$T/claude-auth"
+  printf 'Not logged in\n' >"$T/codex-login"
+  # Restart: the Codex app runs a process older than the App Nap write; the
+  # Claude app is not running.
+  sleep 300 >/dev/null 2>&1 &
+  app=$!
+  echo "$app" >"$T/apps/com.openai.codex"
+  echo none >"$T/apps/com.anthropic.claudefordesktop"
+  echo $(($(date +%s) + 100)) >"$st/host/app-nap.com.openai.codex"
+  # Pins: the bridge thread is active on Codex; the app's state lists no pin.
+  run operator.sh session mailroom-codex thread-bridge
+  printf '{"pinned-thread-ids": ["other"]}\n' >"$CODEX_HOME/.codex-global-state.json"
+  run bootstrap.sh status
+  assert_has "$T/out" 'TODO  sign-in-claude signed out: in a terminal run "claude auth login"'
+  assert_has "$T/out" "TODO  sign-in-codex signed out: in a terminal run"
+  assert_has "$T/out" "TODO  restart-apps  quit the Codex (ChatGPT) desktop app (Cmd-Q"
+  assert_has "$T/out" 'TODO  pins-codex    in the Codex app, pin: Mailroom'
+  assert_has "$T/out" 'TODO  pins-claude   in the Claude app: pin'
+  # Each fixed: the checks pass on their own evidence, with no marks.
+  printf '{"loggedIn": true}\n' >"$T/claude-auth"
+  printf 'Logged in using ChatGPT\n' >"$T/codex-login"
+  echo $(($(date +%s) - 100)) >"$st/host/app-nap.com.openai.codex"
+  printf '{"pinned-thread-ids": ["other", "thread-bridge"]}\n' >"$CODEX_HOME/.codex-global-state.json"
+  run bootstrap.sh status
+  kill "$app" 2>/dev/null
+  assert_has "$T/out" "PASS  sign-in-claude the Claude CLI reports signed in"
+  assert_has "$T/out" "PASS  sign-in-codex the Codex CLI reports signed in"
+  assert_has "$T/out" "PASS  restart-apps  every app started after App Nap was turned off"
+  assert_has "$T/out" "PASS  pins-codex    the Codex app shows all 1 active thread(s) pinned"
+  # The Claude sidebar has no readable state: only the mark passes it.
+  assert_has "$T/out" "TODO  pins-claude"
+  run bootstrap.sh mark pins
+  run bootstrap.sh status
+  assert_has "$T/out" "PASS  pins-claude   confirmed"
 }
 
 ao_test_main "$0"

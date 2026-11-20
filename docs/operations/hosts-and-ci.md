@@ -116,9 +116,20 @@ both apps once, start the two Mailrooms (cheapest model set at creation,
 titled "Mailroom") and record their ids, re-arm the Codex watcher, pin per
 the [conventions](conventions.md#sidebar-and-titles), register the recovery
 hook on each client. Each step has its exact instructions and passes on its
-own evidence (a registry id, the watcher's heartbeat, the hook in Claude's
-settings, Codex's trust record and a run that quotes the digest) or, only
-where no script can see it, on `bootstrap.sh mark STEP`; the last step is a test note that must reach the Oracle through the
+own evidence, read without a model unless noted:
+
+| Step | Evidence |
+| --- | --- |
+| Sign-in | `claude auth status --json` reports `loggedIn: true`; `codex login status` answers without "not logged in" |
+| Apps restarted | Each app whose App Nap `install.sh host` turned off is not running, or its process started after that write (`<state_dir>/host/app-nap.<bundle>` against the process's elapsed time) |
+| Codex pins | The active Codex threads with ids (the Oracle on Codex, operators, the Mailroom) are in the app's own pinned list (`<codex home>/.codex-global-state.json`, `pinned-thread-ids`; undocumented, read only) |
+| Claude pins | None readable: the step names exactly what to pin and what goes in "Inactive Operators", then `bootstrap.sh mark pins` |
+| Recovery hooks | Claude: the hook in its settings file. Codex: the trust record, then one read-only `codex exec` run (a model call) that quotes the digest |
+| Sessions, watcher, round trip | A registry id, the watcher's heartbeat, the test note's delivered ring |
+
+A mark (`bootstrap.sh mark sign-in|restart-apps|pins|hooks`) stands in only
+where the check cannot run (no CLI, an unreadable process or state file, a
+hook kept elsewhere); the last step is a test note that must reach the Oracle through the
 mailroom. `bootstrap.sh status` prints the checklist again; `--yes` runs
 without questions (options and defaults only).
 

@@ -816,6 +816,8 @@ inst_host() {
       elif defaults write "$_id" NSAppSleepDisabled -bool YES &&
         [ "$(defaults read "$_id" NSAppSleepDisabled 2>/dev/null)" = 1 ]; then
         host_row "app-nap $_id" "set (restart needed)" "quit and reopen the app"
+        # When it was set: bootstrap.sh checks the app restarted after this.
+        mkdir -p "$AO_STATE/host" && printf '%s\n' "$AO_T_EPOCH" >"$AO_STATE/host/app-nap.$_id"
         _napset=1
       else
         host_row "app-nap $_id" FAILED "defaults write $_id NSAppSleepDisabled -bool YES"

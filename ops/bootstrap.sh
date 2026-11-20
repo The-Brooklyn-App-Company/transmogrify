@@ -55,10 +55,12 @@ AO_SCRIPTS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 . "$AO_SCRIPTS/lib/mailroom.sh"
 . "$AO_SCRIPTS/lib/guide.sh"
 
-BS_MARKS='sign-in restart-apps pins'
-# `mark hooks`: the Claude recovery hook is registered somewhere the
-# checklist cannot read (a project's own settings file).
-BS_MARKS_OK="$BS_MARKS hooks"
+# Marks: what a person confirms where no script can see it. pins: the
+# Claude sidebar (nothing on disk shows it). The others only stand in where
+# the automatic check cannot run: sign-in (no client CLI to ask),
+# restart-apps (the app's process start cannot be read), hooks (a Claude
+# hook registered where the checklist cannot read it).
+BS_MARKS_OK='sign-in restart-apps pins hooks'
 
 bs_marks_file() { printf '%s/bootstrap.marks\n' "$AO_STATE"; }
 bs_marked() { [ -n "$(ao_st_get "$(bs_marks_file)" "$1")" ]; }
@@ -330,6 +332,132 @@ bs_hooks() {
   echo "   Codex records the hook as trusted."
 }
 
+# ---------------------------------------------------------------- sign-in, restart, pins
+
+# bs_signin_rows  Each client's CLI says whether you are signed in (the kit's
+# headless steps use it). Model-free: `claude auth status --json`,
+# `codex login status`.
+bs_signin_rows() {
+  if bs_uses claude; then
+    _si_o=''
+    if command -v claude >/dev/null 2>&1; then
+      _si_o=$(ao_timeout 20 claude auth status --json 2>/dev/null | tr -d '\n')
+    fi
+    case $_si_o in
+      *'"loggedIn":true'* | *'"loggedIn": true'*) ao_step PASS sign-in-claude "the Claude CLI reports signed in" ;;
+      *'"loggedIn":false'* | *'"loggedIn": false'*) ao_step TODO sign-in-claude "signed out: in a terminal run \"claude auth login\" and sign in yourself, and sign in to the Claude desktop app; the checklist then asks the CLI again" ;;
+      *) if bs_marked sign-in; then ao_step PASS sign-in-claude "confirmed"
+         else ao_step TODO sign-in-claude "no Claude CLI answered \"claude auth status\": install Claude Code, run \"claude auth login\", sign in to the desktop app (or, without the CLI: bootstrap.sh mark sign-in)"; fi ;;
+    esac
+  fi
+  bs_uses codex || return 0
+  if _si_c=$(bs_codex_cli); then
+    _si_o=$(ao_timeout 20 "$_si_c" login status 2>&1)
+    _si_r=$?
+    if printf '%s' "$_si_o" | grep -Eiq 'not logged in|signed out'; then
+      ao_step TODO sign-in-codex "signed out: in a terminal run \"$_si_c\" login and sign in yourself (the desktop app shares it); the checklist then asks again"
+    elif [ "$_si_r" -eq 0 ]; then ao_step PASS sign-in-codex "the Codex CLI reports signed in"
+    elif bs_marked sign-in; then ao_step PASS sign-in-codex "confirmed"
+    else ao_step TODO sign-in-codex "\"$_si_c login status\" did not answer (exit $_si_r): sign in with \"$_si_c\" login, then run bootstrap.sh again"; fi
+  elif bs_marked sign-in; then ao_step PASS sign-in-codex "confirmed"
+  else ao_step TODO sign-in-codex "no working Codex CLI (profile codex_cli, PATH or the desktop app): install it and run \"codex login\", or set codex_cli in $(ao_profile_path)"; fi
+}
+
+# bs_app_name BUNDLE  The desktop app's name for people.
+bs_app_name() {
+  case $1 in
+    com.openai.codex) echo "the Codex (ChatGPT) desktop app" ;;
+    com.anthropic.claudefordesktop) echo "the Claude desktop app" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# bs_proc_start PID  The process's start time in epoch seconds, from its
+# elapsed time ([[dd-]hh:]mm:ss); nothing when it cannot be read.
+bs_proc_start() {
+  _ps_e=$(ps -o etime= -p "$1" 2>/dev/null | tr -d ' ')
+  [ -n "$_ps_e" ] || return 1
+  _ps_s=$(printf '%s\n' "$_ps_e" | awk -F'[-:]' '{
+    if (index($0, "-")) { d = $1; h = $2; m = $3; s = $4 }
+    else if (NF == 3) { d = 0; h = $1; m = $2; s = $3 }
+    else { d = 0; h = 0; m = $1; s = $2 }
+    print ((d * 24 + h) * 60 + m) * 60 + s }')
+  ao_is_uint "$_ps_s" || return 1
+  echo $((AO_T_EPOCH - _ps_s))
+}
+
+# bs_restart_row  Each desktop app whose App Nap install.sh turned off must
+# have started since (or not be running): its process start time against the
+# time of the write (<state_dir>/host/app-nap.<bundle>).
+bs_restart_row() {
+  _rs_todo='' _rs_unknown='' _rs_ok=''
+  for _rs_f in "$AO_STATE"/host/app-nap.*; do
+    [ -f "$_rs_f" ] || continue
+    _rs_id=${_rs_f##*/app-nap.}
+    _rs_at=$(cat "$_rs_f" 2>/dev/null)
+    ao_is_uint "$_rs_at" || continue
+    _rs_pid=$(_ao_mr_app_pid "$_rs_id")
+    if [ "$_rs_pid" = none ]; then _rs_ok="$_rs_ok $_rs_id"
+    elif [ -n "$_rs_pid" ] && _rs_st=$(bs_proc_start "$_rs_pid"); then
+      if [ "$_rs_st" -gt "$_rs_at" ]; then _rs_ok="$_rs_ok $_rs_id"; else _rs_todo="$_rs_todo $_rs_id"; fi
+    else _rs_unknown="$_rs_unknown $_rs_id"; fi
+  done
+  if [ -n "$_rs_todo" ]; then
+    _rs_n=''
+    for _rs_id in $_rs_todo; do _rs_n="${_rs_n:+$_rs_n and }$(bs_app_name "$_rs_id")"; done
+    ao_step TODO restart-apps "quit $_rs_n (Cmd-Q, not just the window) and open it again, so App Nap stays off; the checklist reads the app's start time"
+  elif [ -n "$_rs_unknown" ] && ! bs_marked restart-apps; then
+    ao_step TODO restart-apps "quit and reopen$(for _rs_id in $_rs_unknown; do printf ' %s' "$(bs_app_name "$_rs_id")"; done) once; its start time cannot be read here, so then: bootstrap.sh mark restart-apps"
+  elif [ -n "$_rs_ok" ]; then ao_step PASS restart-apps "every app started after App Nap was turned off, or is not running"
+  else ao_step PASS restart-apps "no App Nap change waits for a restart"; fi
+}
+
+# bs_pin_rows  Codex: the threads that must be pinned (the active Codex rows
+# with a thread id: the Oracle when it runs on Codex, operators, the
+# Mailroom) are read back from the desktop app's own state file
+# (<codex home>/.codex-global-state.json, "pinned-thread-ids"; undocumented,
+# read only). Claude: nothing on disk shows the sidebar, so the step lists
+# exactly what to pin and waits for `bootstrap.sh mark pins`.
+bs_pin_rows() {
+  if bs_uses codex; then
+    _pn_out=$(/usr/bin/python3 -I - "$AO_REGISTRY" "$(bs_codex_home)/.codex-global-state.json" <<'PY'
+import json, sys
+reg, state = sys.argv[1], sys.argv[2]
+want = []
+for line in open(reg, encoding="utf-8"):
+    c = line.rstrip("\n").split("\t")
+    if line.startswith("#") or len(c) < 5 or c[4] != "codex" or c[3] in ("", "-", "pending"):
+        continue
+    want.append((c[1], c[3]))
+if not want:
+    print("none")
+    sys.exit(0)
+try:
+    pinned = json.load(open(state, encoding="utf-8")).get("pinned-thread-ids")
+    if not isinstance(pinned, list):
+        raise ValueError
+except (OSError, ValueError, AttributeError):
+    print("unreadable")
+    sys.exit(0)
+missing = [n for n, t in want if t not in pinned]
+print("missing\t" + ", ".join(missing) if missing else "ok\t%d" % len(want))
+PY
+)
+    case $_pn_out in
+      ok*) ao_step PASS pins-codex "the Codex app shows all ${_pn_out#*"$AO_TAB"} active thread(s) pinned" ;;
+      missing*) ao_step TODO pins-codex "in the Codex app, pin: ${_pn_out#*"$AO_TAB"} (right-click the thread, Pin); the checklist reads the app's pinned list" ;;
+      none) ao_step PASS pins-codex "no Codex thread recorded yet to pin" ;;
+      *) if bs_marked pins; then ao_step PASS pins-codex "confirmed"
+         else ao_step TODO pins-codex "pin the Oracle (if on Codex), the active Codex operators and the Mailroom in the Codex app; its pinned list cannot be read here, so then: bootstrap.sh mark pins"; fi ;;
+    esac
+  fi
+  bs_uses claude || return 0
+  if bs_marked pins; then ao_step PASS pins-claude "confirmed"; return; fi
+  _pn_on=$(awk -F'\t' '!/^#/ && $5 == "claude" && $1 != "mailroom-claude" { printf "%s\"%s\"", (n++ ? ", " : ""), $2 }' "$AO_REGISTRY")
+  _pn_off=$(awk -F'\t' '!/^#/ && NF >= 5 && $5 != "claude" && $1 !~ /^mailroom-/ { printf "%s\"%s\"", (n++ ? ", " : ""), $2 }' "$AO_REGISTRY")
+  ao_step TODO pins-claude "in the Claude app: pin ${_pn_on:-the Oracle}; the Mailroom may nest under the Oracle; ${_pn_off:+put $_pn_off in a sidebar section named \"Inactive Operators\"; }then: bootstrap.sh mark pins (nothing on disk shows the Claude sidebar)"
+}
+
 # bs_hook_rows  The checklist rows for both recovery hooks.
 bs_hook_rows() {
   if bs_uses claude; then
@@ -416,15 +544,9 @@ bs_checklist() {
   elif _gc=$(sh "$AO_SCRIPTS/grants.sh" check --findings 2>&1); then ao_step PASS grants "rendered and resolved on both clients"
   else ao_step TODO grants "$(printf '%s\n' "$_gc" | sed -n 's/^- grants: //p' | head -n 1) (review, then grants.sh render-claude / render-codex --all)"; fi
   bs_hook_rows
-  for _m in $BS_MARKS; do
-    if bs_marked "$_m"; then ao_step PASS "$_m" "confirmed"; continue; fi
-    case $_m in
-      sign-in) _do="open each desktop app you use and sign in yourself (the kit never signs in for you)" ;;
-      restart-apps) _do="quit and reopen each desktop app once, so App Nap stays off" ;;
-      pins) _do="pin the Oracle; Claude: active operators pinned, inactive ones in a section named \"Inactive Operators\"; Codex: the active threads and the Mailroom pinned (docs/operations/conventions.md)" ;;
-    esac
-    ao_step TODO "$_m" "$_do; then: bootstrap.sh mark $_m"
-  done
+  bs_signin_rows
+  bs_restart_row
+  bs_pin_rows
   if [ -n "$_bc" ]; then
     _bh=$(awk -F'\t' '$1 == "mailroom-claude" { print $3; exit }' "$AO_REGISTRY")
     if bs_has mailroom-claude; then ao_step PASS claude-mailroom "session $(bs_sid mailroom-claude)"

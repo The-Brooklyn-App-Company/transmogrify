@@ -141,6 +141,7 @@ Unknown keys warn; keys starting with `x_` are free for local hooks.
 | `bridge_codex_node`, `bridge_codex_server` | none | The node binary and the `codex-app-tools/server.mjs` bundled in the Codex desktop app, for `mailroom.sh arm-codex` |
 | `bridge_claude_t1` | `off` | `socket`: the Claude watcher delivers to warm sessions model-free (tier 1; undocumented client interface, see the mailroom doc); `off`: the bridge model sends every ring |
 | `owner_tz` | none | The owner's timezone (for example `Europe/Paris`), set by `bootstrap.sh`: times for people are reported in it; logs stay UTC ([K-12](../kit/KIT.md)) |
+| `codex_cli` | `codex` on `PATH`, else one inside a desktop app bundle | The Codex CLI `bootstrap.sh` uses to guide the recovery hook's trust and check it; any candidate must answer `--version` |
 | `archive_dir` | `<oracle_home>/../archive` | Where `operator.sh archive` keeps an archived operator's verified local git bundles |
 | `wake_link` | none | The desktop app's link to a session, with `{session}` where the id goes, for the supervisor's deep-link warm-up; the kit ships no default |
 | `host_apps` | `com.anthropic.claudefordesktop com.openai.codex` | Desktop apps whose App Nap `install.sh host` turns off and `check.sh host` checks; `none` skips |

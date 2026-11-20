@@ -189,7 +189,7 @@ lease_stale doorbell_codex doorbell_rering_min
 relay_bridge bridge_dir bridge_codex_node bridge_codex_server bridge_claude_t1
 wake_link host_apps host_latency_jobs host_launchd_dirs owner_tz archive_dir
 grants_file grants_accepted grants_claude_settings grants_codex_bin
-grants_managed_requirements_ok'
+grants_managed_requirements_ok codex_cli'
 # Host defaults (install.sh host, check.sh host): desktop apps whose App Nap
 # is turned off, launchd label patterns that must not run as Background,
 # and the launchd folders scanned.

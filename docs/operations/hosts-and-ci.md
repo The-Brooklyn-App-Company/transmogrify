@@ -90,16 +90,35 @@ active Oracle. The rest it does with the kit's own scripts
 ([K-36](../../kit/KIT.md)): `install.sh oracle`; the profile, including the
 Codex app's bundled node and tool server found inside the app bundle;
 `install.sh host --apply` (below); `install.sh sync` for a toehold in the
-other client; the Oracle's session id (`operator.sh session`) and the lock.
+other client; the Oracle's session id (`operator.sh session`) and the lock;
+on your yes, your grants into each client's approval layer
+([grants](grants.md)); and the Codex recovery hook, below.
+
+**The Codex recovery hook, guided.** Codex runs a `SessionStart` hook only
+after a person trusts it, and trust is given in the interactive Codex CLI:
+the desktop app's composer has no `/hooks` command (observed 2026-11-20).
+`bootstrap.sh` writes `<codex home>/hooks.json` (default `~/.codex`) with one
+hook that runs `ops/recover-context.sh`, only on your yes and never over an
+existing file; prints the exact steps (run `"<codex CLI>" -C "<Oracle
+home>"`, type `/hooks`, choose SessionStart, Trust, `/exit`); waits; reads
+Codex's own trust record in `config.toml` (a `[hooks.state."<hooks.json>:
+session_start:..."]` table with a `trusted_hash` and `enabled = true`); and
+then makes one read-only, ephemeral `codex exec` run in the Oracle home that
+must quote the digest's first line (`## Oracle recovery (...)`). The CLI is
+the profile's `codex_cli`, else `codex` on `PATH`, else one inside a desktop
+app bundle, each used only if it answers `--version`. On Claude Code the
+checklist reads the settings file for the hook and prints the exact JSON to
+add when it is missing.
 
 It ends with a checklist that waits for you and re-checks after each step:
 start the Oracle session, sign in to each app yourself, quit and reopen
 both apps once, start the two Mailrooms (cheapest model set at creation,
 titled "Mailroom") and record their ids, re-arm the Codex watcher, pin per
 the [conventions](conventions.md#sidebar-and-titles), register the recovery
-hook on each client. Each step passes on its own evidence (a registry id,
-the watcher's heartbeat) or on `bootstrap.sh mark STEP` where no script can
-see it; the last step is a test note that must reach the Oracle through the
+hook on each client. Each step has its exact instructions and passes on its
+own evidence (a registry id, the watcher's heartbeat, the hook in Claude's
+settings, Codex's trust record and a run that quotes the digest) or, only
+where no script can see it, on `bootstrap.sh mark STEP`; the last step is a test note that must reach the Oracle through the
 mailroom. `bootstrap.sh status` prints the checklist again; `--yes` runs
 without questions (options and defaults only).
 

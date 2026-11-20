@@ -35,6 +35,16 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   first run writes client settings only after a consent step: a yes at the
   terminal, or an explicit `--yes`. Never run against a real client config
   yet.
+- **Every first-run step is guided and checked.** `bootstrap.sh` writes the
+  Codex recovery hook (`~/.codex/hooks.json`) on consent, prints the exact
+  steps to trust it in the interactive Codex CLI (the desktop app's
+  composer has no `/hooks`), waits, reads Codex's trust record in
+  `config.toml`, and confirms with one read-only `codex exec` run that the
+  digest arrives. The Claude hook is checked in its settings file, with the
+  exact JSON printed when missing. The Codex CLI is found from the
+  profile's new `codex_cli`, `PATH` or a desktop app bundle, and used only
+  if it answers `--version`. `bootstrap.sh mark hooks` remains for a Claude
+  hook registered where the checklist cannot read it.
 - **Worker completions through the mailroom**, behind
   `TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`: a child's wake becomes a note in
   its parent's inbox. The default is unchanged until a live proof.

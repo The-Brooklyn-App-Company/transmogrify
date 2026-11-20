@@ -31,6 +31,10 @@
 #                             layer (the Oracle home's .codex included),
 #                             only on consent: a yes at the terminal, or
 #                             --yes given explicitly
+#   7. the Codex recovery hook: <codex home>/hooks.json written on consent,
+#      the exact CLI steps to trust it (the desktop app has no /hooks),
+#      Codex's trust record read back, then one read-only `codex exec`
+#      check that the digest arrives
 # Then the checklist: each in-app step with what to do and the check that
 # proves it (a registry id, the Codex watcher's heartbeat, a test note's
 # delivery); steps no script can see are confirmed with `bootstrap.sh mark`.
@@ -51,7 +55,10 @@ AO_SCRIPTS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 . "$AO_SCRIPTS/lib/mailroom.sh"
 . "$AO_SCRIPTS/lib/guide.sh"
 
-BS_MARKS='sign-in restart-apps pins hooks'
+BS_MARKS='sign-in restart-apps pins'
+# `mark hooks`: the Claude recovery hook is registered somewhere the
+# checklist cannot read (a project's own settings file).
+BS_MARKS_OK="$BS_MARKS hooks"
 
 bs_marks_file() { printf '%s/bootstrap.marks\n' "$AO_STATE"; }
 bs_marked() { [ -n "$(ao_st_get "$(bs_marks_file)" "$1")" ]; }
@@ -189,7 +196,179 @@ bs_run() {
     sh "$AO_SCRIPTS/switch.sh" oracle-lock take "$_client" --session "$(bs_sid "$AO_ORACLE_KEY")" </dev/null | sed 's/^/   /'
   fi
   bs_grants
+  bs_hooks
   bs_checklist_loop
+}
+
+# ---------------------------------------------------------------- recovery hooks
+# Each client runs ops/recover-context.sh at session start, so a session
+# (re)starts from the home's files. Claude Code: a SessionStart hook in its
+# settings; the checklist reads the settings file. Codex: a SessionStart hook
+# in <codex home>/hooks.json, which Codex runs only once a person trusts it
+# in the interactive CLI (the desktop app's composer has no /hooks). Codex
+# records the trust in its config.toml; the checklist reads that record, then
+# makes one read-only `codex exec` run that must quote the digest.
+
+# bs_uses CLIENT  The registry has a row on CLIENT, or its Mailroom.
+bs_uses() {
+  ao_registry_has "mailroom-$1" ||
+    awk -F'\t' -v c="$1" '$5 == c { f = 1 } END { exit !f }' "$AO_REGISTRY" 2>/dev/null
+}
+
+bs_codex_home() { printf '%s\n' "${CODEX_HOME:-$HOME/.codex}"; }
+bs_claude_settings() { printf '%s/settings.json\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; }
+
+# bs_codex_cli  The Codex CLI used for the trust step and its check: the
+# profile's codex_cli, else codex on PATH, else one inside a desktop app
+# bundle. A candidate counts only if it answers --version: no app path is
+# assumed to exist or to work.
+bs_codex_cli() {
+  _ad=${AO_APPS_DIR:-/Applications}
+  for _c in "$(ao_cfg codex_cli '')" "$(command -v codex 2>/dev/null)" \
+    "$_ad/ChatGPT.app/Contents/Resources/codex-cli/bin/codex" \
+    "$_ad/Codex.app/Contents/Resources/codex-cli/bin/codex"; do
+    [ -n "$_c" ] && [ -x "$_c" ] || continue
+    ao_timeout 30 "$_c" --version >/dev/null 2>&1 || continue
+    printf '%s\n' "$_c"
+    return 0
+  done
+  return 1
+}
+
+# bs_hook_cmd  The hook's command: the digest script by absolute path, with
+# the profile when it is not at its default place.
+bs_hook_cmd() {
+  _hc_p=$(ao_profile_path)
+  if [ "$_hc_p" = "${XDG_CONFIG_HOME:-$HOME/.config}/agent-operations/profile" ]; then
+    printf '%s\n' "$AO_SCRIPTS/recover-context.sh"
+  else
+    printf 'env AO_PROFILE=%s %s\n' "$_hc_p" "$AO_SCRIPTS/recover-context.sh"
+  fi
+}
+
+# bs_codex_hook_state  ours | other | toml | none: whether hooks.json runs
+# the digest, exists without it, or hooks are defined in config.toml (Codex
+# takes one or the other, never both).
+bs_codex_hook_state() {
+  _hs_d=$(bs_codex_home)
+  if grep -Eq '^[[:space:]]*\[hooks\][[:space:]]*$|^[[:space:]]*\[\[hooks\.' "$_hs_d/config.toml" 2>/dev/null; then echo toml
+  elif [ ! -f "$_hs_d/hooks.json" ]; then echo none
+  elif grep -q 'recover-context\.sh' "$_hs_d/hooks.json"; then echo ours
+  else echo other; fi
+}
+
+# bs_codex_hook_trusted  Codex's own record: a [hooks.state."<hooks.json>:
+# session_start:..."] table with a trusted_hash and enabled = true.
+bs_codex_hook_trusted() {
+  _ht_d=$(bs_codex_home)
+  awk -v p="[hooks.state.\"$_ht_d/hooks.json:session_start:" '
+    function close_s() { if (in_s && h && e) found = 1 }
+    index($0, p) == 1 { close_s(); in_s = 1; h = 0; e = 0; next }
+    /^[[:space:]]*\[/ { close_s(); in_s = 0; next }
+    in_s && /^[[:space:]]*trusted_hash[[:space:]]*=[[:space:]]*"[^"]+"/ { h = 1 }
+    in_s && /^[[:space:]]*enabled[[:space:]]*=[[:space:]]*true[[:space:]]*$/ { e = 1 }
+    END { close_s(); exit !found }' "$_ht_d/config.toml" 2>/dev/null
+}
+
+# bs_codex_hook_write  Write <codex home>/hooks.json (it must not exist).
+bs_codex_hook_write() {
+  _hw_d=$(bs_codex_home)
+  mkdir -p "$_hw_d" || return 1
+  /usr/bin/python3 -I - "$_hw_d/hooks.json" "$(bs_hook_cmd)" <<'PY'
+import json, os, sys
+path, cmd = sys.argv[1], sys.argv[2]
+doc = {"description": "Transmogrify recovery digest (ops/recover-context.sh)",
+       "hooks": {"SessionStart": [{"matcher": "startup|resume|compact|fork",
+                                   "hooks": [{"type": "command", "command": cmd,
+                                              "statusMessage": "Loading recovery digest", "timeout": 10}]}]}}
+fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+with os.fdopen(fd, "w") as f:
+    f.write(json.dumps(doc, indent=2) + "\n")
+PY
+}
+
+# bs_trust_steps CLI  The exact owner steps for trusting the hook.
+bs_trust_steps() {
+  printf '   1. In a terminal, run: "%s" -C "%s"\n' "$1" "$AO_HOME"
+  printf '   2. Type /hooks, choose SessionStart, then Trust.\n'
+  printf '   3. Leave the CLI with /exit. (The desktop app has no /hooks command.)\n'
+}
+
+# bs_hooks  Step 7: write the Codex hook on consent and guide its trust.
+bs_hooks() {
+  bs_uses codex || return 0
+  _hk_d=$(bs_codex_home)
+  ao_explain "7. The recovery hook on Codex" \
+    "Codex runs ops/recover-context.sh at session start once it is in $_hk_d/hooks.json" \
+    "and you have trusted it in the Codex CLI. This writes a file in Codex's own folder," \
+    "so it asks first; then it shows the exact trust steps and checks Codex's record."
+  case $(bs_codex_hook_state) in
+    none)
+      printf '   Would write %s with one SessionStart hook: %s\n' "$_hk_d/hooks.json" "$(bs_hook_cmd)"
+      case "$(ao_profile_path)$AO_SCRIPTS" in *' '* | *\"* | *\'*)
+        echo "   Not written: a path has a space or a quote; add the hook by hand (ops/templates/home/settings/README.md)."; return 0 ;;
+      esac
+      if [ -n "${_yes-}" ] || ao_consent "Write $_hk_d/hooks.json?"; then
+        if bs_codex_hook_write; then echo "   written: $_hk_d/hooks.json"
+        else echo "   could not write $_hk_d/hooks.json"; return 0; fi
+      else
+        echo "   Not written (no consent): run bootstrap.sh at a terminal or with --yes."; return 0
+      fi ;;
+    other) echo "   $_hk_d/hooks.json exists without the digest: add this SessionStart hook to it yourself: $(bs_hook_cmd)"; return 0 ;;
+    toml) echo "   Hooks are defined in $_hk_d/config.toml: add a SessionStart hook there that runs $(bs_hook_cmd) (Codex reads one place, never both)."; return 0 ;;
+  esac
+  bs_codex_hook_trusted && { echo "   Codex records the hook as trusted."; return 0; }
+  if ! _hk_cli=$(bs_codex_cli); then
+    echo "   No working Codex CLI found (profile codex_cli, PATH, or inside the desktop app). Install it, or set codex_cli in $(ao_profile_path), then run bootstrap.sh again."
+    return 0
+  fi
+  echo "   Trust it once:"
+  bs_trust_steps "$_hk_cli"
+  while ! bs_codex_hook_trusted; do
+    ao_pause "Trust the hook as above" || return 0
+  done
+  echo "   Codex records the hook as trusted."
+}
+
+# bs_hook_rows  The checklist rows for both recovery hooks.
+bs_hook_rows() {
+  if bs_uses claude; then
+    _hr_s=$(bs_claude_settings)
+    if grep -q 'recover-context\.sh' "$_hr_s" 2>/dev/null; then ao_step PASS hook-claude "SessionStart hook in $_hr_s"
+    elif bs_marked hooks; then ao_step PASS hook-claude "confirmed (registered elsewhere)"
+    else ao_step TODO hook-claude "add to $_hr_s: {\"hooks\": {\"SessionStart\": [{\"matcher\": \"compact|resume\", \"hooks\": [{\"type\": \"command\", \"command\": \"$(bs_hook_cmd)\"}]}]}} (merge with what is there); the checklist then finds it (registered elsewhere: bootstrap.sh mark hooks)"; fi
+  fi
+  bs_uses codex || return 0
+  _hr_d=$(bs_codex_home)
+  _hr_m=$(bs_marks_file)
+  case $(bs_codex_hook_state) in
+    none) ao_step TODO hook-codex "bootstrap.sh writes $_hr_d/hooks.json on your yes (run it at a terminal, or with --yes)"; return ;;
+    other | toml) ao_step TODO hook-codex "add a SessionStart hook that runs $(bs_hook_cmd) to Codex's hooks ($_hr_d/hooks.json or config.toml, one of them)"; return ;;
+  esac
+  if ! bs_codex_hook_trusted; then
+    _hr_cli=$(bs_codex_cli) || _hr_cli='<codex CLI: set codex_cli in the profile>'
+    ao_step TODO hook-codex "trust it once in the Codex CLI: run \"$_hr_cli\" -C \"$AO_HOME\", type /hooks, choose SessionStart, Trust, then /exit (the desktop app has no /hooks); the checklist then reads Codex's record"
+    return
+  fi
+  if [ -n "$(ao_st_get "$_hr_m" hook-codex-verified)" ]; then
+    ao_step PASS hook-codex "trusted; a fresh Codex run received the digest"
+    return
+  fi
+  if [ -n "${BS_READONLY-}" ] || [ -n "${BS_HOOK_TRIED-}" ]; then
+    ao_step WAIT hook-codex "trusted; bootstrap.sh (not status) runs one read-only Codex check that the digest arrives"
+    return
+  fi
+  BS_HOOK_TRIED=1
+  if ! _hr_cli=$(bs_codex_cli); then ao_step TODO hook-codex "trusted, but no working Codex CLI to check it: set codex_cli in the profile"; return; fi
+  _hr_o=$(ao_tmp hook-check)
+  ao_timeout 300 "$_hr_cli" exec --ephemeral --skip-git-repo-check -s read-only -C "$AO_HOME" -o "$_hr_o" \
+    "Reply with only the first line of the recovery digest your session start hook gave you, exactly as given, or NONE if you received none." >/dev/null 2>&1
+  if grep -q '^## Oracle recovery (' "$_hr_o" 2>/dev/null; then
+    ao_st_set "$_hr_m" hook-codex-verified "$AO_T_EPOCH"
+    ao_step PASS hook-codex "trusted; a fresh read-only Codex run quoted the digest's first line"
+  else
+    ao_step TODO hook-codex "trusted, but a fresh read-only Codex run did not quote the digest (it said: $(head -n 1 "$_hr_o" 2>/dev/null | cut -c 1-80)); check $_hr_d/hooks.json, re-trust after any edit, then run bootstrap.sh again"
+  fi
 }
 
 # bs_grants  Step 6: the owner's standing grants rendered into each client's
@@ -236,13 +415,13 @@ bs_checklist() {
   if [ ! -f "$_gf" ]; then ao_step PASS grants "no grants file yet (ops/templates/oracle/GRANTS.md when the owner gives one)"
   elif _gc=$(sh "$AO_SCRIPTS/grants.sh" check --findings 2>&1); then ao_step PASS grants "rendered and resolved on both clients"
   else ao_step TODO grants "$(printf '%s\n' "$_gc" | sed -n 's/^- grants: //p' | head -n 1) (review, then grants.sh render-claude / render-codex --all)"; fi
+  bs_hook_rows
   for _m in $BS_MARKS; do
     if bs_marked "$_m"; then ao_step PASS "$_m" "confirmed"; continue; fi
     case $_m in
       sign-in) _do="open each desktop app you use and sign in yourself (the kit never signs in for you)" ;;
       restart-apps) _do="quit and reopen each desktop app once, so App Nap stays off" ;;
       pins) _do="pin the Oracle; Claude: active operators pinned, inactive ones in a section named \"Inactive Operators\"; Codex: the active threads and the Mailroom pinned (docs/operations/conventions.md)" ;;
-      hooks) _do="register the recovery hook on each client (ops/templates/home/settings/README.md; on Codex, trust the hook when it asks)" ;;
     esac
     ao_step TODO "$_m" "$_do; then: bootstrap.sh mark $_m"
   done
@@ -304,7 +483,7 @@ main() {
     status) ao_load --no-state; BS_READONLY=1; bs_checklist; [ "$AO_STEPS_LEFT" -eq 0 ] || exit "$AO_E_FAIL" ;;
     mark)
       ao_load
-      case " $BS_MARKS " in *" ${2-} "*) ;; *) ao_die "$AO_E_USAGE" "STEP must be one of: $BS_MARKS" ;; esac
+      case " $BS_MARKS_OK " in *" ${2-} "*) ;; *) ao_die "$AO_E_USAGE" "STEP must be one of: $BS_MARKS_OK" ;; esac
       ao_st_set "$(bs_marks_file)" "$2" "$AO_T_EPOCH"
       echo "marked ${2}" ;;
     *)

@@ -148,9 +148,12 @@ Oracle home, your timezone, models, the Oracle lock), creates the Oracle
 home and profile, applies the host settings on your yes (App Nap off, both
 launchd units, both bridge homes), and, if you already have a grants file,
 shows the approvals it would write into each app's settings and writes them
-only on your yes. It ends with the short list of in-app steps no script can
-do (sign in, pin, title the two "Mailroom" sessions), each with the check
-that proves it. `node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT" --apply-host`
+only on your yes. It writes the Codex recovery hook on your yes and gives
+the exact steps to trust it in the Codex CLI (the desktop app has no
+`/hooks`), then confirms Codex's trust record and that a fresh run receives
+the digest. It ends with the short list of in-app steps no script can do
+(sign in, pin, title the two "Mailroom" sessions), each with exact
+instructions and the check that proves it. `node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT" --apply-host`
 applies the same host steps from the Node side.
 
 ## Your first hour

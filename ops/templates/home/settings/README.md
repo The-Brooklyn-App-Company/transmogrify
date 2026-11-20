@@ -1,7 +1,9 @@
 # Client permission patterns
 
 Placeholders for the human to adapt and apply in each client's own
-settings. The kit never edits client settings; agents do not apply these.
+settings. Agents do not apply these. The kit writes a client's settings
+only in the first run and only on the human's yes: the grants and the
+Codex recovery hook.
 
 ## Claude Code
 
@@ -35,12 +37,27 @@ the session to read the full files first. Register it for this home:
 }
 ```
 
-On Codex, register the same command as a `SessionStart` hook for the
-sources `startup|resume|compact|fork` in Codex's hooks configuration, and
-trust it when Codex asks (non-managed hooks need trust). The digest stays
-under about 2,000 tokens. The exact Codex registration format is not
-verified by the kit; until a live recovery passes, the session re-reads its
-files itself (the kit's `docs/operations/client-capabilities.md`).
+On Codex, `bootstrap.sh` writes the hook for you, on your yes, into
+`~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`; Codex reads hooks from
+there or from `[hooks]` in `config.toml`, never both):
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup|resume|compact|fork",
+        "hooks": [{ "type": "command", "command": "<kit-dir>/ops/recover-context.sh",
+                    "statusMessage": "Loading recovery digest", "timeout": 10 }] }
+    ]
+  }
+}
+```
+
+Then trust it once in the interactive Codex CLI (the desktop app has no
+`/hooks`): run `codex -C <oracle-home>`, type `/hooks`, choose SessionStart,
+Trust, and `/exit`. `bootstrap.sh` reads the trust record Codex writes in
+`config.toml` and checks with one read-only run that the digest arrives. The
+digest stays under about 2,000 tokens. Re-trust after any edit to the file.
 
 ### Mailroom home
 

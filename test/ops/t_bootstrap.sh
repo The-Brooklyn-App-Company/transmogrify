@@ -83,6 +83,12 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   run operator.sh session mailroom-claude sid-bridge
   run operator.sh session mailroom-codex thread-bridge
   for m in sign-in restart-apps pins hooks; do run bootstrap.sh mark "$m"; assert_rc 0; done
+  # The Codex hook: written by the --yes run above, trusted in Codex's own
+  # record, then checked by one read-only run (the fake quotes the digest).
+  assert_has "$CODEX_HOME/hooks.json" "recover-context.sh"
+  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  FAKE_OUTPUT='## Oracle recovery (2026-11-19). The files win over any summary.'
+  export FAKE_OUTPUT
   sleep 300 >/dev/null 2>&1 &
   live=$!
   mkdir -p "$T/ops/oracle/inbox/.mailroom/codex/.watcher"
@@ -95,6 +101,8 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   run bootstrap.sh --yes --oracle-session sid-oracle --home "$T/ops/oracle"
   run bootstrap.sh status
   assert_rc 1
+  assert_has "$T/out" "PASS  hook-codex    trusted; a fresh Codex run received the digest"
+  assert_has "$T/out" "PASS  hook-claude   confirmed"
   assert_has "$T/out" "PASS  codex-watcher armed"
   assert_has "$T/out" "WAIT  round-trip    a test note went to the Oracle"
   ls "$T/ops/oracle/inbox/oracle"/*bootstrap-check.md >/dev/null 2>&1 || _fail "no test note"
@@ -142,6 +150,50 @@ test_grants_are_written_into_client_settings_only_on_consent() {
   run bootstrap.sh --yes --home "$T/ops/oracle"
   assert_has "$T/claude/settings.json" "[grant:own-merges]"
   assert_has "$T/claude/settings.json" '"model": "x"'
+}
+
+test_codex_hook_is_written_on_consent_trusted_by_the_owner_then_checked() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  # No terminal, no --yes: nothing is written; the step says how.
+  assert_no_file "$CODEX_HOME/hooks.json"
+  assert_has "$T/out" "Not written (no consent)"
+  assert_has "$T/out" "TODO  hook-codex    bootstrap.sh writes $CODEX_HOME/hooks.json on your yes"
+  assert_has "$T/out" "TODO  hook-claude   add to $CLAUDE_CONFIG_DIR/settings.json"
+  # --yes: written, and the exact trust steps name the CLI and the home.
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$CODEX_HOME/hooks.json" '"matcher": "startup|resume|compact|fork"'
+  assert_has "$CODEX_HOME/hooks.json" "$SCRIPTS/recover-context.sh"
+  assert_has "$T/out" "1. In a terminal, run: \"$T/bin/codex\" -C \"$T/ops/oracle\""
+  assert_has "$T/out" "2. Type /hooks, choose SessionStart, then Trust."
+  assert_has "$T/out" "TODO  hook-codex    trust it once in the Codex CLI"
+  # A record for another file, or without enabled = true, is not trust.
+  printf '[hooks.state."/elsewhere/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' >"$CODEX_HOME/config.toml"
+  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = false\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-codex    trust it once"
+  # Trusted: status only reads; bootstrap.sh runs the one check, which fails
+  # when the run does not quote the digest, and passes when it does.
+  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  run bootstrap.sh status
+  assert_has "$T/out" "WAIT  hook-codex    trusted; bootstrap.sh (not status) runs one"
+  FAKE_OUTPUT=NONE
+  export FAKE_OUTPUT
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$T/out" "TODO  hook-codex    trusted, but a fresh read-only Codex run did not quote the digest (it said: NONE)"
+  assert_has "$FAKE_LOG" "arg: --ephemeral"
+  assert_has "$FAKE_LOG" "arg: read-only"
+  FAKE_OUTPUT='## Oracle recovery (2026-11-19). The files win.'
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$T/out" "PASS  hook-codex    trusted; a fresh read-only Codex run quoted the digest's first line"
+  # An existing hooks.json is never rewritten.
+  rm "$CODEX_HOME/hooks.json"
+  printf '{"hooks": {}}\n' >"$CODEX_HOME/hooks.json"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_eq "$(cat "$CODEX_HOME/hooks.json")" '{"hooks": {}}'
+  assert_has "$T/out" "exists without the digest"
 }
 
 ao_test_main "$0"

@@ -130,5 +130,8 @@ an `AGENTS.md` over 8000 bytes, expired quiet-list rows, delivered logs to
 rotate, and standing grants that differ from the client's permission
 rules. For that last check, write the permission rule a grant needs in
 backticks in the Scope cell of `MANDATE.md`'s standing grants table, for
-example `` `Bash(sh ~/src/agent-operations/scripts/mailroom.sh:*)` ``.
-Codex permission rules are not read yet.
+example `` `Bash(sh ~/src/transmogrify/ops/mailroom.sh:*)` ``. When the
+Oracle home has a grants file, hygiene also reports `grants.sh check
+--findings`: the owner's standing grants against both clients' rendered
+approval layers ([grants](grants.md)), and `lane.sh` refuses to route an
+operator to a side whose grants do not match.

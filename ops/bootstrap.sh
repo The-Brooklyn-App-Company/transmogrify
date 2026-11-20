@@ -202,6 +202,11 @@ bs_checklist() {
   else ao_step TODO oracle "start a $_cl session in $AO_HOME (model and effort chosen when you create it), title it \"Oracle\", pin it; then: bootstrap.sh --oracle-session <id>"; fi
   if [ -f "$AO_HOME/operators/ORACLE-LOCK" ]; then ao_step PASS oracle-lock "$(sed -n 's/^holder=//p' "$AO_HOME/operators/ORACLE-LOCK" | head -n 1)"
   else ao_step TODO oracle-lock "after the Oracle session: bootstrap.sh again (it asks), or lane.sh oracle-lock take $_cl --session <id>"; fi
+  # Standing grants follow an operator across clients (docs/operations/grants.md).
+  _gf=$(ao_cfg_path grants_file operators/GRANTS.md)
+  if [ ! -f "$_gf" ]; then ao_step PASS grants "no grants file yet (ops/templates/oracle/GRANTS.md when the owner gives one)"
+  elif _gc=$(sh "$AO_SCRIPTS/grants.sh" check --findings 2>&1); then ao_step PASS grants "rendered and resolved on both clients"
+  else ao_step TODO grants "$(printf '%s\n' "$_gc" | sed -n 's/^- grants: //p' | head -n 1) (review, then grants.sh render-claude / render-codex --all)"; fi
   for _m in $BS_MARKS; do
     if bs_marked "$_m"; then ao_step PASS "$_m" "confirmed"; continue; fi
     case $_m in

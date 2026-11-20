@@ -1,0 +1,102 @@
+#!/usr/bin/python3 -I
+"""fake-codex-grants - the three Codex CLI calls grants.sh makes, for tests.
+
+  --version                 prints "codex-cli 9.9.9-test"
+  debug models --bundled    a catalog whose codex-auto-review row carries the baseline policy
+                            (FAKE_CODEX_BASELINE: a file with the policy text; default a fictional one)
+  app-server                stdio JSON-RPC: initialize, config/read, configRequirements/read. The project layer is
+                            <cwd>/.codex; its policy is read from the [auto_review] table in its config.toml.
+
+Knobs: FAKE_CODEX_DEBUG_FAIL=1 (debug fails), FAKE_CODEX_UNTRUSTED=1 (project layer disabled),
+FAKE_CODEX_MANAGED=1 (a managed layer sets auto_review), FAKE_CODEX_STALE=1 (config/read reports another policy),
+FAKE_CODEX_SILENT=1 (app-server never answers). Every call is logged to FAKE_LOG.
+"""
+import json
+import os
+import re
+import sys
+
+DEFAULT = "Example reviewer policy (fictional, for tests).\n\nDeny anything that leaves the sandbox.\n"
+
+
+def log(line):
+    if os.environ.get("FAKE_LOG"):
+        with open(os.environ["FAKE_LOG"], "a") as f:
+            f.write("== codex-grants %s\n" % line)
+
+
+def baseline():
+    p = os.environ.get("FAKE_CODEX_BASELINE")
+    return open(p).read() if p else DEFAULT
+
+
+def project_policy(dot):
+    try:
+        text = open(os.path.join(dot, "config.toml")).read()
+    except OSError:
+        return None
+    m = re.search(r"^\[auto_review\]\npolicy = ('''\n.*?'''|\"(?:[^\"\\\\]|\\\\.)*\")$", text, re.S | re.M)
+    if not m:
+        return None
+    v = m.group(1)
+    return v[4:-3] if v.startswith("'''") else json.loads(v)
+
+
+def app_server():
+    if os.environ.get("FAKE_CODEX_SILENT"):
+        sys.stdin.read()
+        return
+    dot = os.path.join(os.getcwd(), ".codex")
+    for line in sys.stdin:
+        try:
+            m = json.loads(line)
+        except ValueError:
+            continue
+        out = None
+        if m.get("method") == "initialize":
+            out = {"id": m["id"], "result": {"userAgent": "fake"}}
+        elif m.get("method") == "config/read":
+            policy = project_policy(dot)
+            if os.environ.get("FAKE_CODEX_STALE") and policy:
+                policy += "stale\n"
+            layers = [{"name": {"type": "user", "file": os.path.join(os.environ.get("CODEX_HOME", "/x"), "config.toml")},
+                       "config": {}}]
+            proj = {"name": {"type": "project", "dotCodexFolder": dot}, "config": {}}
+            if policy is not None:
+                proj["config"]["auto_review"] = {"policy": "(elided)"}
+            if os.environ.get("FAKE_CODEX_UNTRUSTED"):
+                proj["disabledReason"] = "untrusted project"
+            layers.append(proj)
+            if os.environ.get("FAKE_CODEX_MANAGED"):
+                layers.append({"name": {"type": "mdm", "domain": "example.managed"}, "config": {"auto_review": {}}})
+            cfg, origins = {}, {}
+            if policy is not None and not os.environ.get("FAKE_CODEX_UNTRUSTED"):
+                cfg["auto_review"] = {"policy": policy}
+                origins["auto_review.policy"] = {"name": {"type": "project", "dotCodexFolder": dot}, "version": "v1"}
+            out = {"id": m["id"], "result": {"config": cfg, "origins": origins, "layers": layers}}
+        elif m.get("method") == "configRequirements/read":
+            out = {"id": m["id"], "result": {"requirements": {}}}
+        if out:
+            out["jsonrpc"] = "2.0"
+            sys.stdout.write(json.dumps(out) + "\n")
+            sys.stdout.flush()
+
+
+def main(argv):
+    log(" ".join(argv))
+    if argv == ["--version"]:
+        print("codex-cli 9.9.9-test")
+    elif argv[:3] == ["debug", "models", "--bundled"]:
+        if os.environ.get("FAKE_CODEX_DEBUG_FAIL"):
+            return 1
+        print(json.dumps({"models": [{"slug": "other"}, {"slug": "codex-auto-review", "model_messages": {
+            "auto_review": {"policy": baseline()}}}]}))
+    elif argv[:1] == ["app-server"]:
+        app_server()
+    else:
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -106,6 +106,18 @@ st_set() {
     ao_die "$AO_E_FAIL" "cannot write $1"
 }
 
+# lane_grants_gate KEY CLIENT  0 when there is no grants file, or when the
+# grants that apply on CLIENT are rendered and resolved (grants.sh check
+# --gate). Sets _gate to the one-line reason.
+lane_grants_gate() {
+  _gf=$(ao_cfg_path grants_file operators/GRANTS.md)
+  if [ ! -f "$_gf" ]; then _gate="no grants file"; return 0; fi
+  _grc=0
+  _gate=$(sh "$AO_SCRIPTS/grants.sh" check --gate "$1" "$2" 2>&1) || _grc=$?
+  _gate=$(printf '%s\n' "$_gate" | tail -n 1)
+  [ "$_grc" -eq 0 ]
+}
+
 lane_family() { case $1 in claude | codex) return 0 ;; esac; return 1; }
 
 # ---------------------------------------------------------------- switch
@@ -128,6 +140,8 @@ lane_switch() {
   ao_is_name "$_sid" && [ "$_sid" != pending ] && [ "$_sid" != - ] || ao_die "$AO_E_USAGE" "--session needs the incoming session or thread id"
   case $_name in *"$AO_TAB"* | *"$AO_NL"*) ao_die "$AO_E_USAGE" "--name must be one line without tabs" ;; esac
   [ "$_to" != "$R_CLIENT" ] || [ "$_sid" != "$R_SID" ] || refuse "$_key already runs on $_to in session $_sid"
+  lane_grants_gate "$_key" "$_to" ||
+    refuse "the standing grants on $_to do not match the grants file ($_gate); render them (grants.sh render-$_to), then switch"
   ao_lock registry || ao_die "$AO_E_BUSY" "the registry is being changed by another command; try again"
   _other=$(awk -F'\t' -v k="$_key" -v s="$_sid" '$1 !~ /^#/ && $1 != k && $4 == s { print $1; exit }' "$AO_REGISTRY")
   [ -z "$_other" ] || refuse "session $_sid already leads '$_other': one session per operator"
@@ -177,6 +191,9 @@ lane_verify() {
   if [ -n "$_hc" ]; then lane_say PASS handoff "HANDOFF.md committed $(ao_utc "$_hc") UTC"
   elif lane_marked handoff; then lane_say PASS handoff "$(st_get "$_st" done_handoff | cut -d ' ' -f 2-)"
   else lane_say WAIT handoff "the outgoing session has not committed HANDOFF.md in $R_DIR yet (gone? lane.sh mark $_key handoff --cold REASON)"; fi
+  # approvals: the grants must follow the operator before it is routed
+  if lane_grants_gate "$_key" "$_tc"; then lane_say PASS approvals "$_gate"
+  else lane_say TODO approvals "$_gate (grants.sh render-$_tc, then verify again)"; fi
   # routing
   if [ "$R_CLIENT" = "$_tc" ] && [ "$R_SID" = "$_ts" ]; then
     lane_say PASS routing "registry: $_tc $_ts"

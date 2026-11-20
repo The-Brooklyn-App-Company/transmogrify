@@ -109,6 +109,19 @@ hy_grants() {
   done <"$_grants"
 }
 
+# hy_grants_file  The grants file against both clients' rendered layers
+# (grants.sh check --findings), when there is one.
+hy_grants_file() {
+  _gf=$(ao_cfg_path grants_file operators/GRANTS.md)
+  [ -f "$_gf" ] || return 0
+  sh "$AO_SCRIPTS/grants.sh" check --findings >"$(ao_tmp grants-check)" 2>&1
+  _grc=$?
+  grep '^- ' "$AO_TMPDIR/grants-check" >>"$out"
+  if [ "$_grc" -ne 0 ] && ! grep -q '^- ' "$AO_TMPDIR/grants-check"; then
+    hy "grants: grants.sh check failed: $(tail -n 1 "$AO_TMPDIR/grants-check" | cut -c 1-200)"
+  fi
+}
+
 hy_home() {
   [ -d "$1" ] || return 0
   if git -C "$1" rev-parse --git-dir >/dev/null 2>&1; then
@@ -140,6 +153,7 @@ main() {
   : >"$out"
   hy_holds
   hy_switches
+  hy_grants_file
   _seen="$AO_HOME" _codex=''
   hy_home "$AO_HOME"
   [ ! -r "$AO_REGISTRY" ] || ao_registry_each _hy_row
@@ -149,7 +163,8 @@ main() {
   fi
   _n=$(wc -l <"$out" | tr -d ' ')
   cat "$out"
-  [ -z "$_codex" ] || echo "(Codex permission rules are not read; check Codex operators' grants by hand.)"
+  [ -z "$_codex" ] || [ -f "$(ao_cfg_path grants_file operators/GRANTS.md)" ] ||
+    echo "(Codex permission rules are not read without a grants file; check Codex operators' grants by hand.)"
   printf 'hygiene %s: %s finding(s).\n' "$AO_T_DATE" "$_n"
   [ "$_n" -gt 0 ] || exit 0
   if [ -n "$_note" ]; then

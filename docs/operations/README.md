@@ -119,6 +119,7 @@ Start-to-finish setup: [docs/operations/manual.md](manual.md).
    [hosts and CI](hosts-and-ci.md),
    [conventions](conventions.md) (two apps, one active side),
    [mailroom](mailroom.md),
+   [grants](grants.md) (approvals that follow an operator),
    [continuity](continuity.md), and the
    [scripts reference](../../ops/README.md).
 
@@ -151,22 +152,23 @@ Highest stage reached for each piece, with the client, version and date.
 | **Experimental:** human takeover, `settle`, `unlock` on a terminal | Driven through a pseudo-terminal (`script(1)`) only; a human at a real terminal and the clients' interactive permission prompts are **unverified** | |
 | **Experimental:** Claude doorbell | Fakes only; live unrun | See [handoff](handoff.md); ordinary Claude relay proof does not verify the doorbell |
 | **Experimental:** Codex doorbell | Fakes only; live unrun | Separate `doorbell_codex=queue` opt-in, default `off`; see [handoff](handoff.md) |
+| **New in 2.0:** `grants.sh` (grants file, Claude and Codex renderers, three-state check, switch gate) | Test suite with a fixture settings file and a fake Codex CLI only; never run against a real client config. The Codex mechanism (`[auto_review].policy` replaces the default; `config/read` readback) is from Codex 0.169.1 source and docs, not a live probe | 2026-11-20 |
 | `ops/examples/tracker-linear` | **Untested** sketch | |
 
 ## Repository layout
 
 ```
-kit/KIT.md      the rules, stable IDs
-docs/operations/           seven guides
-ops/templates/      home/, oracle/, team/, packets/
-ops/profiles/       claude-only, codex-only, both, custom
-ops/        install, tick, relay, mailroom, worker-run, review-run,
-                cross-review, status, inbox-put, check, drift-check,
-                recover-context, lib/, units/
-ops/adapters/       CONTRACT.md, none.sh, git-gh.sh
-skills/         operator-setup, review-handoff, release-closeout,
-                return-to-desk, model-bakeoff
-ops/examples/       two-operators/, tracker-linear/, security-auto-ship.md, hooks/
+kit/KIT.md         the rules, stable IDs
+docs/operations/   the operations guides (this folder)
+ops/               install, tick, relay, mailroom, worker-run, review-run,
+                   cross-review, status, inbox-put, check, drift-check,
+                   recover-context, grants, lib/, units/
+ops/templates/     home/, oracle/, team/, packets/
+ops/profiles/      claude-only, codex-only, both, custom
+ops/adapters/      CONTRACT.md, none.sh, git-gh.sh
+ops/examples/      two-operators/, tracker-linear/, security-auto-ship.md, hooks/
+skills/            operator-setup, review-handoff, release-closeout,
+                   return-to-desk, model-bakeoff
 test/ops/          sh test suite with fake agent CLIs
 ```
 

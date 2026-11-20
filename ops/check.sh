@@ -77,7 +77,10 @@
 #          text or a denylist line (a denylist match in a file name prints
 #          that name). One stderr line says how many denylist rules ran. A
 #          line carrying `leak-ok: RULE` is exempt from RULE. Tracked
-#          symlinks are scanned as their target path, never followed.
+#          symlinks are scanned as their target path, never followed. Each
+#          file has a hard time budget (TRANSMOGRIFY_LEAK_FILE_SECONDS,
+#          default 60); one that runs over it is stopped, reported as not
+#          scanned, and the run fails.
 #          --staged scans only what is staged (the pre-commit hook,
 #          install.sh precommit); --no-denylist runs the generic rules only
 #          (CI); --require-denylist fails (exit 2) without denylist rules (the
@@ -533,9 +536,17 @@ CHECK_LEAK_HOMES='example examples test tests tester owner private me person use
 # for a denylist match in the name. File names, the contact and the
 # denylist reach awk through the environment, never through program text. A
 # line carrying `leak-ok: RULE` is exempt from RULE.
+# Each file gets a hard time budget (TRANSMOGRIFY_LEAK_FILE_SECONDS, default
+# 60): a scan that runs over it is stopped, its whole process group killed,
+# and the file reported as not scanned, so the guard can never spin forever.
 check_leak_scan() {
   case $1 in /*) _lf=$1 ;; *) _lf=./$1 ;; esac
-  AO_N=$2 AO_P=$3 AO_C=$4 AO_H=$CHECK_LEAK_HOMES awk '
+  _lb=${TRANSMOGRIFY_LEAK_FILE_SECONDS:-60}
+  ao_is_uint "$_lb" && [ "$_lb" -gt 0 ] || ao_die "$AO_E_USAGE" "TRANSMOGRIFY_LEAK_FILE_SECONDS must be a positive integer"
+  AO_N=$2 AO_P=$3 AO_C=$4 AO_H=$CHECK_LEAK_HOMES
+  export AO_N AO_P AO_C AO_H
+  # shellcheck disable=SC2016 # the awk program is literal text
+  ao_timeout "$_lb" awk '
     # exempt(rule): the line carries `leak-ok: RULE` with no letter or digit
     # after the id (leak-ok: D12 does not exempt D1).
     function exempt(rule,   t, k, c) {
@@ -705,6 +716,12 @@ check_leak_scan() {
       for (i = 1; i <= nd; i++) if ((i in deny) && (word[i] ? wordin(low, deny[i]) : index(low, deny[i]))) hit("D" i)
     }
     '"$CHECK_AWK_WORDIN" "$_lf"
+  _lrc=$?
+  if [ "$_lrc" -eq "$AO_E_TIMEOUT" ]; then
+    printf '%s: not scanned (stopped after the %s s budget)\n' "$2" "$_lb"
+    return 2
+  fi
+  return "$_lrc"
 }
 
 # check_leaks_each PATTERNS CONTACT FILE...  Scan tracked text files

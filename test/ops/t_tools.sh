@@ -370,15 +370,20 @@ test_check_leaks_staged_only_and_the_precommit_hook() {
   assert_has "$T/err" "was not written by this kit; left alone"
 }
 
-# ao_timeout_run CMD...  Run CMD, killed after 20 s (a hang fails the test).
+# ao_timeout_run CMD...  Run CMD in its own process group; after 20 s the
+# whole group gets TERM, then KILL, so a hang fails the test instead of
+# hanging it (a shell that traps TERM cannot defer the KILL).
 ao_timeout_run() {
+  set -m
   "$@" &
   _tp=$!
-  ( sleep 20; kill "$_tp" 2>/dev/null ) &
+  set +m
+  ( sleep 20; kill -TERM -"$_tp" 2>/dev/null; sleep 2; kill -KILL -"$_tp" 2>/dev/null ) &
   _tk=$!
   wait "$_tp"
   _tr=$?
   kill "$_tk" 2>/dev/null
+  wait "$_tk" 2>/dev/null
   return "$_tr"
 }
 
@@ -488,6 +493,26 @@ test_precommit_hook_carries_this_checkouts_denylist() {
   run install.sh precommit --denylist "$T/repo/deny.txt" "$T/repo"
   assert_rc 2
   assert_has "$T/err" "must live outside"
+}
+
+test_check_leaks_stops_a_scan_that_hangs() {
+  leak_repo || return 0
+  printf 'clean\n' >"$T/repo/a.md"
+  (cd "$T/repo" && git add -A)
+  # An awk that never returns on the leak program (everything else goes to the real awk).
+  real=$(command -v awk)
+  printf '#!/bin/sh\nfor a in "$@"; do case $a in *"function exempt(rule"*) exec sleep 7319 ;; esac; done\nexec "%s" "$@"\n' "$real" >"$T/bin/awk"
+  chmod +x "$T/bin/awk"
+  start=$(date +%s)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' TRANSMOGRIFY_LEAK_FILE_SECONDS=2 \
+    ao_timeout_run "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  rm -f "$T/bin/awk"
+  [ $(($(date +%s) - start)) -lt 18 ] || _fail "the per-file budget did not stop the scan"
+  assert_rc 1
+  assert_has "$T/out" "a.md: not scanned (stopped after the 2 s budget)"
+  assert_has "$T/err" "leak scan incomplete"
+  ! pgrep -f 'sleep 7319' >/dev/null 2>&1 || _fail "the hung scan outlived the guard"
 }
 
 ao_test_main "$0"

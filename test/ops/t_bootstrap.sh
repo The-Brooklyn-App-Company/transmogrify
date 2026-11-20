@@ -33,10 +33,21 @@ case \$1 in
 esac
 EOF
   chmod +x "$T/bin/defaults" "$T/bin/launchctl"
+  cp "$TESTS_DIR/fakes/fake-codex-firstrun" "$T/bin/codex" && chmod +x "$T/bin/codex"
+  unset FAKE_HOOKS_LIST FAKE_CODEX_LOGIN
   r=$T/Applications/Codex.app/Contents/Resources
   mkdir -p "$r/bin" "$r/plugins/codex-app-tools"
   printf '#!/bin/sh\n' >"$r/bin/node" && chmod +x "$r/bin/node"
   : >"$r/plugins/codex-app-tools/server.mjs"
+}
+
+# hooks_list TRUST [HASH] [SCRIPT] [ENABLED]  What Codex's hooks/list reports for the home: the
+# codex-cli 0.169.1 response shape (fixtures/codex-hooks-list.json) with one SessionStart hook.
+hooks_list() {
+  sed -e "s|@SCRIPT@|${3:-$SCRIPTS/recover-context.sh}|" -e "s|@HASH@|${2:-aaaa}|" -e "s|@TRUST@|$1|" \
+    -e "s|\"enabled\": true|\"enabled\": ${4:-true}|" "$TESTS_DIR/fixtures/codex-hooks-list.json" >"$T/hooks-list.json"
+  FAKE_HOOKS_LIST=$T/hooks-list.json
+  export FAKE_HOOKS_LIST
 }
 
 # The profile's PATH must find the fakes first: never the real defaults or
@@ -87,7 +98,7 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   # The Codex hook: written by the --yes run above, trusted in Codex's own
   # record, then checked by one read-only run (the fake quotes the digest).
   assert_has "$CODEX_HOME/hooks.json" "recover-context.sh"
-  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  hooks_list trusted
   FAKE_OUTPUT='## Oracle recovery (2026-11-19). The files win over any summary.'
   export FAKE_OUTPUT
   sleep 300 >/dev/null 2>&1 &
@@ -102,7 +113,7 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   run bootstrap.sh --yes --oracle-session sid-oracle --home "$T/ops/oracle"
   run bootstrap.sh status
   assert_rc 1
-  assert_has "$T/out" "PASS  hook-codex    trusted; a fresh Codex run received the digest"
+  assert_has "$T/out" "PASS  hook-codex    trusted (Codex's hooks/list); a fresh isolated Codex run quoted the digest for this hook"
   assert_has "$T/out" "PASS  hook-claude   confirmed"
   assert_has "$T/out" "PASS  codex-watcher armed"
   assert_has "$T/out" "WAIT  round-trip    a test note went to the Oracle"
@@ -161,40 +172,99 @@ test_codex_hook_is_written_on_consent_trusted_by_the_owner_then_checked() {
   # No terminal, no --yes: nothing is written; the step says how.
   assert_no_file "$CODEX_HOME/hooks.json"
   assert_has "$T/out" "Not written (no consent)"
-  assert_has "$T/out" "TODO  hook-codex    bootstrap.sh writes $CODEX_HOME/hooks.json on your yes"
-  assert_has "$T/out" "TODO  hook-claude   add to $CLAUDE_CONFIG_DIR/settings.json"
-  # --yes: written, and the exact trust steps name the CLI and the home.
+  assert_has "$T/out" "TODO  hook-codex    Codex has no SessionStart hook for this home that runs the digest"
+  assert_has "$T/out" "TODO  hook-claude   no settings file: add to $CLAUDE_CONFIG_DIR/settings.json"
+  # --yes: written, the command shell-quoted, and the exact trust steps name the CLI and the home.
   run bootstrap.sh --yes --home "$T/ops/oracle"
   assert_has "$CODEX_HOME/hooks.json" '"matcher": "startup|resume|compact|fork"'
-  assert_has "$CODEX_HOME/hooks.json" "$SCRIPTS/recover-context.sh"
+  assert_has "$CODEX_HOME/hooks.json" "env 'AO_PROFILE=$AO_PROFILE' '$SCRIPTS/recover-context.sh'"
   assert_has "$T/out" "1. In a terminal, run: \"$T/bin/codex\" -C \"$T/ops/oracle\""
   assert_has "$T/out" "2. Type /hooks, choose SessionStart, then Trust."
-  assert_has "$T/out" "TODO  hook-codex    trust it once in the Codex CLI"
-  # A record for another file, or without enabled = true, is not trust.
-  printf '[hooks.state."/elsewhere/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' >"$CODEX_HOME/config.toml"
-  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = false\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  # Codex's own verdicts: untrusted, changed since trust, disabled, another script.
+  hooks_list untrusted
   run bootstrap.sh status
-  assert_has "$T/out" "TODO  hook-codex    trust it once"
-  # Trusted: status only reads; bootstrap.sh runs the one check, which fails
-  # when the run does not quote the digest, and passes when it does.
-  printf '[hooks.state."%s/hooks.json:session_start:0:0"]\ntrusted_hash = "sha256:x"\nenabled = true\n' "$CODEX_HOME" >>"$CODEX_HOME/config.toml"
+  assert_has "$T/out" "TODO  hook-codex    trust it in the Codex CLI"
+  hooks_list modified
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-codex    trust it again (it changed since it was trusted)"
+  hooks_list trusted aaaa "$SCRIPTS/recover-context.sh" false
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-codex    the hook is disabled in Codex"
+  hooks_list trusted aaaa /elsewhere/other-hook.sh
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-codex    Codex has no SessionStart hook for this home"
+  # Trusted (as Codex reports a Trust that wrote only trusted_hash): status only reads; bootstrap.sh
+  # runs the one isolated check, which fails when the run does not quote the digest.
+  hooks_list trusted aaaa
   run bootstrap.sh status
   assert_has "$T/out" "WAIT  hook-codex    trusted; bootstrap.sh (not status) runs one"
+  # shellcheck disable=SC2089,SC2090 # JSON for the fake, not shell words
+  FAKE_MCP='[{"name":"trade","enabled":true}]'
   FAKE_OUTPUT=NONE
-  export FAKE_OUTPUT
+  # shellcheck disable=SC2090
+  export FAKE_OUTPUT FAKE_MCP
   run bootstrap.sh --yes --home "$T/ops/oracle"
-  assert_has "$T/out" "TODO  hook-codex    trusted, but a fresh read-only Codex run did not quote the digest (it said: NONE)"
+  assert_has "$T/out" "TODO  hook-codex    trusted, but a fresh isolated read-only Codex run did not quote the digest (it said: NONE)"
+  # The probe is boxed: plugins, apps and every listed tool server off; read-only; ephemeral.
   assert_has "$FAKE_LOG" "arg: --ephemeral"
   assert_has "$FAKE_LOG" "arg: read-only"
+  assert_has "$FAKE_LOG" "arg: plugins"
+  assert_has "$FAKE_LOG" "arg: mcp_servers.trade.enabled=false"
   FAKE_OUTPUT='## Oracle recovery (2026-11-19). The files win.'
   run bootstrap.sh --yes --home "$T/ops/oracle"
-  assert_has "$T/out" "PASS  hook-codex    trusted; a fresh read-only Codex run quoted the digest's first line"
+  assert_has "$T/out" "PASS  hook-codex    trusted (Codex's hooks/list); a fresh isolated read-only Codex run quoted the digest's first line"
+  # The pass is bound to the hook's current hash: a changed, re-trusted hook is checked again.
+  hooks_list trusted bbbb
+  run bootstrap.sh status
+  assert_has "$T/out" "WAIT  hook-codex    trusted; bootstrap.sh (not status) runs one"
+  # Fails closed when the tool-server list cannot be read: no probe runs.
+  FAKE_MCP=fail
+  : >"$FAKE_LOG"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$T/out" "TODO  hook-codex    trusted, but the check did not run: cannot list Codex tool servers"
+  assert_lacks "$FAKE_LOG" "arg: exec"
+  unset FAKE_MCP
   # An existing hooks.json is never rewritten.
+  hooks_list trusted aaaa /elsewhere/other-hook.sh
   rm "$CODEX_HOME/hooks.json"
   printf '{"hooks": {}}\n' >"$CODEX_HOME/hooks.json"
   run bootstrap.sh --yes --home "$T/ops/oracle"
   assert_eq "$(cat "$CODEX_HOME/hooks.json")" '{"hooks": {}}'
   assert_has "$T/out" "exists without the digest"
+  # Hooks kept in config.toml: bootstrap adds nothing beside them and says where.
+  rm "$CODEX_HOME/hooks.json"
+  printf '[[hooks.SessionStart]]\nmatcher = "startup"\n' >>"$CODEX_HOME/config.toml"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_no_file "$CODEX_HOME/hooks.json"
+  assert_has "$T/out" "Your Codex hooks live in $CODEX_HOME/config.toml"
+}
+
+test_claude_hook_and_sign_in_are_parsed_not_matched() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --yes --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  mkdir -p "$CLAUDE_CONFIG_DIR"
+  # The script's name outside hooks.SessionStart is not a hook.
+  printf '{"description": "old recover-context.sh integration", "hooks": {}}\n' >"$CLAUDE_CONFIG_DIR/settings.json"
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-claude   no SessionStart command hook for compact and resume runs the digest"
+  printf '{"hooks": {"SessionStart": [{"matcher": "startup", "hooks": [{"type": "command", "command": "%s"}]}]}}\n' \
+    "$SCRIPTS/recover-context.sh" >"$CLAUDE_CONFIG_DIR/settings.json"
+  run bootstrap.sh status
+  assert_has "$T/out" "TODO  hook-claude   no SessionStart command hook"
+  printf '{"hooks": {"SessionStart": [{"matcher": "compact|resume", "hooks": [{"type": "command", "command": "%s"}]}]}}\n' \
+    "$SCRIPTS/recover-context.sh" >"$CLAUDE_CONFIG_DIR/settings.json"
+  run bootstrap.sh status
+  assert_has "$T/out" "PASS  hook-claude   a SessionStart hook for compact and resume"
+  # Sign-in: any valid JSON layout of loggedIn counts.
+  mkdir -p "$T/fake"
+  cp "$TESTS_DIR/fakes/fake-agent" "$T/fake/claude"
+  printf '#!/bin/sh\nif [ "$1 $2" = "auth status" ]; then cat "%s"; exit 0; fi\nexec "%s" "$@"\n' "$T/claude-auth" "$T/fake/claude" >"$T/bin/claude"
+  chmod +x "$T/bin/claude"
+  printf '{\n  "loggedIn":   true,\n  "authMethod": "claude.ai"\n}\n' >"$T/claude-auth"
+  run bootstrap.sh status
+  assert_has "$T/out" "PASS  sign-in-claude the Claude CLI reports signed in"
 }
 
 test_sign_in_restart_and_pins_are_checked_not_just_marked() {
@@ -209,12 +279,11 @@ test_sign_in_restart_and_pins_are_checked_not_just_marked() {
   # Sign-in: each CLI is asked. Signed out first, then signed in.
   mkdir -p "$T/fake"
   cp "$TESTS_DIR/fakes/fake-agent" "$T/fake/claude"
-  cp "$TESTS_DIR/fakes/fake-agent" "$T/fake/codex"
   printf '#!/bin/sh\nif [ "$1 $2" = "auth status" ]; then cat "%s"; exit 0; fi\nexec "%s" "$@"\n' "$T/claude-auth" "$T/fake/claude" >"$T/bin/claude"
-  printf '#!/bin/sh\nif [ "$1 $2" = "login status" ]; then cat "%s"; exit 0; fi\nexec "%s" "$@"\n' "$T/codex-login" "$T/fake/codex" >"$T/bin/codex"
-  chmod +x "$T/bin/claude" "$T/bin/codex"
+  chmod +x "$T/bin/claude"
   printf '{"loggedIn": false}\n' >"$T/claude-auth"
-  printf 'Not logged in\n' >"$T/codex-login"
+  FAKE_CODEX_LOGIN='Not logged in'
+  export FAKE_CODEX_LOGIN
   # Restart: the Codex app runs a process older than the App Nap write; the
   # Claude app is not running.
   sleep 300 >/dev/null 2>&1 &
@@ -225,23 +294,27 @@ test_sign_in_restart_and_pins_are_checked_not_just_marked() {
   # Pins: the bridge thread is active on Codex; the app's state lists no pin.
   run operator.sh session mailroom-codex thread-bridge
   printf '{"pinned-thread-ids": ["other"]}\n' >"$CODEX_HOME/.codex-global-state.json"
+  # A four-column row takes the profile's relay_default (here codex), as everywhere else.
+  printf 'web\tWeb\t%s\tthread-web\n' "$T/ops/web" >>"$T/ops/oracle/operators/REGISTRY.tsv"
+  printf 'relay_default=codex\n' >>"$AO_PROFILE"
   run bootstrap.sh status
   assert_has "$T/out" 'TODO  sign-in-claude signed out: in a terminal run "claude auth login"'
   assert_has "$T/out" "TODO  sign-in-codex signed out: in a terminal run"
   assert_has "$T/out" "TODO  restart-apps  quit the Codex (ChatGPT) desktop app (Cmd-Q"
-  assert_has "$T/out" 'TODO  pins-codex    in the Codex app, pin: Mailroom'
+  assert_has "$T/out" 'TODO  pins-codex    in the Codex app, pin: Mailroom, Web'
   assert_has "$T/out" 'TODO  pins-claude   in the Claude app: pin'
   # Each fixed: the checks pass on their own evidence, with no marks.
   printf '{"loggedIn": true}\n' >"$T/claude-auth"
-  printf 'Logged in using ChatGPT\n' >"$T/codex-login"
+  FAKE_CODEX_LOGIN='Logged in using ChatGPT'
+  export FAKE_CODEX_LOGIN
   echo $(($(date +%s) - 100)) >"$st/host/app-nap.com.openai.codex"
-  printf '{"pinned-thread-ids": ["other", "thread-bridge"]}\n' >"$CODEX_HOME/.codex-global-state.json"
+  printf '{"pinned-thread-ids": ["other", "thread-bridge", "thread-web"]}\n' >"$CODEX_HOME/.codex-global-state.json"
   run bootstrap.sh status
   kill "$app" 2>/dev/null
   assert_has "$T/out" "PASS  sign-in-claude the Claude CLI reports signed in"
   assert_has "$T/out" "PASS  sign-in-codex the Codex CLI reports signed in"
   assert_has "$T/out" "PASS  restart-apps  every app started after App Nap was turned off"
-  assert_has "$T/out" "PASS  pins-codex    the Codex app shows all 1 active thread(s) pinned"
+  assert_has "$T/out" "PASS  pins-codex    the Codex app shows all 2 active thread(s) pinned"
   # The Claude sidebar has no readable state: only the mark passes it.
   assert_has "$T/out" "TODO  pins-claude"
   run bootstrap.sh mark pins

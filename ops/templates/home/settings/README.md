@@ -38,8 +38,9 @@ the session to read the full files first. Register it for this home:
 ```
 
 On Codex, `bootstrap.sh` writes the hook for you, on your yes, into
-`~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`; Codex reads hooks from
-there or from `[hooks]` in `config.toml`, never both):
+`~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`). Codex also reads hooks
+from `[hooks]` in `config.toml` and loads both, with a warning, so keep one;
+if yours live in `config.toml`, add the hook there instead:
 
 ```json
 {
@@ -55,8 +56,9 @@ there or from `[hooks]` in `config.toml`, never both):
 
 Then trust it once in the interactive Codex CLI (the desktop app has no
 `/hooks`): run `codex -C <oracle-home>`, type `/hooks`, choose SessionStart,
-Trust, and `/exit`. `bootstrap.sh` reads the trust record Codex writes in
-`config.toml` and checks with one read-only run that the digest arrives. The
+Trust, and `/exit`. `bootstrap.sh` asks Codex (`codex app-server`
+`hooks/list`) whether the hook is enabled and trusted at its current hash,
+and checks with one isolated read-only run that the digest arrives. The
 digest stays under about 2,000 tokens. Re-trust after any edit to the file.
 
 ### Mailroom home

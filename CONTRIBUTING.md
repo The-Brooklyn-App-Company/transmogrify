@@ -159,8 +159,15 @@ in order and record the outcomes in the ROADMAP run record.
    protected by a repository ruleset: it cannot be deleted or force-pushed,
    and a commit reaches it only after the six CI matrix checks have passed on
    that exact commit, so every change lands through a branch first.
-5. Publish. Fast-forward `main`, tag `v<version>` on the release commit, and
-   reinstall the skill on the maintainer hosts. Delete the release branch once
+5. Publish. Tag `v<version>` on the release commit and push the tag first.
+   Then, from a scratch directory and without credentials, confirm the public
+   repository serves exactly that release:
+   `git ls-remote https://github.com/The-Brooklyn-App-Company/transmogrify.git refs/tags/v<version>`
+   names the release commit, and `git init -q x && git -C x fetch --depth 1
+   https://github.com/The-Brooklyn-App-Company/transmogrify.git <commit>`
+   succeeds. `/start` installs from that commit, so do not fast-forward
+   `main` (which deploys the site) until both pass. Then fast-forward `main`
+   and reinstall the skill on the maintainer hosts. Delete the release branch once
    `main` carries it; the only long-lived branch is `main`.
 6. Verify the deployment. Confirm the Site deploy run on `main` succeeded, that
    `https://transmogrify.sh/start` begins with the released version and pins

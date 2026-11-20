@@ -1,0 +1,31 @@
+{
+ "data": [
+  {
+   "cwd": "/Users/example/ops/oracle",
+   "hooks": [
+    {
+     "key": "/Users/example/.codex/hooks.json:session_start:0:0",
+     "eventName": "sessionStart",
+     "handlerType": "command",
+     "command": "@SCRIPT@",
+     "async": false,
+     "matcher": "startup|resume|compact|fork",
+     "timeoutSec": 10,
+     "statusMessage": "Loading recovery digest",
+     "additionalContextLimit": null,
+     "sourcePath": "/Users/example/.codex/hooks.json",
+     "source": "user",
+     "pluginId": null,
+     "environmentId": null,
+     "displayOrder": 0,
+     "enabled": true,
+     "isManaged": false,
+     "currentHash": "sha256:@HASH@",
+     "trustStatus": "@TRUST@"
+    }
+   ],
+   "warnings": [],
+   "errors": []
+  }
+ ]
+}

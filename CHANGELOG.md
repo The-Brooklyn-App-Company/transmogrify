@@ -38,10 +38,13 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
 - **Every first-run step is guided and checked.** `bootstrap.sh` writes the
   Codex recovery hook (`~/.codex/hooks.json`) on consent, prints the exact
   steps to trust it in the interactive Codex CLI (the desktop app's
-  composer has no `/hooks`), waits, reads Codex's trust record in
-  `config.toml`, and confirms with one read-only `codex exec` run that the
-  digest arrives. The Claude hook is checked in its settings file, with the
-  exact JSON printed when missing. The Codex CLI is found from the
+  composer has no `/hooks`), waits, asks Codex itself (`codex app-server`
+  `hooks/list`: enabled and trusted at the hook's current hash, from
+  `hooks.json` or `config.toml`), and confirms with one isolated read-only
+  `codex exec` run (plugins, apps and tool servers off, failing closed)
+  that the digest arrives; the pass is bound to the hook's hash. The Claude
+  hook is checked by parsing the settings JSON (`hooks.SessionStart`), with
+  the exact JSON printed when missing. Generated commands are shell-quoted. The Codex CLI is found from the
   profile's new `codex_cli`, `PATH` or a desktop app bundle, and used only
   if it answers `--version`. Sign-in is read from `claude auth status` and
   `codex login status`; the app restart after the App Nap write from each

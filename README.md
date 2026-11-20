@@ -150,8 +150,8 @@ launchd units, both bridge homes), and, if you already have a grants file,
 shows the approvals it would write into each app's settings and writes them
 only on your yes. It writes the Codex recovery hook on your yes and gives
 the exact steps to trust it in the Codex CLI (the desktop app has no
-`/hooks`), then confirms Codex's trust record and that a fresh run receives
-the digest. It ends with the short list of steps only you can do (sign in, restart
+`/hooks`), then asks Codex whether the hook is trusted at its current
+definition and checks that an isolated fresh run receives the digest. It ends with the short list of steps only you can do (sign in, restart
 the apps, pin, start the two "Mailroom" sessions), each with exact
 instructions and an automatic check that it worked: the CLIs' sign-in
 status, the apps' start time, the Codex app's pinned list, registry ids.

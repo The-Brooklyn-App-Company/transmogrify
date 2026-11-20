@@ -98,17 +98,27 @@ on your yes, your grants into each client's approval layer
 after a person trusts it, and trust is given in the interactive Codex CLI:
 the desktop app's composer has no `/hooks` command (observed 2026-11-20).
 `bootstrap.sh` writes `<codex home>/hooks.json` (default `~/.codex`) with one
-hook that runs `ops/recover-context.sh`, only on your yes and never over an
-existing file; prints the exact steps (run `"<codex CLI>" -C "<Oracle
-home>"`, type `/hooks`, choose SessionStart, Trust, `/exit`); waits; reads
-Codex's own trust record in `config.toml` (a `[hooks.state."<hooks.json>:
-session_start:..."]` table with a `trusted_hash` and `enabled = true`); and
-then makes one read-only, ephemeral `codex exec` run in the Oracle home that
-must quote the digest's first line (`## Oracle recovery (...)`). The CLI is
-the profile's `codex_cli`, else `codex` on `PATH`, else one inside a desktop
-app bundle, each used only if it answers `--version`. On Claude Code the
-checklist reads the settings file for the hook and prints the exact JSON to
-add when it is missing.
+hook that runs `ops/recover-context.sh` (every word of the command
+shell-quoted), only on your yes and never over an existing file; when your
+Codex hooks already live in `[hooks]` in `config.toml` it adds nothing and
+says to add the hook there (Codex loads both places, warning when both are
+used, so keep one). It prints the exact steps (run `"<codex CLI>" -C
+"<Oracle home>"`, type `/hooks`, choose SessionStart, Trust, `/exit`) and
+waits. The check asks Codex itself: `codex app-server` `hooks/list` for the
+Oracle home (plugins and apps off) returns every hook from every layer and
+both places, each with its current hash, `enabled` and `trustStatus`
+(`trusted`, `untrusted`, `modified` after an edit, `managed`). Trust written
+by the CLI holds only a `trusted_hash`; an omitted `enabled` means enabled,
+and Codex's own answer covers both. A trusted hook then gets one isolated,
+read-only, ephemeral `codex exec` run in the Oracle home (plugins, apps and
+every listed tool server off; no run when the server list cannot be read)
+that must quote the digest's first line (`## Oracle recovery (...)`). The
+pass is bound to the hook's current hash and the home, so an edited,
+re-trusted hook is checked again. The CLI is the profile's `codex_cli`,
+else `codex` on `PATH`, else one inside a desktop app bundle, each used
+only if it answers `--version`. On Claude Code the checklist parses the
+settings JSON for a `hooks.SessionStart` command hook covering `compact`
+and `resume` and prints the exact JSON to add when it is missing.
 
 It ends with a checklist that waits for you and re-checks after each step:
 start the Oracle session, sign in to each app yourself, quit and reopen
@@ -120,11 +130,11 @@ own evidence, read without a model unless noted:
 
 | Step | Evidence |
 | --- | --- |
-| Sign-in | `claude auth status --json` reports `loggedIn: true`; `codex login status` answers without "not logged in" |
+| Sign-in | `claude auth status --json` parses with `loggedIn` true; `codex login status` answers without "not logged in" |
 | Apps restarted | Each app whose App Nap `install.sh host` turned off is not running, or its process started after that write (`<state_dir>/host/app-nap.<bundle>` against the process's elapsed time) |
-| Codex pins | The active Codex threads with ids (the Oracle on Codex, operators, the Mailroom) are in the app's own pinned list (`<codex home>/.codex-global-state.json`, `pinned-thread-ids`; undocumented, read only) |
+| Codex pins | The operators active on Codex with thread ids (the registry's own resolution: the row's client, else `relay_default`, else a lease; the Oracle, operators, the Mailroom) are in the app's own pinned list (`<codex home>/.codex-global-state.json`, `pinned-thread-ids`; undocumented, read only) |
 | Claude pins | None readable: the step names exactly what to pin and what goes in "Inactive Operators", then `bootstrap.sh mark pins` |
-| Recovery hooks | Claude: the hook in its settings file. Codex: the trust record, then one read-only `codex exec` run (a model call) that quotes the digest |
+| Recovery hooks | Claude: a `hooks.SessionStart` command hook for `compact` and `resume` in the parsed settings JSON. Codex: `hooks/list` reports the hook enabled and trusted at its current hash, then one isolated read-only `codex exec` run (a model call) quotes the digest |
 | Sessions, watcher, round trip | A registry id, the watcher's heartbeat, the test note's delivered ring |
 
 A mark (`bootstrap.sh mark sign-in|restart-apps|pins|hooks`) stands in only

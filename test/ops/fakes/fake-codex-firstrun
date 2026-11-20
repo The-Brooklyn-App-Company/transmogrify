@@ -1,0 +1,54 @@
+#!/usr/bin/python3 -I
+"""fake-codex-firstrun - a stand-in Codex CLI for bootstrap.sh's first-run checks. Never calls a model.
+
+  --version                 prints a version
+  login status              prints $FAKE_CODEX_LOGIN (default "Logged in using ChatGPT"), exit 0
+  mcp list --json           prints $FAKE_MCP (default "[]"); the word fail makes it exit 1
+  app-server                answers initialize, then hooks/list with the JSON in $FAKE_HOOKS_LIST (a file;
+                            default: no hooks)
+  exec ... -o FILE ...      writes $FAKE_OUTPUT (default "fake answer") to FILE
+Leading --disable/--enable FEATURE pairs are skipped. Every call is logged to $FAKE_LOG, one `arg:` line per word.
+The hooks/list fixture is the shape codex-cli 0.169.1 returns (test/ops/fixtures/codex-hooks-list.json).
+"""
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+log = os.environ.get("FAKE_LOG")
+if log:
+    with open(log, "a") as f:
+        f.write("== codex-firstrun\n" + "".join("arg: %s\n" % a for a in args))
+rest = list(args)
+while len(rest) >= 2 and rest[0] in ("--disable", "--enable"):
+    rest = rest[2:]
+sub = rest[0] if rest else ""
+if sub == "--version":
+    print("codex-cli 9.9.9")
+elif rest[:2] == ["login", "status"]:
+    print(os.environ.get("FAKE_CODEX_LOGIN", "Logged in using ChatGPT"))
+elif rest[:2] == ["mcp", "list"]:
+    m = os.environ.get("FAKE_MCP", "[]")
+    if m == "fail":
+        sys.exit(1)
+    print(m)
+elif sub == "app-server":
+    path = os.environ.get("FAKE_HOOKS_LIST", "")
+    try:
+        result = json.load(open(path)) if path else {"data": [{"cwd": os.getcwd(), "hooks": [], "warnings": [], "errors": []}]}
+    except (OSError, ValueError):
+        result = None
+    for line in sys.stdin:
+        try:
+            m = json.loads(line)
+        except ValueError:
+            continue
+        if m.get("method") == "initialize":
+            print(json.dumps({"jsonrpc": "2.0", "id": m["id"], "result": {"userAgent": "fake/9.9.9"}}), flush=True)
+        elif m.get("method") == "hooks/list":
+            r = {"result": result} if result is not None else {"error": {"code": -1, "message": "no"}}
+            print(json.dumps(dict({"jsonrpc": "2.0", "id": m["id"]}, **r)), flush=True)
+elif sub == "exec":
+    if "-o" in rest:
+        with open(rest[rest.index("-o") + 1], "w") as f:
+            f.write(os.environ.get("FAKE_OUTPUT", "fake answer") + "\n")

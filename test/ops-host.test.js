@@ -51,6 +51,20 @@ test('the host report parses into pending items and in-app steps', () => {
   assert.equal(parseHostReport('garbage').pending, null);
 });
 
+test('tab-separated rows keep their cells however long they are', () => {
+  const tsv = [
+    'ITEM\tSTATE\tACTION',
+    'folder inbox/.mailroom/claude/delivered\twould create\t-',
+    'unit relay\tstale (differs from the rendered template, a long state)\tinstall.sh host --apply',
+    'power\tsystem sleeps after 10 min\tturn system sleep off in Settings (check only here)',
+    '',
+    '3 item(s) need you.',
+  ].join('\n');
+  const parsed = parseHostReport(tsv);
+  assert.equal(parsed.applicable, 2);
+  assert.deepEqual(parsed.manual, ['power: system sleeps after 10 min (turn system sleep off in Settings (check only here))']);
+});
+
 test('the check states map to non-blocking owner actions', async () => {
   assert.deepEqual(await opsHostCheck({ TRANSMOGRIFY_OPS_DIR: '/nonexistent-ops' }), { state: 'absent' });
   assert.deepEqual(await opsHostCheck({ HOME: '/nonexistent-home' }, { existsSync: (p) => p.endsWith('install.sh') }),
@@ -136,6 +150,8 @@ test('end to end: the real dry run reads a sandbox host and writes nothing', asy
   const check = await opsHostCheck({ PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: root, AO_PROFILE: path.join(root, 'profile') });
   assert.ok(['ready', 'needsOwner'].includes(check.state), JSON.stringify(check));
   assert.equal(typeof check.pending, 'number');
+  assert.equal(typeof check.applicable, 'number');
+  assert.ok(check.applicable + check.manualSteps.length >= Math.min(check.pending, 1), 'every pending row is classified');
   assert.ok(check.inAppSteps.length > 0, 'the in-app steps are listed');
   const after = fs.readdirSync(root, { recursive: true }).filter((p) => !p.startsWith('state')).sort();
   assert.deepEqual(after, before.filter((p) => !p.startsWith('state')), 'the dry run creates nothing in the home');

@@ -61,7 +61,8 @@
 #           read for bridge ids. Then prints how to start and name the
 #           session and record its id.
 # host      An always-on host, turnkey: check then set, idempotent; prints
-#           one table row per item (item, state, action), then the few
+#           one table row per item (item, state, action; tab-separated
+#           with AO_HOST_TSV=1, for programs such as the doctor), then the few
 #           in-app steps only a person can do, each marked done or to do.
 #           Always: App Nap off for each desktop app in host_apps (default:
 #           com.anthropic.claudefordesktop and com.openai.codex), read back,
@@ -701,7 +702,9 @@ EOT
 # done (ok, set, created, installed, updated, loaded, removed, opt-in) do
 # not count as needing you.
 host_row() {
-  printf '%-34s %-40s %s\n' "$1" "$2" "${3:--}"
+  # AO_HOST_TSV=1: tab-separated cells, for a program that reads the table.
+  if [ -n "${AO_HOST_TSV-}" ]; then printf '%s\t%s\t%s\n' "$1" "$2" "${3:--}"
+  else printf '%-34s %-40s %s\n' "$1" "$2" "${3:--}"; fi
   case $2 in ok* | set* | created* | installed* | updated* | loaded* | removed* | off\ \(opt-in*) ;; *) host_todo=$((host_todo + 1)) ;; esac
 }
 
@@ -792,7 +795,7 @@ inst_host() {
   _prof=
   if [ -r "$_pf" ]; then ao_load --no-state; _prof=1; fi
   apps=$(ao_cfg host_apps "$AO_HOST_APPS")
-  printf '%-34s %-40s %s\n' ITEM STATE ACTION
+  if [ -n "${AO_HOST_TSV-}" ]; then printf 'ITEM\tSTATE\tACTION\n'; else printf '%-34s %-40s %s\n' ITEM STATE ACTION; fi
   # 1. App Nap, per app: check, set, read back.
   if ! command -v defaults >/dev/null 2>&1; then
     host_row app-nap "n/a (not macOS)"

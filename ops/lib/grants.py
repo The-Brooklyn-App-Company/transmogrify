@@ -149,8 +149,13 @@ def registry():
                 if line.startswith("#") or not line.strip():
                     continue
                 c = line.rstrip("\n").split("\t")
-                if len(c) >= 3 and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", c[0]) and c[2].startswith("/"):
-                    reg[c[0]] = (c[1], c[2])
+                if len(c) < 3:
+                    continue
+                home = c[2]
+                if home == "~" or home.startswith("~/"):  # as the installer writes them
+                    home = os.environ.get("HOME", "") + home[1:]
+                if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", c[0]) and home.startswith("/"):
+                    reg[c[0]] = (c[1], home)
     except OSError:
         raise Fail("registry: cannot read %s" % REG, E_USAGE)
     if ORACLE not in reg:

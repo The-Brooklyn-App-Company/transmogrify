@@ -53,18 +53,14 @@ function runSh(script, args, env, timeoutMs, dependencies = {}) {
 // States the host table counts as done (install.sh host_row).
 const DONE_STATE = /^(ok|set|created|installed|updated|loaded|removed|off \(opt-in)/;
 
-// One table row: printf '%-34s %-40s %s' (item, state, action); a wider cell
-// pushes the rest right, so fall back to splitting on runs of two spaces.
+// One table row. The doctor runs install.sh with AO_HOST_TSV=1, so cells are
+// tab-separated; a padded row (a person's terminal copy) splits on runs of
+// two or more spaces.
 function parseRow(line) {
   const cell = (value) => (value === '-' ? '' : value);
-  const fixed = /^(.{34}) (.{40}) (.*)$/.exec(line);
-  const fits = (value, width) => /\s$/.test(value) || value.trim().length === width;
-  if (fixed && fixed[1].trim() && fixed[2].trim() && fits(fixed[1], 34) && fits(fixed[2], 40)) {
-    return { item: fixed[1].trim(), state: fixed[2].trim(), action: cell(fixed[3].trim()) };
-  }
-  const cells = line.trim().split(/ {2,}/);
-  if (cells.length < 2) return null;
-  return { item: cells[0], state: cells[1], action: cell(cells.slice(2).join(' ')) };
+  const cells = line.includes('\t') ? line.split('\t') : line.trim().split(/ {2,}/);
+  if (cells.length < 2 || !cells[0].trim() || !cells[1].trim()) return null;
+  return { item: cells[0].trim(), state: cells[1].trim(), action: cell(cells.slice(2).join(' ').trim()) };
 }
 
 // Parse the host report: the table (header ITEM STATE ACTION), "N item(s)
@@ -73,7 +69,7 @@ function parseRow(line) {
 function parseHostReport(text) {
   const lines = text.split(/\r?\n/);
   const pendingLine = lines.findIndex((line) => /^\d+ item\(s\) need you\.$/.test(line));
-  const header = lines.findIndex((line) => /^ITEM\s+STATE\s+ACTION$/.test(line));
+  const header = lines.findIndex((line) => /^ITEM\s+STATE\s+ACTION\s*$/.test(line));
   const rows = header >= 0 && pendingLine > header
     ? lines.slice(header + 1, pendingLine).filter((line) => line.trim()).map(parseRow).filter(Boolean) : [];
   const open = rows.filter((row) => !DONE_STATE.test(row.state));
@@ -96,7 +92,7 @@ async function opsHostCheck(env = process.env, dependencies = {}) {
   if (!dir || !exists(path.join(dir, 'install.sh'))) return { state: 'absent' };
   const profile = opsProfile(env);
   if (!profile || !exists(profile)) return { state: 'unconfigured' };
-  const result = await (dependencies.runSh || runSh)(path.join(dir, 'install.sh'), ['--dry-run', 'host'], env,
+  const result = await (dependencies.runSh || runSh)(path.join(dir, 'install.sh'), ['--dry-run', 'host'], { ...env, AO_HOST_TSV: '1' },
     dependencies.timeoutMs || CHECK_TIMEOUT_MS, dependencies);
   const report = parseHostReport(result.out || '');
   if (result.code !== 0 || report.pending === null) return { state: 'failed', timedOut: result.timedOut === true };
@@ -129,7 +125,7 @@ async function opsHostApply(env = process.env, dependencies = {}) {
   const dir = opsDir(env);
   const exists = dependencies.existsSync || fs.existsSync;
   if (!dir || !exists(path.join(dir, 'install.sh'))) return { applied: false, state: 'absent' };
-  const result = await (dependencies.runSh || runSh)(path.join(dir, 'install.sh'), ['host', '--apply'], env,
+  const result = await (dependencies.runSh || runSh)(path.join(dir, 'install.sh'), ['host', '--apply'], { ...env, AO_HOST_TSV: '1' },
     dependencies.timeoutMs || APPLY_TIMEOUT_MS, dependencies);
   const report = parseHostReport(result.out || '');
   return {

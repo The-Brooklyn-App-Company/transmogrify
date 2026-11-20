@@ -416,4 +416,16 @@ test_existing_text_is_kept_byte_for_byte() {
     "$(printf '\n[tail]\nx = 1\n\n\n' | od -c | head -n 1 | tr -s ' ')" "text after the block kept"
 }
 
+test_registry_homes_written_with_a_tilde_resolve() {
+  gsetup
+  mkdir -p "$T/user/ops/alpha"
+  awk -F'\t' -v OFS='\t' '$1 == "alpha" { $3 = "~/ops/alpha" } { print }' "$T/home/operators/REGISTRY.tsv" >"$T/reg" &&
+    mv "$T/reg" "$T/home/operators/REGISTRY.tsv"
+  run grants.sh render-codex --actor alpha
+  assert_rc 0
+  assert_file "$T/user/ops/alpha/.codex/config.toml"
+  run grants.sh check --gate alpha codex
+  assert_rc 0
+}
+
 ao_test_main "$0"

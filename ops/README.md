@@ -12,7 +12,7 @@ and exit codes.
 | `bootstrap.sh` | The guided first run: the Oracle on the client you start with, the always-on host, a toehold in the other client, then a checklist of the few in-app steps, each with its check ([first run](../docs/operations/hosts-and-ci.md#first-run)) |
 | `operator.sh` | The operator routines as guided scripts with verifiers: `create` (models for both clients decided at creation), `archive` (worktrees to verified local bundles), `model` (the owner-only model change), `session`, `recover` (an unresponsive Codex thread), `verify`, `mark` ([conventions](../docs/operations/conventions.md#operator-routines)) |
 | `install.sh` | Create the Oracle home, operator homes, mailroom bridge homes, skill links and the tick and relay units; `host [--apply]` sets up an always-on host, turnkey (check then set, units loaded, bridge homes, then the in-app steps); `sync <client>` brings every home up to date for a second client; `--dry-run` lists everything first |
-| `lane.sh` | Switch an operator between clients as a scripted checklist with a verifier (`switch`, `verify`, `mark`, `ack`); `side` for the parked-side guard; `check`; holds with an owner, expiry and reason; the Oracle lock ([conventions](../docs/operations/conventions.md)) |
+| `switch.sh` | Switch an operator between clients as a scripted checklist with a verifier (`switch`, `verify`, `mark`, `ack`); `side` for the parked-side guard; `check`; holds with an owner, expiry and reason; the Oracle lock ([conventions](../docs/operations/conventions.md)) |
 | `hygiene.sh` | The nightly, model-free hygiene check: expired holds, open switches and routines, unresponsive threads, uncommitted work, budgets, standing grants against permission rules and, with a grants file, against both clients |
 | `grants.sh` | One client-neutral grants file rendered into Claude Code's `autoMode.allow` and each home's Codex `[auto_review]` policy, with a three-state check (rendered, resolved, accepted) and the switch gate ([grants](../docs/operations/grants.md)) |
 | `tick.sh` | Scheduled heartbeat: stall watchdog, period hooks, then the relay and the mailroom supervisor |
@@ -246,7 +246,7 @@ agents do not write unattended, or review every change to it.
 An optional executable `hooks/gate` is asked before acting on an operator:
 `gate <action> <key> <client> <session>`, where action is `relay`,
 `watchdog` or `doorbell`; non-zero holds that operator for this tick. A
-hold with an owner and an expiry (`lane.sh hold`, `<state_dir>/holds/<key>`)
+hold with an owner and an expiry (`switch.sh hold`, `<state_dir>/holds/<key>`)
 holds the operator before the gate is asked. Optional `hooks/wake <client>
 <session>` warms a cold session and `hooks/push <text>` reaches the owner at
 the mailroom's tier 4 ([mailroom](../docs/operations/mailroom.md)). An

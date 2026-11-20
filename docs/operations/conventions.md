@@ -8,9 +8,9 @@ this page says how to apply them, and which script applies each one.
 
 | Convention | Where it lives | Applied by |
 | --- | --- | --- |
-| **One active side per operator** ([K-13](../../kit/KIT.md)): exactly one client and session run an operator; the other side is parked | The registry row (`client`, `session`) | `lane.sh switch` and `verify`; `lane.sh check` |
-| **The parked side stays dormant**: it does not act, write or coordinate; asked anything, it replies "parked" and names the active side | The first recovery step of every home's `AGENTS.md` (`lane.sh side <key>`) | `install.sh operator` (the template) |
-| **One active Oracle** ([K-13](../../kit/KIT.md)): one client holds the Oracle role at a time | `operators/ORACLE-LOCK` in the Oracle home (`holder=`, `session=`, `since=`) | `lane.sh oracle-lock take`, only on the human's word ([K-01](../../kit/KIT.md)); `lane.sh check`, `install.sh host` |
+| **One active side per operator** ([K-13](../../kit/KIT.md)): exactly one client and session run an operator; the other side is parked | The registry row (`client`, `session`) | `switch.sh switch` and `verify`; `switch.sh check` |
+| **The parked side stays dormant**: it does not act, write or coordinate; asked anything, it replies "parked" and names the active side | The first recovery step of every home's `AGENTS.md` (`switch.sh side <key>`) | `install.sh operator` (the template) |
+| **One active Oracle** ([K-13](../../kit/KIT.md)): one client holds the Oracle role at a time | `operators/ORACLE-LOCK` in the Oracle home (`holder=`, `session=`, `since=`) | `switch.sh oracle-lock take`, only on the human's word ([K-01](../../kit/KIT.md)); `switch.sh check`, `install.sh host` |
 | **Delegation goes to workers, not to the standby Oracle** | [K-23](../../kit/KIT.md) | `worker-run.sh` |
 
 ## Messages
@@ -21,7 +21,7 @@ this page says how to apply them, and which script applies each one.
 | **Cross-app, and anything a script sends, goes through the mailroom**: a note in the recipient's inbox, then the relay, a ring, and the receiving app's bridge ([mailroom](mailroom.md)) | `inbox-put.sh`, `relay.sh`, the bridges |
 | **Messages are pointers**: the relay's fixed message names the archived note files and a relay id, never the note text ([K-01](../../kit/KIT.md)) | `relay.sh` |
 | **Steer or queue**: a note whose file name says `urgent` or `steer` steers (lands mid-turn); every other note queues until the target's turn ends | `relay.sh` (the ring name), the Codex watcher |
-| **Lanes are never pre-woken** ([mailroom](mailroom.md#one-rule)) | The supervisor wakes only the bridges |
+| **Operators are never pre-woken** ([mailroom](mailroom.md#one-rule)) | The supervisor wakes only the bridges |
 | **Short handoffs**: a task handed to another session says the outcome, a reference to its scope and authority (the mandate section, the ask id), the exact artifact or head, the acceptance test, what is excluded, and where to return; uncertainty and the one next step stay in the sender's notes | [Delegation packet](../../ops/templates/packets/delegation.md) |
 | **Never a config-only message**: no message to an idle session exists only to change its model or settings ([K-26](../../kit/KIT.md)) | `operator.sh model` |
 
@@ -38,7 +38,7 @@ them true to the registry.
 Both bridges are titled "Mailroom"; the registry keys `mailroom-claude`
 and `mailroom-codex` tell them apart. Titles, pins and sections are set in
 each app, by the human or by that side's own tools; no script writes them.
-`install.sh host` lists them as in-app steps, and `lane.sh verify` will not
+`install.sh host` lists them as in-app steps, and `switch.sh verify` will not
 close a switch until they are marked done.
 
 ## Operator routines
@@ -56,7 +56,7 @@ day).
 | First run | `bootstrap.sh` | [First run](hosts-and-ci.md#first-run) |
 | Create an operator | `operator.sh create KEY` | home, models (both clients, decided now with the human), session (created with that model), title, pin, mandate (the human's words), `check.sh home` |
 | Archive an operator | `operator.sh archive KEY` | handoff, worktrees (verified local git bundles in `archive_dir` with the `KEY/*` branches and the worktree's HEAD, then removed; uncommitted or ignored files stop it for the human), jobs, sidebar, registry (last) |
-| Switch between clients | `lane.sh switch KEY --to CLIENT --session ID` (or `operator.sh switch`) | [below](#switching-an-operator-between-clients) |
+| Switch between clients | `switch.sh switch KEY --to CLIENT --session ID` (or `operator.sh switch`) | [below](#switching-an-operator-between-clients) |
 | Change an operator's model | `operator.sh model KEY --client C --model M --words "..."` | record (with the human's words, in the journal), apply (the app's own setting, or a new session and a switch) |
 | Recover a Codex thread | `operator.sh recover KEY` (the supervisor opens it) | [thread recovery](mailroom.md#thread-recovery) |
 | Record a session id | `operator.sh session KEY ID` | Also for the Oracle and both Mailrooms |
@@ -71,19 +71,19 @@ own session ([client capabilities](client-capabilities.md#models)).
 
 ## Switching an operator between clients
 
-A switch is a scripted checklist ([K-36](../../kit/KIT.md)): `lane.sh switch`
-opens it, `lane.sh verify` checks every step in order and does the ones a
+A switch is a scripted checklist ([K-36](../../kit/KIT.md)): `switch.sh switch`
+opens it, `switch.sh verify` checks every step in order and does the ones a
 script can do, and the switch closes only when every step passes.
 
 ```sh
-ops/lane.sh switch web --to codex --session <thread-id>
-ops/lane.sh verify web          # repeat; it says what is left
-ops/lane.sh mark web labels --evidence 'sidebar listing shows "Web"'
+ops/switch.sh switch web --to codex --session <thread-id>
+ops/switch.sh verify web          # repeat; it says what is left
+ops/switch.sh mark web labels --evidence 'sidebar listing shows "Web"'
 ```
 
 | Step | What passes it | Who |
 | --- | --- | --- |
-| handoff | The outgoing session committed a warm `HANDOFF.md` in the home after the switch opened (`switch` asks it by an inbox note). Gone already: `lane.sh mark KEY handoff --cold REASON` | Outgoing session |
+| handoff | The outgoing session committed a warm `HANDOFF.md` in the home after the switch opened (`switch` asks it by an inbox note). Gone already: `switch.sh mark KEY handoff --cold REASON` | Outgoing session |
 | routing | The registry row names the incoming client and session; `verify` writes it once the handoff passes, then sends the incoming session a switch-in note with a one-time token | Script |
 | watchdog | No quiet-list entry silences the operator; no timed job in `JOBS.tsv` names the old session | Script checks; you fix |
 | labels | Incoming session titled with the operator's name; outgoing retitled or archived | `mark --evidence` |
@@ -91,7 +91,7 @@ ops/lane.sh mark web labels --evidence 'sidebar listing shows "Web"'
 | pins-codex | Codex sidebar as in the table above | `mark --evidence` (passes by itself when no side is Codex) |
 | models | The incoming session was created with the model and effort in `operator.conf` for its client | `mark --evidence` |
 | switch-in | A move to the other model family has its switch-in audit recorded ([K-22](../../kit/KIT.md)) | Incoming session (`lease.sh audit-done`) |
-| ack | The incoming session ran `lane.sh ack KEY TOKEN` (from Codex, its thread id must match), or a note to the Oracle quotes the token | Incoming session |
+| ack | The incoming session ran `switch.sh ack KEY TOKEN` (from Codex, its thread id must match), or a note to the Oracle quotes the token | Incoming session |
 
 In-app marks carry evidence: the app's own readback, or `gap: <why>` where
 the app gives none ([client capabilities](client-capabilities.md)). The ACK
@@ -107,8 +107,8 @@ hygiene check reports it.
 
 | What | File | Set and clear |
 | --- | --- | --- |
-| Hold one operator (no relay, watchdog or doorbell) | `<state_dir>/holds/<key>` | `lane.sh hold KEY --owner WHO --until DATE --reason TEXT`; `lane.sh unhold KEY` |
-| Pause the mailroom supervisor | `<state_dir>/mailroom-pause` | `lane.sh hold mailroom ...`; `lane.sh unhold mailroom` |
+| Hold one operator (no relay, watchdog or doorbell) | `<state_dir>/holds/<key>` | `switch.sh hold KEY --owner WHO --until DATE --reason TEXT`; `switch.sh unhold KEY` |
+| Pause the mailroom supervisor | `<state_dir>/mailroom-pause` | `switch.sh hold mailroom ...`; `switch.sh unhold mailroom` |
 | Claude tier-1 kill switch (rings go to the bridge model) | `<bridge_dir>/claude/.watcher/t1-off` | create or remove it; `install.sh host` and `hygiene.sh` flag it while on |
 
 ## Reporting
@@ -133,5 +133,5 @@ backticks in the Scope cell of `MANDATE.md`'s standing grants table, for
 example `` `Bash(sh ~/src/transmogrify/ops/mailroom.sh:*)` ``. When the
 Oracle home has a grants file, hygiene also reports `grants.sh check
 --findings`: the owner's standing grants against both clients' rendered
-approval layers ([grants](grants.md)), and `lane.sh` refuses to route an
+approval layers ([grants](grants.md)), and `switch.sh` refuses to route an
 operator to a side whose grants do not match.

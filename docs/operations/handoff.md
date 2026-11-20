@@ -8,7 +8,7 @@
 
 A planned move of an operator between clients runs as the scripted
 checklist in [conventions](conventions.md#switching-an-operator-between-clients)
-(`lane.sh switch` and `verify`); this page covers the optional lease that
+(`switch.sh switch` and `verify`); this page covers the optional lease that
 adds a holder token and a human-confirmed takeover.
 
 An operator may have a session on each client (Claude Code, Codex): one

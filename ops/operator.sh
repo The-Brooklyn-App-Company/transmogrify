@@ -2,7 +2,7 @@
 # operator.sh - the pre-baked operator routines, each a guided script with a
 # verifier (K-36): create an operator, archive one, change its model on the
 # owner's word, record a session id, and recover an unresponsive Codex
-# thread. Switching an operator between clients is `lane.sh switch` (or
+# thread. Switching an operator between clients is `switch.sh switch` (or
 # `operator.sh switch`, which runs it).
 #
 # Usage: operator.sh [--yes] create KEY [--name NAME] [--client CLIENT]
@@ -16,7 +16,7 @@
 #        operator.sh recover KEY [--replaced THREAD]
 #        operator.sh verify KEY
 #        operator.sh mark KEY STEP [--cold REASON]
-#        operator.sh switch KEY ...        (runs lane.sh switch)
+#        operator.sh switch KEY ...        (runs switch.sh switch)
 #        operator.sh list
 #
 # Each routine opens a checklist (<state_dir>/routine/KEY, one open routine
@@ -62,8 +62,8 @@
 #          watcher, steered; same check), replace (a new thread in the
 #          operator's home, same title, model and effort set at creation
 #          from operator.conf; then `recover KEY --replaced THREAD`),
-#          archive-old (mark), switch (lane.sh switch to the new thread with
-#          a cold handoff, then lane.sh verify). A revive that works closes
+#          archive-old (mark), switch (switch.sh switch to the new thread with
+#          a cold handoff, then switch.sh verify). A revive that works closes
 #          the routine.
 #
 # --yes: take every choice from the options and defaults without asking
@@ -222,7 +222,7 @@ op_archive() {
     [ "$(ao_st_get "$_st" kind)" = archive ] || refuse "a $(ao_st_get "$_st" kind) routine for $_key is open: operator.sh verify $_key"
     op_verify "$_key"
   fi
-  [ ! -f "$AO_STATE/switch/$_key" ] || refuse "a lane switch of $_key is open: lane.sh verify $_key"
+  [ ! -f "$AO_STATE/switch/$_key" ] || refuse "a switch of $_key is open: switch.sh verify $_key"
   ao_explain "Archive the operator \"$_key\" ($R_NAME)" \
     "Its outgoing session writes a warm handoff; each of its worktrees becomes a" \
     "verified local git bundle in $(op_archive_dir)/$_key/ (nothing is pushed)," \
@@ -390,7 +390,7 @@ op_verify_model() {
   ao_step PASS record "operator.conf and the journal (owner's words quoted)"
   if [ "$R_CLIENT" != "$_c" ]; then ao_step PASS apply "$_c is not the active side: the next session there is created with $_m"
   elif op_marked apply; then ao_step PASS apply "marked"
-  else ao_step TODO apply "set the session's model to $_m with the app's own model setting, or create a new session with it and switch (lane.sh switch); never by a message to the thread. Then: operator.sh mark $_key apply"; fi
+  else ao_step TODO apply "set the session's model to $_m with the app's own model setting, or create a new session with it and switch (switch.sh switch); never by a message to the thread. Then: operator.sh mark $_key apply"; fi
 }
 
 # ---------------------------------------------------------------- session
@@ -538,20 +538,20 @@ op_verify_recover() {
   else ao_step TODO archive-old "archive the old thread $_old in the Codex app, then: operator.sh mark $_key archive-old"; fi
   if [ -z "$_new" ]; then ao_step WAIT switch "once the new thread is recorded"; return; fi
   if [ "$R_SID" = "$_new" ] && [ ! -f "$AO_STATE/switch/$_key" ]; then
-    ao_step PASS switch "registry names $_new; lane switch closed"
+    ao_step PASS switch "registry names $_new; switch closed"
     rm -f "$AO_STATE/mailroom/unhealthy/$_old"
     return
   fi
   if [ ! -f "$AO_STATE/switch/$_key" ]; then
-    # lane.sh takes the same registry lock in its own process.
+    # switch.sh takes the same registry lock in its own process.
     ao_unlock
-    if ! sh "$AO_SCRIPTS/lane.sh" switch "$_key" --to codex --session "$_new" </dev/null >"$_tmpo" 2>&1 ||
-      ! sh "$AO_SCRIPTS/lane.sh" mark "$_key" handoff --cold "thread $_old unresponsive; replaced by operator.sh recover" </dev/null >>"$_tmpo" 2>&1; then
-      ao_step TODO switch "lane.sh switch failed: $(tail -n 1 "$_tmpo")"
+    if ! sh "$AO_SCRIPTS/switch.sh" switch "$_key" --to codex --session "$_new" </dev/null >"$_tmpo" 2>&1 ||
+      ! sh "$AO_SCRIPTS/switch.sh" mark "$_key" handoff --cold "thread $_old unresponsive; replaced by operator.sh recover" </dev/null >>"$_tmpo" 2>&1; then
+      ao_step TODO switch "switch.sh switch failed: $(tail -n 1 "$_tmpo")"
       return
     fi
   fi
-  ao_step WAIT switch "finish the lane switch: lane.sh verify $_key"
+  ao_step WAIT switch "finish the switch: switch.sh verify $_key"
 }
 
 # ---------------------------------------------------------------- verify, mark
@@ -633,7 +633,7 @@ main() {
   ao_guide_init "$_yes"
   cmd=$1
   shift
-  if [ "$cmd" = switch ]; then exec sh "$AO_SCRIPTS/lane.sh" switch "$@"; fi
+  if [ "$cmd" = switch ]; then exec sh "$AO_SCRIPTS/switch.sh" switch "$@"; fi
   ao_load
   case $cmd in
     create) op_create "$@" ;;

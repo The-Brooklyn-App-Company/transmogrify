@@ -181,7 +181,7 @@ bs_run() {
   fi
   if bs_has "$AO_ORACLE_KEY" && [ ! -f "$AO_HOME/operators/ORACLE-LOCK" ] &&
     ao_confirm "Make $_client the one active Oracle (session $(bs_sid "$AO_ORACLE_KEY"))?"; then
-    sh "$AO_SCRIPTS/lane.sh" oracle-lock take "$_client" --session "$(bs_sid "$AO_ORACLE_KEY")" </dev/null | sed 's/^/   /'
+    sh "$AO_SCRIPTS/switch.sh" oracle-lock take "$_client" --session "$(bs_sid "$AO_ORACLE_KEY")" </dev/null | sed 's/^/   /'
   fi
   bs_checklist_loop
 }
@@ -202,7 +202,7 @@ bs_checklist() {
   if bs_has "$AO_ORACLE_KEY"; then ao_step PASS oracle "session $(bs_sid "$AO_ORACLE_KEY")"
   else ao_step TODO oracle "start a $_cl session in $AO_HOME (model and effort chosen when you create it), title it \"Oracle\", pin it; then: bootstrap.sh --oracle-session <id>"; fi
   if [ -f "$AO_HOME/operators/ORACLE-LOCK" ]; then ao_step PASS oracle-lock "$(sed -n 's/^holder=//p' "$AO_HOME/operators/ORACLE-LOCK" | head -n 1)"
-  else ao_step TODO oracle-lock "after the Oracle session: bootstrap.sh again (it asks), or lane.sh oracle-lock take $_cl --session <id>"; fi
+  else ao_step TODO oracle-lock "after the Oracle session: bootstrap.sh again (it asks), or switch.sh oracle-lock take $_cl --session <id>"; fi
   # Standing grants follow an operator across clients (docs/operations/grants.md).
   _gf=$(ao_cfg_path grants_file operators/GRANTS.md)
   if [ ! -f "$_gf" ]; then ao_step PASS grants "no grants file yet (ops/templates/oracle/GRANTS.md when the owner gives one)"

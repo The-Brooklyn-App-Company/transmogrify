@@ -73,7 +73,7 @@
 #           <state_dir>/backup) and loaded in your user's launchd domain;
 #           each bridge's home and lean duty file; the retired probes'
 #           state removed. Checked only: bridge ids in the registry, the
-#           Claude tier-1 switch, the supervisor pause and lane holds (owner
+#           Claude tier-1 switch, the supervisor pause and operator holds (owner
 #           and expiry), the Oracle lock, and `check.sh host` (App Nap,
 #           launchd ProcessType Background or Adaptive). It never uses sudo
 #           and never opens an app.
@@ -867,14 +867,14 @@ inst_host() {
       host_row "claude tier 1" "off (opt-in: bridge_claude_t1=socket)"
     fi
     if [ -f "$AO_STATE/mailroom-pause" ]; then
-      if ao_hold_active "$AO_STATE/mailroom-pause"; then host_row "supervisor" "PAUSED until $AO_H_UNTIL by $AO_H_OWNER" "lane.sh unhold mailroom"
-      else host_row "supervisor" "pause file expired or without owner" "lane.sh unhold mailroom"; fi
+      if ao_hold_active "$AO_STATE/mailroom-pause"; then host_row "supervisor" "PAUSED until $AO_H_UNTIL by $AO_H_OWNER" "switch.sh unhold mailroom"
+      else host_row "supervisor" "pause file expired or without owner" "switch.sh unhold mailroom"; fi
     else
       host_row "supervisor" "ok (not paused)"
     fi
     _nh=0
     for _h in "$AO_STATE/holds"/*; do [ -f "$_h" ] && _nh=$((_nh + 1)); done
-    if [ "$_nh" -eq 0 ]; then host_row "lane holds" "ok (none)"; else host_row "lane holds" "$_nh held" "lane.sh check"; fi
+    if [ "$_nh" -eq 0 ]; then host_row "operator holds" "ok (none)"; else host_row "operator holds" "$_nh held" "switch.sh check"; fi
     # 7. The retired hourly probes' state.
     if [ ! -d "$AO_STATE/mailroom-probe" ]; then host_row "retired hourly probes" "ok (none left)"
     elif [ -n "$_apply" ] && [ -z "$dry_run" ] && rm -rf "$AO_STATE/mailroom-probe"; then host_row "retired hourly probes" "removed"
@@ -883,7 +883,7 @@ inst_host() {
     if [ -f "$AO_HOME/operators/ORACLE-LOCK" ]; then
       host_row "oracle lock" "ok ($(sed -n 's/^holder=//p' "$AO_HOME/operators/ORACLE-LOCK" | head -n 1))"
     else
-      host_row "oracle lock" missing "lane.sh oracle-lock take CLIENT --session ID (on the human's word)"
+      host_row "oracle lock" missing "switch.sh oracle-lock take CLIENT --session ID (on the human's word)"
     fi
   fi
   # 9. Verify App Nap and launchd priority.

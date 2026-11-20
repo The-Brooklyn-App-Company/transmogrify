@@ -515,7 +515,7 @@ def main(argv):
         while True:
             while not rings(d):
                 kq.control([ev], 1, None)  # sleeps until the folder changes
-            if t1:  # settle: a burst across lanes becomes one pass
+            if t1:  # settle: a burst across operators becomes one pass
                 seen, start = set(rings(d)), time.monotonic()
                 last = start
                 while True:

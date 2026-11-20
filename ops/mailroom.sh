@@ -16,7 +16,7 @@
 # from scripts. Every delivery walks a degradation ladder (tier 1 model-free,
 # tier 2 a bridge model turn, tier 3 headless or CLI queue, tier 4 an alarm
 # and then a push to the owner): it gets slower, never stops, and each drop
-# is logged and flagged once per cause. Lanes are never pre-woken. See
+# is logged and flagged once per cause. Operators are never pre-woken. See
 # docs/operations/mailroom.md.
 #
 # status     Per side: watcher state, first tier and its health, waiting
@@ -28,7 +28,7 @@
 #            fingerprint and canaries, once-per-cause degradation alarms and
 #            tier 4. No model runs unless something is down or stuck.
 #            Paused while <state_dir>/mailroom-pause holds an unexpired hold
-#            (owner=, until=; see lane.sh hold).
+#            (owner=, until=; see switch.sh hold).
 # wait       For the Claude bridge's background task: a kqueue push watch
 #            (macOS), no polling. With bridge_claude_t1=socket it delivers
 #            rings to warm sessions itself (tier 1) and only exits for the

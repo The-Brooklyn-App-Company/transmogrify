@@ -5,9 +5,9 @@
 # Usage: hygiene.sh [--note]
 #
 # Read-only. Prints one line per finding and a summary:
-#   holds      a lane hold or the mailroom pause that is expired or lacks an
+#   holds      an operator hold or the mailroom pause that is expired or lacks an
 #              owner, expiry or reason (K-07): it is no longer obeyed
-#   switches   a lane switch open for more than a day (lane.sh verify)
+#   switches   a switch open for more than a day (switch.sh verify)
 #   switches   an operator routine (operator.sh) open for more than a day;
 #              a Codex thread marked unresponsive
 #   switches   the Claude tier-1 kill switch left on
@@ -41,7 +41,7 @@ hy_holds() {
   for _h in "$AO_STATE/holds"/* "$AO_STATE/mailroom-pause"; do
     [ -f "$_h" ] || continue
     ao_hold_active "$_h" ||
-      hy "holds: ${_h##*/} is expired or lacks an owner, expiry or reason, so it is ignored: lane.sh unhold ${_h##*/} (or set it again with all three)"
+      hy "holds: ${_h##*/} is expired or lacks an owner, expiry or reason, so it is ignored: switch.sh unhold ${_h##*/} (or set it again with all three)"
   done
 }
 
@@ -50,7 +50,7 @@ hy_switches() {
     [ -f "$_s" ] || continue
     _at=$(sed -n 's/^started=//p' "$_s" | tail -n 1)
     ao_is_uint "${_at:-x}" || _at=0
-    [ $((AO_T_EPOCH - _at)) -lt 86400 ] || hy "switches: the switch of ${_s##*/} is open since $(ao_utc "$_at") UTC: lane.sh verify ${_s##*/}"
+    [ $((AO_T_EPOCH - _at)) -lt 86400 ] || hy "switches: the switch of ${_s##*/} is open since $(ao_utc "$_at") UTC: switch.sh verify ${_s##*/}"
   done
   for _s in "$AO_STATE/routine"/*; do
     [ -f "$_s" ] || continue

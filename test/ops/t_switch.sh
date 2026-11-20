@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016,SC2034
 # (SC2016: single-quoted code is passed to other shells on purpose;
 #  SC2034: rc and friends are read by the harness in lib.sh.)
-# t_lane.sh - lane switches as a scripted checklist, holds, the Oracle lock,
+# t_switch.sh - operator switches as a scripted checklist, holds, the Oracle lock,
 # and the nightly hygiene check.
 . "$(dirname -- "$0")/lib.sh"
 
@@ -24,12 +24,12 @@ st() { sed -n "s/^$1=//p" "$T/state/switch/alpha" | tail -n 1; }
 
 test_switch_walks_every_step_and_closes_only_when_all_pass() {
   home_repo "$T/proj/alpha"
-  run lane.sh switch alpha --to codex --session thread-new
+  run switch.sh switch alpha --to codex --session thread-new
   assert_rc 0
   assert_file "$T/state/switch/alpha"
-  assert_has "$(ls "$T/home/inbox/alpha"/*lane-switch.md)" "write a warm HANDOFF.md"
+  assert_has "$(ls "$T/home/inbox/alpha"/*switch-out.md)" "write a warm HANDOFF.md"
   # Nothing moves before the handoff.
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_rc 1
   assert_has "$T/out" "WAIT  handoff"
   assert_has "$T/out" "WAIT  routing"
@@ -37,7 +37,7 @@ test_switch_walks_every_step_and_closes_only_when_all_pass() {
   # The outgoing session commits its handoff: routing follows, with a note.
   sleep 1
   commit_handoff
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_rc 1
   assert_has "$T/out" "PASS  handoff"
   assert_has "$T/out" "PASS  routing      registry updated: codex thread-new"
@@ -46,25 +46,25 @@ test_switch_walks_every_step_and_closes_only_when_all_pass() {
   assert_has "$T/state/audit/alpha" "from=claude"
   assert_has "$T/state/audit/alpha" "change=1"
   tok=$(st token)
-  assert_has "$(ls "$T/home/inbox/alpha"/*lane-switch-in.md)" "lane.sh ack alpha $tok"
+  assert_has "$(ls "$T/home/inbox/alpha"/*switch-in.md)" "switch.sh ack alpha $tok"
   assert_has "$T/out" "TODO  labels"
   assert_has "$T/out" "TODO  pins-claude  unpin the Claude session; move it to \"Inactive Operators\""
   assert_has "$T/out" "TODO  pins-codex   pin the Codex thread"
   assert_has "$T/out" "WAIT  switch-in"
   assert_has "$T/out" "WAIT  ack"
   # In-app steps are marked; a wrong token or the wrong thread is refused.
-  run lane.sh mark alpha labels
+  run switch.sh mark alpha labels
   assert_rc 2
-  for s in labels pins-claude pins-codex models; do run lane.sh mark alpha "$s" --evidence "readback ok"; assert_rc 0; done
-  run lane.sh ack alpha wrong
+  for s in labels pins-claude pins-codex models; do run switch.sh mark alpha "$s" --evidence "readback ok"; assert_rc 0; done
+  run switch.sh ack alpha wrong
   assert_rc 5
-  CODEX_THREAD_ID=thread-other run lane.sh ack alpha "$tok"
+  CODEX_THREAD_ID=thread-other run switch.sh ack alpha "$tok"
   assert_rc 5
-  CODEX_THREAD_ID=thread-new run lane.sh ack alpha "$tok"
+  CODEX_THREAD_ID=thread-new run switch.sh ack alpha "$tok"
   assert_rc 0
   assert_has "$T/out" "acknowledged from Codex thread thread-new"
   # The switch-in audit is still pending: not done yet.
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_rc 1
   assert_has "$T/out" "WAIT  switch-in"
   assert_has "$T/out" "PASS  ack"
@@ -72,36 +72,36 @@ test_switch_walks_every_step_and_closes_only_when_all_pass() {
   mkdir -p "$T/state/audit"
   printf 'provider=codex\nfrom=claude\nto=codex\nchange=1\nsince=2026-11-19T00:00:00Z\n' >"$T/state/audit/alpha"
   printf 'change=1\nsince=2026-11-19T00:00:00Z\nreport=audits/x.md\ncommit=abc123\nat=2026-11-19T00:00:00Z\n' >"$T/state/audit/alpha.done"
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_rc 0
   assert_has "$T/out" "switch of alpha complete."
   assert_no_file "$T/state/switch/alpha"
   assert_count "$T/state/switch/done" 1
-  assert_has "$(ls "$T/home/inbox/oracle"/*lane-switched.md)" "every step passed"
+  assert_has "$(ls "$T/home/inbox/oracle"/*switched.md)" "every step passed"
 }
 
 test_switch_refusals_cold_handoff_and_same_family() {
-  run lane.sh switch oracle --to codex --session t
+  run switch.sh switch oracle --to codex --session t
   assert_rc 5
-  run lane.sh switch alpha --to other --session t
+  run switch.sh switch alpha --to other --session t
   assert_rc 2
-  run lane.sh switch alpha --to claude --session sid-alpha
+  run switch.sh switch alpha --to claude --session sid-alpha
   assert_rc 5
-  run lane.sh switch alpha --to claude --session sid-beta
+  run switch.sh switch alpha --to claude --session sid-beta
   assert_rc 5
   assert_has "$T/err" "already leads 'beta'"
-  run lane.sh switch alpha --to claude --session sid-new
+  run switch.sh switch alpha --to claude --session sid-new
   assert_rc 0
-  run lane.sh switch alpha --to claude --session sid-newer
+  run switch.sh switch alpha --to claude --session sid-newer
   assert_rc 5
   assert_has "$T/err" "is open since"
   # The outgoing session is gone: a cold handoff needs a reason.
-  run lane.sh mark alpha handoff
+  run switch.sh mark alpha handoff
   assert_rc 2
-  run lane.sh mark alpha handoff --cold "session lost in a restart"
+  run switch.sh mark alpha handoff --cold "session lost in a restart"
   assert_rc 0
   printf 'alpha\t2099-01-01\tbusy\n' >"$T/home/operators/WATCHDOG-QUIET.tsv"
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_has "$T/out" "PASS  handoff      cold: session lost in a restart"
   assert_has "$T/out" "TODO  watchdog     a quiet-list entry silences alpha"
   assert_has "$T/out" "PASS  pins-codex   no Codex side"
@@ -110,36 +110,36 @@ test_switch_refusals_cold_handoff_and_same_family() {
   tok=$(st token)
   printf 'got it %s\n' "$tok" | sh "$SCRIPTS/inbox-put.sh" oracle ack-note >/dev/null
   rm -f "$T/home/operators/WATCHDOG-QUIET.tsv"
-  for s in labels pins-claude models; do run lane.sh mark alpha "$s" --evidence "gap: test"; done
-  run lane.sh verify alpha
+  for s in labels pins-claude models; do run switch.sh mark alpha "$s" --evidence "gap: test"; done
+  run switch.sh verify alpha
   assert_rc 0
   assert_has "$T/out" "PASS  ack          token quoted in"
 }
 
 test_side_check_holds_and_the_oracle_lock() {
-  run lane.sh side alpha
+  run switch.sh side alpha
   assert_rc 0
   assert_eq "$(cat "$T/out")" "claude sid-alpha Alpha Op" "side"
-  run lane.sh check
+  run switch.sh check
   assert_rc 1
   assert_has "$T/out" "ok: alpha on claude (sid-alpha)"
   assert_has "$T/out" "no Oracle lock"
-  run lane.sh oracle-lock take claude --session sid-oracle
+  run switch.sh oracle-lock take claude --session sid-oracle
   assert_rc 0
   assert_has "$T/home/operators/ORACLE-LOCK" "holder=claude"
-  run lane.sh check
+  run switch.sh check
   assert_rc 0
   assert_has "$T/out" "oracle: claude (sid-oracle)"
-  # A hold names its owner, expiry and reason, and stops the relay for the lane.
-  run lane.sh hold alpha --until 2099-01-01 --reason x
+  # A hold names its owner, expiry and reason, and stops the relay for the operator.
+  run switch.sh hold alpha --until 2099-01-01 --reason x
   assert_rc 2
-  run lane.sh hold alpha --owner ops --until 2099-01-01
+  run switch.sh hold alpha --owner ops --until 2099-01-01
   assert_rc 2
-  run lane.sh hold alpha --owner ops --until 2000-01-01 --reason x
+  run switch.sh hold alpha --owner ops --until 2000-01-01 --reason x
   assert_rc 2
-  run lane.sh hold alpha --owner ops --until 2099-01-01 --reason "deploy freeze"
+  run switch.sh hold alpha --owner ops --until 2099-01-01 --reason "deploy freeze"
   assert_rc 0
-  run lane.sh check
+  run switch.sh check
   assert_has "$T/out" "hold: alpha by ops until 2099-01-01 (deploy freeze)"
   note alpha a.md x
   FAKE_MODE=sent run relay.sh
@@ -149,20 +149,20 @@ test_side_check_holds_and_the_oracle_lock() {
   printf 'owner=ops\nuntil=2000-01-01\nreason=x\n' >"$T/state/holds/alpha"
   FAKE_MODE=sent run relay.sh
   assert_has "$FAKE_LOG" 'to "Alpha Op"'
-  run lane.sh check
+  run switch.sh check
   assert_rc 1
   assert_has "$T/out" "hold not honoured"
   run hygiene.sh
   assert_rc 1
   assert_has "$T/out" "holds: alpha is expired or lacks an owner, expiry or reason"
-  run lane.sh unhold alpha
+  run switch.sh unhold alpha
   assert_rc 0
   assert_no_file "$T/state/holds/alpha"
 }
 
 test_mailroom_pause_is_a_hold_with_an_owner() {
   profile_set relay_bridge on
-  run lane.sh hold mailroom --owner ops --until 2099-01-01 --reason maintenance
+  run switch.sh hold mailroom --owner ops --until 2099-01-01 --reason maintenance
   assert_rc 0
   run mailroom.sh supervise
   assert_rc 0
@@ -200,6 +200,14 @@ EOF
   run hygiene.sh --note
   assert_has "$T/out" "uncommitted or untracked path(s)"
   assert_eq "$(notes_named hygiene)" 1 "one note"
+}
+
+test_lane_sh_is_a_deprecated_alias_of_switch_sh() {
+  run lane.sh check
+  rc_alias=$rc
+  assert_has "$T/err" "lane.sh is deprecated"
+  run switch.sh check
+  assert_eq "$rc_alias" "$rc" "same exit code as switch.sh"
 }
 
 ao_test_main "$0"

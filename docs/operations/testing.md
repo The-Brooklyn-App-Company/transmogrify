@@ -4,8 +4,8 @@ Release remains maintainer-owned. This release adds the experimental
 mailroom with per-side degradation ladders, tier telemetry, version
 fingerprints and canaries, unknown-send reconciliation and Codex thread
 recovery; the guided first run (`bootstrap.sh`) over the turnkey
-`install.sh host --apply`; the operator routines (`operator.sh`) and lane
-switching (`lane.sh`) as scripted checklists; the nightly `hygiene.sh`;
+`install.sh host --apply`; the operator routines (`operator.sh`) and operator
+switches (`switch.sh`) as scripted checklists; the nightly `hygiene.sh`;
 client-neutral recovery with a bounded current-state block; and rule edits
 (K-05, K-07, K-09, K-10, K-11, K-12, K-13, K-24, K-26, K-28, K-29, K-32
 changed; K-35, K-36, K-37 added). Everything below is
@@ -15,7 +15,7 @@ run live yet.
 | Check | Evidence / result |
 | --- | --- |
 | Full suite, sh and dash | PASS: all 18 files under sh and dash, 346 cases per shell (692 in all), macOS, 2026-11-19; no network, no model calls |
-| New tests | `t_mailroom.sh`: Claude tier 1 against a fake peer socket (warm delivery with the session's receipt, cold target and kill switch handed to the bridge with the step, a mention that is not a receipt, claims a dead watcher left), the Codex watcher queueing on a turn-complete line of a fake rollout (no read for unrelated lines, release with `no-rollout` or `queue-cap`), tier rows with latency and step, metrics with tier shares and p50/p90, fingerprint and canary (one alarm per cause, unique canary names), the degradation alarm and its clearing, tier 4 push once per outage, the Claude app restart waking the bridge then returning to the Oracle. `t_lane.sh`: a switch through every step, refusals, cold handoff, ACK by token from the right client, holds with owner and expiry, the mailroom pause, the Oracle lock, hygiene's grants-against-permissions diff. `t_install.sh`: `host --apply` with a fake `launchctl` (units installed, loaded, stale units and duty files replaced with a backup, in-app steps marked done). `t_mailroom.sh` also: unknown Codex sends reconciled against the target's rollout (late receipt settled, absence escalated once, an unconfirmed escalation alarmed and stopped, metrics). `t_operator.sh`: create with both clients' models decided at creation, refusal without a model decision, the owner-only model change (refused without words or from the operator's own session), archive to verified bundles with the row retired last, an unresponsive thread detected and revived, a dead one replaced with the lane switch opened. `t_bootstrap.sh`: the unattended first run (home, profile, the Codex app paths found, host, toehold, lock, checklist through the test note's delivery), invalid choices refused. `t_recover.sh`: the current-state block instead of a notes tail, the Codex sources, `clear` silent |
+| New tests | `t_mailroom.sh`: Claude tier 1 against a fake peer socket (warm delivery with the session's receipt, cold target and kill switch handed to the bridge with the step, a mention that is not a receipt, claims a dead watcher left), the Codex watcher queueing on a turn-complete line of a fake rollout (no read for unrelated lines, release with `no-rollout` or `queue-cap`), tier rows with latency and step, metrics with tier shares and p50/p90, fingerprint and canary (one alarm per cause, unique canary names), the degradation alarm and its clearing, tier 4 push once per outage, the Claude app restart waking the bridge then returning to the Oracle. `t_switch.sh`: a switch through every step, refusals, cold handoff, ACK by token from the right client, holds with owner and expiry, the mailroom pause, the Oracle lock, hygiene's grants-against-permissions diff. `t_install.sh`: `host --apply` with a fake `launchctl` (units installed, loaded, stale units and duty files replaced with a backup, in-app steps marked done). `t_mailroom.sh` also: unknown Codex sends reconciled against the target's rollout (late receipt settled, absence escalated once, an unconfirmed escalation alarmed and stopped, metrics). `t_operator.sh`: create with both clients' models decided at creation, refusal without a model decision, the owner-only model change (refused without words or from the operator's own session), archive to verified bundles with the row retired last, an unresponsive thread detected and revived, a dead one replaced with the switch opened. `t_bootstrap.sh`: the unattended first run (home, profile, the Codex app paths found, host, toehold, lock, checklist through the test note's delivery), invalid choices refused. `t_recover.sh`: the current-state block instead of a notes tail, the Codex sources, `clear` silent |
 | shellcheck, `check.sh kit` | Clean; `kit/KIT.md` is within its 11100-byte budget |
 | Cross-family review | Earlier design: three rounds (13, 7 and 6 findings), all fixed. Final design: two rounds by the other model family through `review-run.sh` (8 findings, then 6), all fixed with regression tests; round-2 fixes not re-reviewed (round cap for this release) |
 | Live mailroom | **Not run** (below) |
@@ -36,9 +36,9 @@ versions, the delivered-log rows and the times (in your local timezone).
 | T6 | Drop a `steer` and a `queue` note for a busy Codex operator | The steer lands mid-turn; the queue note arrives about a second after the turn completes (`t1-native`, mode `queue`) |
 | T7 | Turn on the Claude kill switch and send two notes to warm sessions; after a client update, watch the next supervisor pass | Both delivered at tier 2 with step `kill-switch` (no alarm: neutral); after the update, one canary row from the first tier |
 | T8 | With the Oracle's app quit and an alarm pending, wait 15 minutes | One push through `hooks/push` or the chat adapter; none repeated |
-| T9 | Switch one low-risk operator to the other client with `lane.sh switch` and `verify` | Every step passes, each in-app mark carries the app's readback; the incoming session's ACK names its client |
+| T9 | Switch one low-risk operator to the other client with `switch.sh switch` and `verify` | Every step passes, each in-app mark carries the app's readback; the incoming session's ACK names its client |
 | T10 | On a clean user account, run `bootstrap.sh` from inside the client you start with and follow it to the end | Every checklist step passes; the test note reaches the Oracle; count the in-app steps you did |
-| T11 | Rehearse thread recovery on a scratch Codex thread registered as a throwaway operator: make two sends time out (or mark it by hand), then let the supervisor run | A queued no-op and, if needed, a native no-op; on no answer, the replace request; after `--replaced`, the lane switch opens and closes |
+| T11 | Rehearse thread recovery on a scratch Codex thread registered as a throwaway operator: make two sends time out (or mark it by hand), then let the supervisor run | A queued no-op and, if needed, a native no-op; on no answer, the replace request; after `--replaced`, the switch opens and closes |
 | T12 | Register the recovery hook on Codex (trust it), then compact or resume an operator thread | The digest arrives before the next turn, under its cap; if not, record the gap in client capabilities and keep the re-read |
 
 ---
@@ -94,7 +94,7 @@ returned a resume warning; a later actual recipient turn independently read and
 acknowledged the fixture. Its success is not inferred from the CLI status alone.
 The disposable app thread was archived, its linked seat was removed without
 force, and owned temporary roots were removed after preserving private evidence.
-No real lane route, grant, scheduled job, service or account was changed.
+No real operator route, grant, scheduled job, service or account was changed.
 
 The default-on Codex relay and explicit `relay_codex=off` are both fixture-tested,
 including custody preservation and actual-session-ID requirements. Both lease

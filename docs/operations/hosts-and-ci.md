@@ -121,9 +121,9 @@ any change to the host or its jobs.
 | Units | The tick and relay units match their templates; the relay unit watches every registry inbox (WatchPaths generated from the registry); both are loaded | Rendered, replaced when stale (old copy in `<state_dir>/backup`), loaded with `launchctl bootstrap gui/<uid>` |
 | Bridge homes | Each has its lean duty file (`AGENTS.md`, rendered from `ops/templates/mailroom/`) | Created with `install.sh bridge <client>`, or the duty file brought up to date |
 | Bridge ids | Rows `mailroom-claude` and `mailroom-codex` have session ids: the one file every script reads | In-app step |
-| Switches and holds | Claude tier 1 (`bridge_claude_t1`) and its kill switch; the supervisor pause and lane holds name an owner, an expiry and a reason ([K-07](../../kit/KIT.md)) | Check only |
+| Switches and holds | Claude tier 1 (`bridge_claude_t1`) and its kill switch; the supervisor pause and operator holds name an owner, an expiry and a reason ([K-07](../../kit/KIT.md)) | Check only |
 | Retired probes | No hourly probe state left | Removed |
-| Oracle lock | `operators/ORACLE-LOCK` names the one active Oracle | `lane.sh oracle-lock take`, on the human's word |
+| Oracle lock | `operators/ORACLE-LOCK` names the one active Oracle | `switch.sh oracle-lock take`, on the human's word |
 | launchd priority | No job matching `host_latency_jobs` sets `ProcessType` Background or Adaptive, or `LowPriorityIO` | Check only: edit the job |
 
 The in-app steps it ends with: quit and reopen both apps once (App Nap);

@@ -33,7 +33,7 @@
 #               config/read shows the rendered policy coming from the home's
 #               own .codex layer, with no managed layer above it) and
 #               accepted (a fresh-session probe recorded with `accept`).
-#               --gate is what `lane.sh switch` and `verify` call: exit 0
+#               --gate is what `switch.sh switch` and `verify` call: exit 0
 #               only when the target side is rendered and resolved.
 # accept        Record that a fresh session or thread passed a harmless
 #               probe of the rendered grants; refused unless the side is

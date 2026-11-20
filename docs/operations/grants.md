@@ -81,7 +81,7 @@ the probe pending again.
 
 ## Where it runs
 
-- **Switch refusal:** `lane.sh switch` and `lane.sh verify` call
+- **Switch refusal:** `switch.sh switch` and `switch.sh verify` call
   `grants.sh check --gate KEY CLIENT` and refuse to route an operator to a
   side that is not rendered and resolved.
 - **Nightly hygiene** reports `grants.sh check --findings`.

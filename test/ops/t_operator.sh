@@ -106,7 +106,7 @@ test_archive_bundles_worktrees_and_retires_the_row_last() {
   assert_rc 0
   reg | grep -q "^#archived${TAB}.*${TAB}alpha${TAB}Alpha Op" || _fail "row not commented out"
   assert_has "$T/proj/alpha/operator.conf" "archived="
-  run lane.sh check
+  run switch.sh check
   assert_lacks "$T/out" "alpha"
 }
 
@@ -185,7 +185,7 @@ test_an_unresponsive_thread_is_detected_and_revived() {
   assert_no_file "$T/state/routine/gamma"
 }
 
-test_a_dead_thread_is_replaced_and_the_lane_switched() {
+test_a_dead_thread_is_replaced_and_the_operator_switched() {
   gamma
   run operator.sh recover gamma
   assert_rc 1
@@ -204,11 +204,11 @@ test_a_dead_thread_is_replaced_and_the_lane_switched() {
   run operator.sh recover gamma --replaced thread-new
   assert_rc 1
   assert_has "$T/out" "PASS  replace       new thread thread-new"
-  assert_has "$T/out" "WAIT  switch        finish the lane switch: lane.sh verify gamma"
+  assert_has "$T/out" "WAIT  switch        finish the switch: switch.sh verify gamma"
   assert_has "$T/state/switch/gamma" "to_sid=thread-new"
   assert_has "$T/state/switch/gamma" "done_handoff="
   run operator.sh mark gamma archive-old
-  # The lane switch finishes (its own tests walk every step).
+  # The switch finishes (its own tests walk every step).
   mv "$T/state/switch/gamma" "$T/state/gamma.closed"
   run operator.sh session gamma thread-new
   run operator.sh verify gamma

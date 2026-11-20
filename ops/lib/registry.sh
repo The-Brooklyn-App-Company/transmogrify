@@ -269,7 +269,7 @@ _ao_audit_put() {
 # reason=TEXT. Sets AO_H_OWNER, AO_H_UNTIL and AO_H_REASON. A hold missing
 # any of the three, or past its expiry, is not honoured (hygiene.sh
 # reports it).
-# Written by `lane.sh hold`.
+# Written by `switch.sh hold`.
 ao_hold_active() {
   AO_H_OWNER='' AO_H_UNTIL='' AO_H_REASON=''
   [ -f "$1" ] || return 1

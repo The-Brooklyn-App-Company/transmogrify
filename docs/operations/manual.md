@@ -87,7 +87,7 @@ and authentication consent remain separate from setup authorization (K-01).
 
 For Codex, writable roots must be existing real directories: the operator home,
 its inbound/outbound mail paths and its work repos. Reject symlink roots rather
-than granting a parent containing other lanes. Use absolute paths for Git and
+than granting a parent containing other operators. Use absolute paths for Git and
 build commands when the active home differs from the repository. Test a small
 create/read/delete in the actual approved workspace and verify a Git checkpoint:
 file writes succeeding does not prove the sandbox can modify `.git`.
@@ -125,8 +125,8 @@ instance-specific ownership list must agree with the registry, not become a
 second conflicting source. Retain dormant session identities for recovery, but
 exclude them from dispatch. A pointer never transfers ownership (K-34).
 
-Switch an operator between clients with `ops/lane.sh switch KEY --to
-CLIENT --session ID`, then `ops/lane.sh verify KEY` until every step
+Switch an operator between clients with `ops/switch.sh switch KEY --to
+CLIENT --session ID`, then `ops/switch.sh verify KEY` until every step
 passes: handoff, routing, watchdog, labels, pins on both sides, models,
 switch-in audit and the incoming session's acknowledgement
 ([conventions](conventions.md#switching-an-operator-between-clients)).
@@ -164,7 +164,7 @@ through an inbox, the relay, a ring and the receiving app's in-app bridge;
 a model-free supervisor keeps both bridges armed. Every delivery walks a
 degradation ladder (model-free, a bridge model turn, headless or CLI queue,
 an alarm and then a push to you): it gets slower, never stops, and each
-drop is logged and flagged once per cause. Lanes are never pre-woken.
+drop is logged and flagged once per cause. Operators are never pre-woken.
 
 ```sh
 ops/install.sh host                       # what it would do
@@ -302,7 +302,7 @@ saved-project and runtime consumers, and the restore location. Dates, “clean�
 “prunable” alone establish none of those. Use ordinary safe Git operations and
 respect review/protection/release gates. Never force-remove, reset unknown state
 or move a running custody seat to make the tree look uniform. Keep a current
-integration-branch handoff for unfinished source lanes (K-15, K-16).
+integration-branch handoff for unfinished source operators (K-15, K-16).
 
 ## 8. Token efficiency and bounded coordination
 
@@ -315,7 +315,7 @@ as polling loops or reread an entire history on every turn (K-23, K-25).
 
 Read the current backlog/handoff and relevant scoped evidence once, then update
 only the owning record. Parallelize independent work with separate file ownership;
-avoid a second coordinator duplicating lane inventories. Measure tool/API/model
+avoid a second coordinator duplicating operator inventories. Measure tool/API/model
 use and latency honestly; configured cost tiers are not observed account savings.
 
 For same-provider work, use native disposable subagents when available, with
@@ -332,7 +332,7 @@ and archive/unpin through supported controls. Do not wake retired partners with
 late duplicate mail. The holder remains the single approval endpoint (K-13).
 
 Usage balancing is a proposed owner-approved handoff, not a silent model change:
-compare actual subscription pace, choose named lanes, preserve pinned models,
+compare actual subscription pace, choose named operators, preserve pinned models,
 run switch-in audits and migrate routes/receipts without duplicate wakes. Set a
 review/return condition after the usage reset. No paid API fallback (K-26).
 
@@ -379,13 +379,13 @@ requirements, not installed automation or claims of native client parity:
   supervisor in 0.3.1 ([docs/operations/mailroom.md](mailroom.md)), proven only
   against fakes. Retire any model-backed polling fallback only after restart
   recovery has been proven on the installed path.
-- **Thread/sidebar parity:** maintain a private registry of stable lane key,
+- **Thread/sidebar parity:** maintain a private registry of stable operator key,
   display title, session IDs, project/home and desired organization per client.
   Compare native state through supported tools; update titles/pins/sections
   only where each client supports them. A lack of sections in one client means
   a documented pin layout, not an invented API. Detect and report drift before
   changing routes. Pin follows ownership: pin the active side's thread and
-  unpin the dormant side at cutover, driven by the stable lane registry. Retain
+  unpin the dormant side at cutover, driven by the stable operator registry. Retain
   dormant thread identities for recovery. Automated two-client sidebar and
   ownership-driven pin reconciliation are unshipped.
 - **Lifecycle workflows:** add via installer and second-client sync; rename a
@@ -421,14 +421,14 @@ and profile drift checks cover only their documented inputs.
 
 | Declaration | Minimum fields | Check / rendering target |
 | --- | --- | --- |
-| lanes.tsv | key, title, home, work repos, active side, desired pin/section | Native thread/project identity plus generated routing maps |
-| capabilities.tsv | capability, access class, required lane keys, Claude binding, Codex binding, sync policy | Presence and exact authorized route on the target side |
+| operators.tsv | key, title, home, work repos, active side, desired pin/section | Native thread/project identity plus generated routing maps |
+| capabilities.tsv | capability, access class, required operator keys, Claude binding, Codex binding, sync policy | Presence and exact authorized route on the target side |
 | skills.tsv | name, canonical source, package manifest and supporting-file hashes, expected client hashes | Installed complete packages, including referenced scripts, templates and assets |
 | routing.tsv | role, provider model/effort, override expiry | Worker preferences, separate from account grants |
 | jobs.tsv | The validated job schema above | Neutral timers plus explicit native peer bindings/state |
 | Memory/facts | Current repo facts, preferences, mandate, handoff and journal | Client-specific memory contains pointers to these records |
 
-A capability row might declare `docs-read`, access `read`, lanes `web`, bindings
+A capability row might declare `docs-read`, access `read`, operators `web`, bindings
 `local-docs` / `hosted-docs`, policy `manual-auth`. These are fictional labels,
 not credentials or a new integration. **Capability evidence classes (design,
 November 18, 2026; unshipped):** record declared configuration, installed package
@@ -436,7 +436,7 @@ contents (including supporting-file hashes), loaded session capability, exact
 authenticated account/operation scope, and dated behavioral proof separately.
 A descriptor or top-level skill hash proves neither usable account access nor
 the complete package. Report unknowns and freshness explicitly; gate a switch
-only on capabilities actually required by that lane.
+only on capabilities actually required by that operator.
 Never call an effectful connector merely to test presence; use metadata or a
 scoped authorized read. A financial connector requires its own grant regardless
 of a required-capability flag.
@@ -480,7 +480,7 @@ actual startup and permission inheritance still need testing per client.
 current profile parser or an installed automation in this release. In the on
 mode, generated app state would keep only each active side's operator threads
 pinned and keep its standby counterpart unpinned; preserve the stable thread IDs
-and lane registry. Finished disposable task/subagent/automation-run chats would
+and operator registry. Finished disposable task/subagent/automation-run chats would
 be archived after durable result delivery and handling checks. Running chats,
 failed jobs with unresolved work, and persistent operators must remain available.
 Archive preserves history; deletion is a separate authorized action.

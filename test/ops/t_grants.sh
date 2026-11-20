@@ -250,26 +250,26 @@ test_no_command_prints_config_or_policy_text() {
 
 test_switch_is_refused_until_the_target_side_matches() {
   gsetup
-  run lane.sh switch alpha --to codex --session thread-new
+  run switch.sh switch alpha --to codex --session thread-new
   assert_rc 5
   assert_has "$T/err" "the standing grants on codex do not match the grants file"
   assert_no_file "$T/state/switch/alpha"
   run grants.sh render-codex --all
-  run lane.sh switch alpha --to codex --session thread-new
+  run switch.sh switch alpha --to codex --session thread-new
   assert_rc 0
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_has "$T/out" "PASS  approvals    grants gate codex alpha: ok"
   # a later edit of the rendered policy holds the routing back
   sed -i.bak 's/Production deploys\./Production deploys, sometimes./' "$T/proj/alpha/.codex/config.toml"
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_has "$T/out" "TODO  approvals"
   assert_lacks "$T/out" "PASS  routing"
 }
 
 test_switch_without_a_grants_file_is_not_gated() {
-  run lane.sh switch alpha --to codex --session thread-new
+  run switch.sh switch alpha --to codex --session thread-new
   assert_rc 0
-  run lane.sh verify alpha
+  run switch.sh verify alpha
   assert_has "$T/out" "PASS  approvals    no grants file"
 }
 

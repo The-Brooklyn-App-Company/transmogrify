@@ -9,6 +9,7 @@
 #        check.sh skills [--max-lines N] DIR...
 #        check.sh home DIR...
 #        check.sh privacy [--denylist FILE] [PATH...]
+#        check.sh leaks [--staged] [--no-denylist]
 #        check.sh host
 #
 # kit      Run in a kit checkout (CI does): links over every tracked
@@ -46,6 +47,32 @@
 #          the files git tracks in the current directory. Matching lines are
 #          printed as file:line only, never with their text, so the report
 #          itself leaks nothing. Git history and author metadata are out of scope.
+# leaks    The leakage guard for a public checkout: nothing owner- or
+#          company-specific reaches the tree. Scans every tracked file (the
+#          working copy, contents and names) and the staged copy of every
+#          staged file (`staged:` in the output) with generic rules:
+#            L01 a home folder (/Users/NAME, /home/NAME) that is not a
+#                fictional one (example, test, tester, owner, private, me,
+#                person, user, you, runner, someone, name, shared)
+#            L02 an e-mail address other than reserved example domains,
+#                provider noreply addresses, git SSH users and the project
+#                contact (package.json's author email)
+#            L03 a Slack channel, user or team id (C, D, G, T, U or W, a
+#                digit, then uppercase letters and digits; 9 to 12 long)
+#            L04 an API key or token shape (sk-, gh?_, github_pat_, xox?-,
+#                AKIA, AIza) or a PEM private key header
+#            L05 a Keychain item named in a security(1) call
+#          and, with a private denylist, D<n> for a match of its line n
+#          (case-insensitive; `=word` matches whole words; a `!phrase` line
+#          is an allowed phrase, such as the publisher's own name, blanked
+#          out before matching). The denylist
+#          comes from TRANSMOGRIFY_LEAK_DENYLIST, else the profile's
+#          leak_denylist; it must live outside the repository and is never
+#          committed. Output is `file:line: RULE` only, never the matched
+#          text or a denylist line. A line carrying `leak-ok: RULE` is
+#          exempt from RULE. --staged scans only what is staged (the
+#          pre-commit hook, install.sh precommit); --no-denylist runs the
+#          generic rules only (CI).
 # host     An always-on macOS host (reads the profile when there is one;
 #          read-only). App Nap: every desktop app in host_apps that has run
 #          here must have NSAppSleepDisabled set (fix: install.sh host, then
@@ -485,6 +512,212 @@ check_host_plist() {
   return 0
 }
 
+# ---------------------------------------------------------------- leaks
+# The leakage guard: owner- or company-specific text must not reach the
+# public tree. Rule ids are printed, never the matched text.
+
+# Fictional home folders the docs and tests use on purpose.
+CHECK_LEAK_HOMES='example examples test tests tester owner private me person user users you runner someone name shared'
+
+# check_leak_scan FILE SHOWNAME PATTERNS CONTACT  Print `SHOWNAME:LINE: RULE`
+# once per rule and line in FILE's text, and `SHOWNAME: D<n> (file name)`
+# for a denylist match in the name. File names, the contact and the
+# denylist reach awk through the environment, never through program text. A
+# line carrying `leak-ok: RULE` is exempt from RULE.
+check_leak_scan() {
+  case $1 in /*) _lf=$1 ;; *) _lf=./$1 ;; esac
+  AO_N=$2 AO_P=$3 AO_C=$4 AO_H=$CHECK_LEAK_HOMES awk '
+    function hit(rule) {
+      if (index($0, "leak-ok: " rule) || (rule in seen)) return
+      print n ":" FNR ": " rule; seen[rule] = 1
+    }
+    function slackid(t,   i, c, d, l) {
+      if (substr(t, 2, 1) !~ /[0-9]/) return 0
+      d = 0; l = 0
+      for (i = 2; i <= length(t); i++) {
+        c = substr(t, i, 1)
+        if (c ~ /[0-9]/) d++
+        else if (c ~ /[A-Z]/) l++
+        else return 0
+      }
+      return d > 0 && l > 1
+    }
+    # blank(t): t with every allowed phrase (denylist lines `!phrase`) spaced out.
+    function blank(t,   i, k, sp) {
+      for (i = 1; i <= na; i++)
+        while ((k = index(t, allow[i])) > 0) {
+          sp = sprintf("%" length(allow[i]) "s", "")
+          t = substr(t, 1, k - 1) sp substr(t, k + length(allow[i]))
+        }
+      return t
+    }
+    function allup(t,   i) {
+      for (i = 1; i <= length(t); i++) if (substr(t, i, 1) !~ /[A-Z0-9]/) return 0
+      return 1
+    }
+    BEGIN {
+      n = ENVIRON["AO_N"]; contact = tolower(ENVIRON["AO_C"]); sq = sprintf("%c", 39)
+      nh = split(ENVIRON["AO_H"], hl, " "); for (i = 1; i <= nh; i++) homes[hl[i]] = 1
+      while ((getline p < ENVIRON["AO_P"]) > 0) {
+        nd++
+        p = tolower(p); w = 0
+        if (p ~ /^[ \t]*$/ || p ~ /^[ \t]*#/) continue
+        if (substr(p, 1, 1) == "!") { if (length(p) > 1) allow[++na] = substr(p, 2); continue }
+        if (substr(p, 1, 1) == "=") { p = substr(p, 2); w = 1 }
+        deny[nd] = p; word[nd] = w
+      }
+      low = blank(tolower(n))
+      for (i = 1; i <= nd; i++) if ((i in deny) && (word[i] ? wordin(low, deny[i]) : index(low, deny[i]))) { print n ": D" i " (file name)"; break }
+    }
+    {
+      split("", seen)
+      # L01: a home folder that is not one of the fictional ones.
+      rest = $0
+      while (match(rest, /\/(Users|home)\/[A-Za-z0-9._-]+/)) {
+        pre = RSTART > 1 ? substr(rest, RSTART - 1, 1) : ""
+        seg = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
+        sub(/^\/(Users|home)\//, "", seg)
+        if (pre ~ /[A-Za-z0-9_}.$-]/) continue
+        if (!(tolower(seg) in homes)) { hit("L01"); break }
+      }
+      # L02: an e-mail address other than a reserved domain, a provider noreply
+      # address, a git SSH user and the project contact.
+      rest = $0
+      while (match(rest, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+/)) {
+        addr = tolower(substr(rest, RSTART, RLENGTH)); rest = substr(rest, RSTART + RLENGTH)
+        if (addr ~ /@([a-z0-9-]+\.)*(example\.(com|org|net)|example|test|invalid|localhost)$/) continue
+        if (addr ~ /^git@/ || addr ~ /^noreply@(anthropic|openai|github)\.com$/ || addr ~ /@users\.noreply\.github\.com$/) continue
+        if (contact != "" && addr == contact) continue
+        hit("L02"); break
+      }
+      # L03 Slack ids and L04 key shapes, token by token.
+      rest = $0
+      while (match(rest, /[A-Za-z0-9_-]+/)) {
+        b = RSTART > 1 ? substr(rest, RSTART - 1, 1) : ""
+        t = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
+        a = substr(rest, 1, 1)
+        l = length(t)
+        # Inside base64 (an integrity hash, a blob) a run of capitals is not an id.
+        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && b !~ /[\/+=]/ && a !~ /[\/+=]/) hit("L03")
+        if ((substr(t, 1, 3) == "sk-" && l >= 24) ||
+            (substr(t, 1, 4) ~ /^gh[opsu]_$/ && l >= 40) ||
+            (substr(t, 1, 11) == "github_pat_" && l >= 40) ||
+            (substr(t, 1, 5) ~ /^xox[abprs]-$/ && l >= 20) ||
+            (substr(t, 1, 4) == "AKIA" && l == 20 && allup(t)) ||
+            (substr(t, 1, 4) == "AIza" && l == 39)) hit("L04")
+      }
+      if (index($0, "PRIVATE KEY-----")) hit("L04") # leak-ok: L04 (the rule itself)
+      # L05: a Keychain item named in a security(1) call: a quoted name, or a
+      # bare one on a shell line; a $variable or <placeholder> is fine.
+      i = 0
+      if (index($0, "generic-password")) {
+        i = index($0, " -s "); off = 4
+        if (!i) { i = index($0, sq "-s" sq); off = 4 }
+        if (!i) { i = index($0, "\"-s\""); off = 4 }
+      }
+      if (i) {
+        v = substr($0, i + off); q = 0
+        while (v != "") {
+          c = substr(v, 1, 1)
+          if (c == sq || c == "\"") q = 1
+          else if (c != " " && c != "\t" && c != ",") break
+          v = substr(v, 2)
+        }
+        c = substr(v, 1, 1)
+        if (v != "" && c != "$" && c != "<" && (q || index($0, "security "))) hit("L05")
+      }
+      # D<n>: line n of the private denylist, after its allowed phrases are blanked.
+      low = blank(tolower($0))
+      for (i = 1; i <= nd; i++) if ((i in deny) && (word[i] ? wordin(low, deny[i]) : index(low, deny[i]))) hit("D" i)
+    }
+    '"$CHECK_AWK_WORDIN" "$_lf"
+}
+
+# check_leaks_each PATTERNS CONTACT FILE...  Scan tracked text files
+# (internal entry point, run through xargs -0 so any file name is safe).
+check_leaks_each() {
+  _pat=$1 _con=$2
+  shift 2
+  _rc=0
+  for _f in "$@"; do
+    [ -f "$_f" ] || continue
+    [ -r "$_f" ] || { ao_warn "cannot read $_f"; _rc=2; continue; }
+    grep -qI . -- "$_f" 2>/dev/null
+    case $? in 0) ;; 1) continue ;; *) ao_warn "cannot read $_f"; _rc=2; continue ;; esac
+    check_leak_scan "$_f" "$_f" "$_pat" "$_con" || _rc=2
+  done
+  return "$_rc"
+}
+
+# check_leaks_staged PATTERNS CONTACT FILE...  Scan the staged copy of each
+# file (internal entry point, run through xargs -0 in the checkout's root).
+check_leaks_staged() {
+  _pat=$1 _con=$2
+  shift 2
+  _rc=0
+  _blob=$(ao_tmp leak-blob)
+  for _f in "$@"; do
+    git show ":$_f" >"$_blob" 2>/dev/null || { ao_warn "cannot read the staged $_f"; _rc=2; continue; }
+    grep -qI . "$_blob" 2>/dev/null || continue
+    check_leak_scan "$_blob" "staged:$_f" "$_pat" "$_con" || _rc=2
+  done
+  return "$_rc"
+}
+
+# check_leaks [--staged] [--no-denylist]
+check_leaks() {
+  _ls_staged='' _ls_deny=1
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --staged) _ls_staged=1 ;;
+      --no-denylist) _ls_deny='' ;;
+      *) ao_die "$AO_E_USAGE" "usage: check.sh leaks [--staged] [--no-denylist]" ;;
+    esac
+    shift
+  done
+  _top=$(git rev-parse --show-toplevel 2>/dev/null) || ao_die "$AO_E_USAGE" "check.sh leaks runs inside a git checkout"
+  _top=$(CDPATH='' cd -- "$_top" && pwd -P)
+  patterns=$(ao_tmp leak-patterns)
+  : >"$patterns"
+  if [ -n "$_ls_deny" ]; then
+    _dl=${TRANSMOGRIFY_LEAK_DENYLIST:-}
+    if [ -z "$_dl" ]; then
+      _pf=$(ao_profile_path)
+      if [ -r "$_pf" ]; then ao_profile_parse "$_pf"; _dl=$(ao_cfg_path leak_denylist ''); fi
+    fi
+    if [ -n "$_dl" ]; then
+      [ -f "$_dl" ] && [ -r "$_dl" ] || ao_die "$AO_E_USAGE" "the leak denylist is not a readable file (TRANSMOGRIFY_LEAK_DENYLIST or the profile's leak_denylist)"
+      _dd=$(CDPATH='' cd -- "$(dirname -- "$_dl")" && pwd -P)
+      case $_dd/ in "$_top"/*) ao_die "$AO_E_USAGE" "the leak denylist must live outside this repository (it is never committed)" ;; esac
+      # Line numbers are kept: the rule id is D<line>; the text never prints.
+      cp "$_dl" "$patterns" || ao_die "$AO_E_USAGE" "cannot read the leak denylist"
+    fi
+  fi
+  _con=$(sed -n 's/^ *"email": *"\([^"]*\)".*/\1/p' "$_top/package.json" 2>/dev/null | head -n 1)
+  hits=$(ao_tmp leak-hits)
+  : >"$hits"
+  _err=0
+  list=$(ao_tmp leak-list)
+  if [ -z "$_ls_staged" ]; then
+    (cd "$_top" && git ls-files -z) >"$list" || ao_die "$AO_E_USAGE" "git ls-files failed"
+    if [ -s "$list" ]; then
+      (cd "$_top" && xargs -0 sh "$AO_SCRIPTS/check.sh" __leaks "$patterns" "$_con" <"$list") >>"$hits" || _err=1
+    fi
+  fi
+  # The staged copy of every added, copied, modified or renamed file.
+  (cd "$_top" && git diff --cached --name-only -z --diff-filter=ACMR) >"$list" || _err=1
+  if [ -s "$list" ]; then
+    (cd "$_top" && xargs -0 sh "$AO_SCRIPTS/check.sh" __leaks_staged "$patterns" "$_con" <"$list") >>"$hits" || _err=1
+  fi
+  _hits=$(sort -u "$hits") || _err=1
+  [ -z "$_hits" ] || printf '%s\n' "$_hits"
+  if [ "$_err" -ne 0 ]; then
+    ao_msg "leak scan incomplete: some files could not be read"
+    return "$AO_E_FAIL"
+  fi
+  [ -z "$_hits" ] || return "$AO_E_FAIL"
+}
+
 main() {
   case ${1-} in
     kit) shift; check_kit "$@" ;;
@@ -494,9 +727,12 @@ main() {
     skills) shift; check_skills "$@" ;;
     privacy) shift; check_privacy "$@" ;;
     host) shift; check_host "$@" ;;
+    leaks) shift; check_leaks "$@" ;;
     __scan) shift; check_privacy_each "$@" ;;
+    __leaks) shift; check_leaks_each "$@" ;;
+    __leaks_staged) shift; check_leaks_staged "$@" ;;
     -h | --help) ao_usage; exit 0 ;;
-    *) ao_die "$AO_E_USAGE" "usage: check.sh kit|links|dupes|skills|home|privacy|host ... (see --help)" ;;
+    *) ao_die "$AO_E_USAGE" "usage: check.sh kit|links|dupes|skills|home|privacy|leaks|host ... (see --help)" ;;
   esac
 }
 

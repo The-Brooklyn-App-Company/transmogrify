@@ -134,16 +134,22 @@ gate reruns the root test suite on Linux first: a red root suite means no
 deploy, and the site keeps showing the previous release. Work through the list
 in order and record the outcomes in the ROADMAP run record.
 
-1. Acceptance. Run the acceptance matrix, or record a dated exception in
+1. Leak guard. With the maintainer's private denylist (kept outside the
+   repository; `TRANSMOGRIFY_LEAK_DENYLIST` or the profile's
+   `leak_denylist`), `sh ops/check.sh leaks` prints nothing on the release
+   commit. It reports only `file:line: RULE`, so the output can be shared.
+   Fix every hit before going on; `leak-ok: RULE` on a line is for a
+   reviewed false positive only.
+2. Acceptance. Run the acceptance matrix, or record a dated exception in
    ROADMAP.md. Re-measure every compatibility pin whose surface changed, then
    update `SKILL.md` metadata, the documents that quote the pin, and
    `verified_date`.
-2. Versions. Set the same version in the root `package.json`, in `SKILL.md`
+3. Versions. Set the same version in the root `package.json`, in `SKILL.md`
    metadata, and in `site/package.json` (`npm version <version>
    --no-git-tag-version` inside `site/` updates its lockfile too). Turn the
    `## <version> (in progress)` changelog heading into `## <version>`. Tests
    fail on any disagreement.
-3. Website sweep. Read the release's changelog entries against
+4. Website sweep. Read the release's changelog entries against
    `site/src/content/sections/*.md` and correct every sentence they make
    stale. Give each added or renamed public document a card in
    `site/src/content/sections/05-read.md`; a test fails for a document without
@@ -152,14 +158,14 @@ in order and record the outcomes in the ROADMAP run record.
    `performance-budgets.json` only for an intentional size change, from the
    analytics-enabled build, and say so in the commit. Run the browser pass in
    `site/README.md` when the release changed layout or styling.
-4. Continuous integration. Push the release branch and wait for the CI and
+5. Continuous integration. Push the release branch and wait for the CI and
    Site workflows to finish green on the release commit
    (`gh run list --commit <sha>`). Fix the tree rather than the gate: a test
    that passes only on the maintainer's machine is a defect. `main` is
    protected by a repository ruleset: it cannot be deleted or force-pushed,
    and a commit reaches it only after the six CI matrix checks have passed on
    that exact commit, so every change lands through a branch first.
-5. Publish. Tag `v<version>` on the release commit and push the tag first.
+6. Publish. Tag `v<version>` on the release commit and push the tag first.
    Then, from a scratch directory and without credentials, confirm the public
    repository serves exactly that release:
    `git ls-remote https://github.com/The-Brooklyn-App-Company/transmogrify.git refs/tags/v<version>`
@@ -169,7 +175,7 @@ in order and record the outcomes in the ROADMAP run record.
    `main` (which deploys the site) until both pass. Then fast-forward `main`
    and reinstall the skill on the maintainer hosts. Delete the release branch once
    `main` carries it; the only long-lived branch is `main`.
-6. Verify the deployment. Confirm the Site deploy run on `main` succeeded, that
+7. Verify the deployment. Confirm the Site deploy run on `main` succeeded, that
    `https://transmogrify.sh/start` begins with the released version and pins
    the deployed commit, and that the landing page header shows the same
    version.

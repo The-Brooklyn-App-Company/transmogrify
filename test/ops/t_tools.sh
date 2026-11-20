@@ -264,4 +264,110 @@ test_scripts_and_hooks_are_executable() {
   done
 }
 
+# leak_repo  A git checkout with a project contact in package.json.
+leak_repo() {
+  mkdir -p "$T/repo"
+  (cd "$T/repo" && git init -q . && git config user.email t@example.invalid && git config user.name t) || return 1
+  printf '{\n  "author": {\n    "email": "%s"\n  }\n}\n' "help@""project.zz" >"$T/repo/package.json"
+}
+
+test_check_leaks_generic_rules() {
+  leak_repo || return 0
+  {
+    printf 'path %s/notes\n' "/Users/""alice"
+    printf 'fine %s and %s\n' "/Users/""example/x" "/home/""runner/work"
+    printf 'mail %s\n' "alice@""corp.zz"
+    printf 'contact %s, noreply %s\n' "help@""project.zz" "noreply@""anthropic.com"
+    printf 'channel %s\n' "C0""1ABCDE2FG"
+    printf 'integrity sha512-abc/%s+def\n' "U2""MHZ63HAJVE"
+    printf 'key %s\n' "sk-""abcdefghijklmnopqrstuvwx"
+    printf 'aws %s\n' "AKIA""ABCDEFGHIJKLMNOP"
+    printf '%s\n' "-----BEGIN RSA ""PRIVATE"" KEY-----"
+    printf 'security find-generic-''password -s %s -w\n' "corp-token"
+    printf 'security find-generic-''password -s "$1" -w\n'
+    printf 'channel %s leak-ok: L03\n' "C0""9ZYXWV8UT"
+  } >"$T/repo/doc.md"
+  (cd "$T/repo" && git add -A)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  assert_has "$T/out" "doc.md:1: L01"
+  assert_lacks "$T/out" "doc.md:2:"
+  assert_has "$T/out" "doc.md:3: L02"
+  assert_lacks "$T/out" "doc.md:4:"
+  assert_has "$T/out" "doc.md:5: L03"
+  assert_lacks "$T/out" "doc.md:6:"
+  assert_has "$T/out" "doc.md:7: L04"
+  assert_has "$T/out" "doc.md:8: L04"
+  assert_has "$T/out" "doc.md:9: L04"
+  assert_has "$T/out" "doc.md:10: L05"
+  assert_lacks "$T/out" "doc.md:11:"
+  assert_lacks "$T/out" "doc.md:12:"
+  # The staged copy is reported too, and the report never quotes the text.
+  assert_has "$T/out" "staged:doc.md:1: L01"
+  assert_lacks "$T/out" "alice"
+}
+
+test_check_leaks_private_denylist() {
+  leak_repo || return 0
+  mkdir -p "$T/private"
+  printf '# names\n=bob\nacme widgets\n!Bob Publisher\n' >"$T/private/deny"
+  printf 'Planned with Bob.\nAcme Widgets ship.\nbobcat is fine.\nCopyright Bob Publisher.\n' >"$T/repo/notes.md"
+  printf 'x\n' >"$T/repo/bob-notes.md"
+  (cd "$T/repo" && git add -A && git commit -qm init)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/deny "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  assert_has "$T/out" "notes.md:1: D2"
+  assert_has "$T/out" "notes.md:2: D3"
+  assert_lacks "$T/out" "notes.md:3:"
+  assert_lacks "$T/out" "notes.md:4:"
+  assert_has "$T/out" "bob-notes.md: D2 (file name)"
+  assert_lacks "$T/out" "Bob"
+  assert_lacks "$T/out" "acme"
+  # Without the denylist (CI): clean.
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/deny "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 0
+  # A denylist inside the repository is refused, and so is a missing one.
+  cp "$T/private/deny" "$T/repo/deny.txt"
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/repo/deny.txt "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 2
+  assert_has "$T/err" "must live outside this repository"
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/none "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 2
+}
+
+test_check_leaks_staged_only_and_the_precommit_hook() {
+  leak_repo || return 0
+  printf 'clean\n' >"$T/repo/a.md"
+  (cd "$T/repo" && git add -A && git commit -qm init)
+  printf 'mail %s\n' "carol@""corp.zz" >"$T/repo/b.md"
+  (cd "$T/repo" && git add b.md)
+  # Only the staged copy counts with --staged; the working copy may differ.
+  printf 'clean now\n' >"$T/repo/b.md"
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --staged >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  assert_has "$T/out" "staged:b.md:1: L02"
+  assert_lacks "$T/out" "a.md"
+  # The hook: installed, kept on a second run, and it stops the commit.
+  run install.sh precommit "$T/repo"
+  assert_rc 0
+  assert_has "$T/repo/.git/hooks/pre-commit" "check.sh' leaks --staged"
+  run install.sh precommit "$T/repo"
+  assert_has "$T/out" "keep    "
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' git commit -qm leak >"$T/out" 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || _fail "the hook let a leaking commit through"
+  assert_has "$T/out" "staged:b.md:1: L02"
+  # A hook someone else wrote is never replaced.
+  printf '#!/bin/sh\nexit 0\n' >"$T/repo/.git/hooks/pre-commit"
+  run install.sh precommit "$T/repo"
+  assert_rc 1
+  assert_has "$T/err" "was not written by this kit; left alone"
+}
+
 ao_test_main "$0"

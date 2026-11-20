@@ -34,7 +34,9 @@ ops/check.sh privacy --denylist <your local list>  # never commit the list
 - **Privacy** ([K-31](../../kit/KIT.md)). Fictional names in examples
   (`example.com`, invented people and products). No real people,
   companies, hosts, accounts, paths or incidents. No AI attribution in
-  commits or text.
+  commits or text. `sh ops/check.sh leaks` checks it: generic rules in CI,
+  plus your private denylist (outside the repository) on your machine and
+  in the pre-commit hook (`sh ops/install.sh precommit`).
 - **Keep it small.** The kit should stay readable in one sitting. Prefer
   removing a rule that no longer prevents a real mistake to adding one
   ([K-32](../../kit/KIT.md)).

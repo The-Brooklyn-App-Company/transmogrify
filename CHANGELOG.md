@@ -52,6 +52,15 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   Codex pins from the app's own pinned list (an undocumented state file,
   read only). Marks remain only where a check cannot run, and for the
   Claude sidebar, which nothing on disk shows.
+- **Leak guard** (`ops/check.sh leaks`). Nothing owner- or
+  company-specific reaches the public tree: generic rules (home folders,
+  e-mail addresses other than the project contact, Slack ids, API-key
+  shapes, Keychain item names) over every tracked file and every staged
+  copy, plus an optional private denylist (`TRANSMOGRIFY_LEAK_DENYLIST` or
+  the profile's `leak_denylist`) that must live outside the repository and
+  is never quoted: output is `file:line: RULE` only. It runs in CI (generic
+  rules), in the pre-commit hook `install.sh precommit` installs, and first
+  in the release checklist.
 - **K-30: agents act as the authorized user.** Commits, pull requests,
   comments and messages made on the human's authority carry no agent or
   model tag, trailer or signature unless the profile sets

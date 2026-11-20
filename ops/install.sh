@@ -12,6 +12,7 @@
 #        install.sh [--dry-run] timers [--launchd | --systemd]
 #        install.sh [--dry-run] bridge claude|codex [--home DIR] [--name NAME]
 #        install.sh [--dry-run] host [--apply]
+#        install.sh [--dry-run] precommit [REPO]
 #
 # --dry-run lists every directory, file, link, worktree and timer the
 # command would create, and changes nothing. Without it the same list is
@@ -578,6 +579,42 @@ inst_skills() {
   printf '\nNext: start a fresh session and check the client lists the skills.\n'
 }
 
+# ---------------------------------------------------------------- precommit
+
+# inst_precommit [REPO]  The leakage guard as REPO's git pre-commit hook
+# (default: this checkout): every commit runs `check.sh leaks --staged`, so
+# nothing owner- or company-specific is committed by accident. An existing
+# hook this kit did not write is left alone and reported.
+INST_HOOK_MARK='transmogrify-leak-guard'
+inst_precommit() {
+  [ $# -le 1 ] || ao_die "$AO_E_USAGE" "usage: install.sh precommit [REPO]"
+  _pr=$(inst_abs "${1:-$KIT}")
+  git -C "$_pr" rev-parse --git-dir >/dev/null 2>&1 || ao_die "$AO_E_USAGE" "not a git checkout: $_pr"
+  _hk=$(git -C "$_pr" rev-parse --git-path hooks/pre-commit) || ao_die "$AO_E_FAIL" "cannot find the hooks folder of $_pr"
+  case $_hk in /*) ;; *) _hk=$_pr/$_hk ;; esac
+  _want=$(ao_tmp pre-commit)
+  {
+    printf '#!/bin/sh\n'
+    printf '# %s (install.sh precommit): stop a commit that stages owner- or\n' "$INST_HOOK_MARK"
+    printf '# company-specific text. The private denylist comes from\n'
+    printf '# TRANSMOGRIFY_LEAK_DENYLIST or the profile'"'"'s leak_denylist.\n'
+    printf "exec sh '%s' leaks --staged\n" "$(printf '%s' "$KIT/ops/check.sh" | sed "s/'/'\\\\''/g")"
+  } >"$_want"
+  if [ -f "$_hk" ] && cmp -s "$_want" "$_hk"; then
+    printf 'keep    %s (already installed)\n' "$_hk"
+  elif [ -e "$_hk" ] && ! grep -q "$INST_HOOK_MARK" "$_hk" 2>/dev/null; then
+    ao_warn "$_hk exists and was not written by this kit; left alone (add: sh $KIT/ops/check.sh leaks --staged)"
+    failures=$((failures + 1))
+  else
+    inst_say "$([ -e "$_hk" ] && echo update || echo create)  $_hk (check.sh leaks --staged)"
+    if [ -z "$dry_run" ]; then
+      if ! { mkdir -p "$(dirname -- "$_hk")" && cp "$_want" "$_hk" && chmod 755 "$_hk"; }; then
+        ao_warn "cannot write $_hk"; failures=$((failures + 1))
+      fi
+    fi
+  fi
+}
+
 # ---------------------------------------------------------------- timers
 
 inst_timers() {
@@ -953,6 +990,7 @@ main() {
     timers) inst_timers "$@" ;;
     host) inst_host "$@" ;;
     bridge) inst_bridge "$@" ;;
+    precommit) inst_precommit "$@" ;;
     -h | --help) ao_usage; exit 0 ;;
     *) ao_die "$AO_E_USAGE" "unknown command '$cmd' (see --help)" ;;
   esac

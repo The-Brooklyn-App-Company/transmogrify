@@ -284,7 +284,7 @@ Operations layer, `ops/` (POSIX `sh`; each takes `--help`):
 | `switch.sh` | Move an operator between apps; the parked-side guard; holds; the Oracle lock (`lane.sh` is a deprecated alias until 2.1) |
 | `grants.sh` | Validate, render and check the approvals that follow an operator |
 | `inbox-put.sh`, `relay.sh`, `mailroom.sh` | Write a note; route it; the bridges, supervisor and metrics |
-| `tick.sh`, `hygiene.sh`, `status.sh`, `check.sh` | The scheduled watchdog, the nightly hygiene list, status and drift, checks |
+| `tick.sh`, `hygiene.sh`, `status.sh`, `check.sh` | The scheduled watchdog, the nightly hygiene list, status and drift, checks (including `check.sh leaks`, the leak guard) |
 | `worker-run.sh`, `review-run.sh`, `cross-review.sh` | Boxed headless runs, reviews, the weekly cross-model review |
 | `recover-context.sh` | The recovery digest a session reads at start |
 

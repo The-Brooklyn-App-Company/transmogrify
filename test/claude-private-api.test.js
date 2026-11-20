@@ -84,7 +84,7 @@ function privateApi(fetch, calls = []) {
       }
       if (executable === '/usr/bin/security') {
         assert.deepEqual(args, [
-          'find-generic-password', '-s', 'Claude Code-credentials', '-a', 'test-user', '-w',
+          'find-generic-password', '-s', 'Claude Code-credentials', '-a', 'test-user', '-w', // leak-ok: L05 (the client's own item)
         ]);
         return JSON.stringify({ claudeAiOauth: { accessToken: TOKEN } });
       }

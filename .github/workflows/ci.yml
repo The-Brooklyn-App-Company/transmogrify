@@ -67,6 +67,8 @@ jobs:
           dash -c 'echo dash ok' && shellcheck --version | head -2 && jq --version
       - name: check.sh kit
         run: sh ops/check.sh kit
+      - name: Leak guard (generic rules; the private denylist runs on maintainer machines)
+        run: sh ops/check.sh leaks --no-denylist
       - name: shellcheck
         shell: bash
         run: |

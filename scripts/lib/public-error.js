@@ -142,7 +142,7 @@ const PUBLIC_ERROR_MESSAGES = new Map([
   ['TARGET_ACTIVE', 'the provider lane is still active'],
   ['TIMEOUT', 'the provider did not answer within the bounded timeout'],
   ['TOOL_FAILED', 'a required local inspection tool failed'],
-  ['TOOL_UNAVAILABLE', 'a required local tool (lsof, open, or osascript) is unavailable'],
+  ['TOOL_UNAVAILABLE', 'a required local tool (lsof, ps, mdfind, plutil, open, or osascript) is unavailable'],
   ['TRANSCRIPT_RECEIPT_PENDING', 'the Claude session has not written its first transcript message yet; reconcile once it has'],
   ['TRANSMOGRIFY_BIN', 'TRANSMOGRIFY_BIN does not name an executable Codex binary'],
   ['TRANSPORT_ERROR', 'the provider transport failed before a receipt was observed'],

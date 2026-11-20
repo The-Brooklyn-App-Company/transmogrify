@@ -233,29 +233,34 @@ async function requireTool(run, executable, args, env, timeoutMs = 5000) {
   return result;
 }
 
+// Read one Info.plist value with plutil. Null when it cannot be read.
+async function plistValue(run, plist, key, env) {
+  const result = await run('plutil', ['-extract', key, 'raw', plist], { timeoutMs: 5000, env });
+  return result.code === 0 ? result.stdout.trim() : null;
+}
+
+// The bundle at appPath when its plist names one of the allowed identifiers.
+async function bundleAt(run, appPath, allowed, env) {
+  const plist = path.join(appPath, 'Contents', 'Info.plist');
+  const bundleId = await plistValue(run, plist, 'CFBundleIdentifier', env);
+  if (!allowed.includes(bundleId)) return null;
+  return {
+    bundleId,
+    appPath,
+    version: await plistValue(run, plist, 'CFBundleShortVersionString', env),
+    build: await plistValue(run, plist, 'CFBundleVersion', env),
+  };
+}
+
 // The first installed Desktop application among the accepted bundle identifiers,
 // with its path, version, and build. Null when none is installed.
+//
+// The lookup never sends Apple Events (no osascript, no `path to application`):
+// those raise a macOS Automation consent prompt on an unattended host. It checks
+// the standard per-machine and per-user locations first, then asks Spotlight
+// (mdfind), and accepts a bundle only after its plist names an allowed id.
 async function resolveDesktopApp(run, env, dependencies = {}) {
-  for (const bundleId of bundleCandidates(env)) {
-    const located = await requireTool(run, 'osascript', [
-      '-e', `POSIX path of (path to application id "${bundleId}")`,
-    ], env);
-    if (located.code !== 0) continue;
-    const appPath = located.stdout.trim().replace(/\/+$/, '');
-    if (!path.isAbsolute(appPath) || !appPath.endsWith('.app')) continue;
-    const plist = path.join(appPath, 'Contents', 'Info.plist');
-    const version = await run('defaults', ['read', plist, 'CFBundleShortVersionString'], { timeoutMs: 5000, env });
-    const build = await run('defaults', ['read', plist, 'CFBundleVersion'], { timeoutMs: 5000, env });
-    return {
-      bundleId,
-      appPath,
-      version: version.code === 0 ? version.stdout.trim() : null,
-      build: build.code === 0 ? build.stdout.trim() : null,
-    };
-  }
-  // LaunchServices lookup can be denied inside a sandbox even though the app
-  // bundle is readable. Fall back to the two standard per-machine and per-user
-  // locations, but accept a bundle only after its plist names an allowed id.
+  const allowed = bundleCandidates(env);
   const homes = env.HOME && path.isAbsolute(env.HOME) ? [env.HOME] : [];
   const candidates = [
     '/Applications/ChatGPT.app',
@@ -267,25 +272,19 @@ async function resolveDesktopApp(run, env, dependencies = {}) {
   ];
   const exists = dependencies.existsSync || fs.existsSync;
   for (const appPath of candidates) {
-    const plist = path.join(appPath, 'Contents', 'Info.plist');
-    if (!exists(plist)) continue;
-    const identifier = await run('plutil', ['-extract', 'CFBundleIdentifier', 'raw', plist], {
-      timeoutMs: 5000, env,
-    });
-    const bundleId = identifier.code === 0 ? identifier.stdout.trim() : null;
-    if (!bundleCandidates(env).includes(bundleId)) continue;
-    const version = await run('plutil', ['-extract', 'CFBundleShortVersionString', 'raw', plist], {
-      timeoutMs: 5000, env,
-    });
-    const build = await run('plutil', ['-extract', 'CFBundleVersion', 'raw', plist], {
-      timeoutMs: 5000, env,
-    });
-    return {
-      bundleId,
-      appPath,
-      version: version.code === 0 ? version.stdout.trim() : null,
-      build: build.code === 0 ? build.stdout.trim() : null,
-    };
+    if (!exists(path.join(appPath, 'Contents', 'Info.plist'))) continue;
+    const found = await bundleAt(run, appPath, allowed, env);
+    if (found) return found;
+  }
+  for (const bundleId of allowed) {
+    const located = await requireTool(run, 'mdfind', [`kMDItemCFBundleIdentifier == "${bundleId}"`], env);
+    if (located.code !== 0) continue;
+    for (const line of located.stdout.split(/\r?\n/)) {
+      const appPath = line.trim().replace(/\/+$/, '');
+      if (!path.isAbsolute(appPath) || !appPath.endsWith('.app')) continue;
+      const found = await bundleAt(run, appPath, [bundleId], env);
+      if (found) return found;
+    }
   }
   return null;
 }
@@ -646,7 +645,10 @@ async function check(options = {}, env = process.env, dependencies = {}) {
 }
 
 // Quit Desktop through the application's own quit and wait for its processes to
-// exit. A refusal is DESKTOP_QUIT_FAILED and a survivor is DESKTOP_QUIT_TIMEOUT;
+// exit. This is the only Apple Events call in Transmogrify: it runs only after
+// the owner consents to a relaunch (`ensure --relaunch-desktop` or
+// TRANSMOGRIFY_DESKTOP_RELAUNCH=auto), and macOS may then ask once for
+// Automation permission. test/no-apple-events.test.js keeps it that way. A refusal is DESKTOP_QUIT_FAILED and a survivor is DESKTOP_QUIT_TIMEOUT;
 // no process is ever signalled.
 async function quitDesktop(run, desktop, env, dependencies) {
   const sleep = dependencies.sleep || delay;

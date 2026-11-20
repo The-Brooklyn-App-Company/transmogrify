@@ -67,7 +67,7 @@ const CODEX_SETUP_ACTIONS = new Map([
   ['desktop-attached-elsewhere', { blocking: false, ownerAction: 'Point TRANSMOGRIFY_URL at the runtime Codex Desktop already uses (see nativeVisibility.nextAction) so lanes appear and stream live there. Declining leaves lanes on the selected runtime protocol-only and not live-visible in Desktop.' }],
   ['desktop-unsupported-platform', { blocking: false, ownerAction: 'Codex Desktop attachment is macOS-only. Attachment would make lanes appear and stream live in Desktop; on this host use \`--allow-protocol-only\`, where they will not be live-visible there.' }],
   ['desktop-attach-disabled', { blocking: false, ownerAction: 'Unset TRANSMOGRIFY_DESKTOP_ATTACH=off if Codex lanes should appear and stream live in Desktop. Leaving it disabled requires \`--allow-protocol-only\`, and those lanes will not be live-visible there.' }],
-  ['desktop-tool-unavailable', { blocking: false, ownerAction: 'Restore lsof, ps, and osascript so attachment can be measured and Codex lanes can be proved live-visible in Desktop. Until then use \`--allow-protocol-only\`; those lanes will not be live-visible there.' }],
+  ['desktop-tool-unavailable', { blocking: false, ownerAction: 'Restore lsof, ps, mdfind, and plutil so attachment can be measured and Codex lanes can be proved live-visible in Desktop. Until then use \`--allow-protocol-only\`; those lanes will not be live-visible there.' }],
 ]);
 
 function claudeSetup(error) {

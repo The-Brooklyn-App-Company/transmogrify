@@ -119,7 +119,7 @@ test('check distinguishes unattached, not running, and not installed', async () 
   assert.deepEqual(notInstalled.desktop, { installed: false });
 });
 
-test('check verifies the standard app path when LaunchServices lookup is sandboxed', async () => {
+test('check verifies the standard app path before asking Spotlight', async () => {
   const receipt = await check({}, ENV, scenario({
     launchServices: false,
     diskInstalled: true,
@@ -147,7 +147,7 @@ test('check reports missing system tools instead of guessing', async () => {
     execFileResult: async () => ({ code: null, failure: 'missing', stdout: '', stderr: '' }),
   });
   assert.equal(receipt.attachment.state, 'toolUnavailable');
-  assert.equal(receipt.attachment.tool, 'osascript');
+  assert.equal(receipt.attachment.tool, 'mdfind');
   await assert.rejects(
     () => ensure({}, ENV, {
       ...scenario().dependencies,

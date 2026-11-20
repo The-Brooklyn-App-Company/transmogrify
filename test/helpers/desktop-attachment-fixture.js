@@ -27,19 +27,22 @@ function scenario(overrides = {}) {
   const fail = (stderr = '', code = 1) => ({ code, stdout: '', stderr });
   async function run(executable, args) {
     calls.push([executable, ...args]);
-    if (executable === 'osascript' && args[1].startsWith('POSIX path')) {
-      return state.installed && state.launchServices && args[1].includes('com.openai.codex')
-        ? ok(`${APP}\n`) : fail('not found');
+    if (executable === 'mdfind') {
+      return state.installed && state.launchServices && args[0].includes('com.openai.codex')
+        ? ok(`${APP}\n`) : ok('');
     }
     if (executable === 'osascript' && args[1].endsWith('to quit')) {
       state.quitRequested = true;
       return ok('');
     }
-    if (executable === 'defaults') {
-      return ok(args[2] === 'CFBundleShortVersionString' ? (state.version || '26.901.20858') : (state.build || '7658'));
-    }
     if (executable === 'plutil') {
+      if (!state.installed) return fail('no such file');
       if (args[1] === 'CFBundleIdentifier') return ok('com.openai.codex\n');
+      // Found through Spotlight in these fixtures: the current build; found only
+      // on disk: an older one, so the two lookups stay distinguishable.
+      if (state.launchServices) {
+        return ok(args[1] === 'CFBundleShortVersionString' ? `${state.version || '26.901.20858'}\n` : `${state.build || '7658'}\n`);
+      }
       return ok(args[1] === 'CFBundleShortVersionString' ? '26.901.22334\n' : '7746\n');
     }
     if (executable === 'ps' && args[0] === '-axo') {

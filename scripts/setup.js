@@ -14,6 +14,7 @@ const { doctor, parseDoctorArgs } = require('./doctor');
 const { detectHostContext } = require('./lib/host-context');
 const { runtimeUrl } = require('./lib/codex-runtime');
 const { publicResult } = require('./lib/output-schema');
+const { opsHostApply, opsHostCheck } = require('./lib/ops-host');
 const { ACTIONS: PLAN_ACTIONS } = require('./lib/setup-plan');
 const {
   PUBLIC_ERROR_MESSAGES, exitCodeForError, publicErrorMessage,
@@ -33,6 +34,8 @@ options:
   --start-runtime        authorize starting an owned Codex runtime
   --relaunch-desktop     authorize relaunching Codex Desktop for attachment
   --persist-attach       authorize persistent Desktop attachment for login sessions
+  --apply-host           authorize the operations layer's host steps (ops/install.sh host --apply);
+                         runs on its own, after a read-only check
   --help                 print this help`;
 
 const ACTIONS = Object.freeze({
@@ -82,6 +85,7 @@ function parseSetupArgs(argv, env = process.env) {
         'start-runtime': { type: 'boolean' },
         'relaunch-desktop': { type: 'boolean' },
         'persist-attach': { type: 'boolean' },
+        'apply-host': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -96,6 +100,10 @@ function parseSetupArgs(argv, env = process.env) {
   if (!repoRoot || !path.isAbsolute(repoRoot) || path.normalize(repoRoot) !== repoRoot) {
     usage('--repo-root or REPO_ROOT must be a normalized absolute path');
   }
+  if (parsed.values['apply-host'] && ['install-claude-cli', 'install-codex-cli', 'sign-in', 'start-runtime',
+    'relaunch-desktop', 'persist-attach'].some((flag) => parsed.values[flag])) {
+    usage('--apply-host runs on its own; give one consent at a time');
+  }
   return {
     repoRoot,
     dryRun: parsed.values['dry-run'] === true,
@@ -105,6 +113,7 @@ function parseSetupArgs(argv, env = process.env) {
     startRuntime: parsed.values['start-runtime'] === true,
     relaunchDesktop: parsed.values['relaunch-desktop'] === true,
     persistAttach: parsed.values['persist-attach'] === true,
+    applyHost: parsed.values['apply-host'] === true,
   };
 }
 
@@ -354,9 +363,37 @@ async function runSetup(options, env = process.env, dependencies = {}) {
   });
 }
 
+// The operations layer's host steps, on the owner's consent (--apply-host):
+// a read-only check first, then `ops/install.sh host --apply` only when it
+// finds host work to do. A dry run reports what would run.
+async function runHostSetup(options, env = process.env, dependencies = {}) {
+  const check = await (dependencies.opsHostCheck || opsHostCheck)(env, dependencies.opsHostDependencies || {});
+  const base = { version: 1, operation: 'setup', dryRun: options.dryRun };
+  if (check.state === 'absent' || check.state === 'unconfigured' || check.state === 'failed') {
+    return publicResult({
+      ...base, ok: false, code: 'POLICY_REFUSAL', message: publicErrorMessage('POLICY_REFUSAL'),
+      host: { state: check.state },
+      refusal: { what: 'Apply the operations host steps.', consent: 'apply-host', reason: `operations-${check.state}` },
+    });
+  }
+  if (check.state === 'ready' || check.pending === 0) {
+    return publicResult({ ...base, ok: true, host: { state: check.state, pending: 0, inAppSteps: check.inAppSteps || [] } });
+  }
+  if (options.dryRun) {
+    return publicResult({ ...base, ok: true, host: { state: 'wouldApply', pending: check.pending, inAppSteps: check.inAppSteps } });
+  }
+  const applied = await (dependencies.opsHostApply || opsHostApply)(env, dependencies.opsHostDependencies || {});
+  return publicResult({
+    ...base, ok: applied.applied,
+    ...(applied.applied ? {} : { code: 'PROVIDER_UNAVAILABLE', message: publicErrorMessage('PROVIDER_UNAVAILABLE') }),
+    host: { state: applied.state, pending: applied.pending, inAppSteps: applied.inAppSteps || [] },
+  });
+}
+
 async function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
   const options = parseSetupArgs(argv, env);
   if (options.help) return options;
+  if (options.applyHost) return runHostSetup(options, env, dependencies);
   return runSetup(options, env, dependencies);
 }
 
@@ -388,6 +425,7 @@ if (require.main === module) {
 
 module.exports = {
   ACTIONS,
+  runHostSetup,
   HELP,
   INSTALL_COMMANDS,
   SetupError,

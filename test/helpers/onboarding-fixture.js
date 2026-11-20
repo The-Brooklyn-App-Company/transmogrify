@@ -107,6 +107,7 @@ async function doctorReport(t, scenario = {}) {
       : { result: 'good', private: 'hidden' },
     desktopAttachment: scenario.desktopAttachment || (async () => attachment(scenario.desktopState, scenario.persisted ?? true, scenario.desktopOptions)),
     claudeSurface: claudeSurface(scenario.claudeReason, scenario.claudeMeasurement),
+    ...(scenario.opsHostCheck ? { opsHostCheck: scenario.opsHostCheck } : {}),
   };
   return doctor({
     repoRoot: REPO_ROOT,
@@ -116,6 +117,7 @@ async function doctorReport(t, scenario = {}) {
     timeoutMs: 1000,
     explain: true,
     json: false,
+    operations: scenario.operations === true,
   }, {}, dependencies);
 }
 

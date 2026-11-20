@@ -118,6 +118,10 @@ Provider status is `ready`, `ready-with-limitations`, `needs-action`,
 `what`, `consent`, and `outcome`. When setup stops safely, `code`, `message`, and `refusal`
 identify the pending step and one plain reason such as `consent-required`,
 `hosting-cli-protected`, `manual-action-required`, or `step-not-verified`.
+With `--apply-host` setup reports only the operations layer's `host`: its
+`state` (`ready`, `needsOwner`, `wouldApply`, `applied`, `failed`,
+`timedOut`, or, refused, `absent`, `unconfigured`), the `pending` host item
+count, and the `inAppSteps` that only a person can do.
 
 The `plan` fields are defined in [Doctor explanation](#doctor-explanation).
 The plan remains measured rather than inferred: setup reruns the doctor after

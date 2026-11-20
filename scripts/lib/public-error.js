@@ -157,6 +157,7 @@ const PUBLIC_ERROR_MESSAGES = new Map([
   ['UNVERIFIED_RUNTIME', 'the app-server runtime is outside the verified version line; run doctor.js for discovery'],
   ['USAGE_ERROR', 'invalid operator request'],
   ['WAKE_UNAVAILABLE', 'the parent context has no wake channel; run wait in the foreground or background instead'],
+  ['MAILROOM_UNCONFIGURED', 'the operations layer is not configured for this parent; set TRANSMOGRIFY_OPS_KEY and the operations profile'],
   ['WAKE_UNCERTAIN', 'the wake message may not have reached the parent session; the durable event still waits for wait and ack'],
   ['WAKE_UNDELIVERED', 'the wake message was not delivered to the parent session; the durable event still waits for wait and ack'],
 ]);

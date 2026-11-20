@@ -13,6 +13,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const { parseArgs } = require('node:util');
+const { opsHostCheck, opsOwnerActions } = require('./lib/ops-host');
 const { AppServerClient, validateTimeout } = require('./lib/app-server');
 const {
   MINIMUM_CLI_VERSION,
@@ -212,6 +213,7 @@ options:
   --claude-bin <absolute>     exact Claude CLI executable
   --timeout-ms <milliseconds> bounded provider probe timeout
   --explain                    add an ordered plain-language setup plan
+  --operations                 add the operations layer's read-only host checks (ops/install.sh --dry-run host)
   --json                       print JSON even when --explain runs on a terminal`;
 
 function usage(message) {
@@ -239,6 +241,7 @@ function parseDoctorArgs(argv, env = process.env, dependencies = {}) {
       'timeout-ms': { type: 'string' },
       explain: { type: 'boolean' },
       json: { type: 'boolean' },
+      operations: { type: 'boolean' },
     },
   });
   const repoRoot = parsed.values['repo-root'] || env.REPO_ROOT;
@@ -283,6 +286,7 @@ function parseDoctorArgs(argv, env = process.env, dependencies = {}) {
     repoRoot, target, url, claudeBin, timeoutMs,
     explain: parsed.values.explain === true,
     json: parsed.values.json === true,
+    ...(parsed.values.operations ? { operations: true } : {}),
   };
 }
 
@@ -637,6 +641,11 @@ async function doctor(options, env = process.env, dependencies = {}) {
   const inspectHost = dependencies.detectHostContext || detectHostContext;
   const hostContext = inspectHost(env, dependencies.hostContextDependencies || dependencies);
   const setup = setupSummary(providers, hostContext);
+  // The operations layer's host checks: read-only, and never blocking lanes.
+  const operations = options.operations
+    ? await (dependencies.opsHostCheck || opsHostCheck)(env, dependencies.opsHostDependencies || {})
+    : undefined;
+  if (operations) setup.ownerActions.push(...opsOwnerActions(operations));
   if (options.explain) {
     setup.plan = computeSetupPlan({ providers, setup }, hostContext);
   }
@@ -651,6 +660,7 @@ async function doctor(options, env = process.env, dependencies = {}) {
       ownership,
     },
     providers,
+    ...(operations ? { operations } : {}),
     setup,
     nextSafeMaintenanceCommands: maintenanceCommands(options, ownership, providers),
   };

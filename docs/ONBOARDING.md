@@ -222,3 +222,17 @@ acknowledgement or hook behavior (measurement checks option acceptance, while
 actual steering fails closed on the vendor acknowledgment and transcript); and
 the Desktop's bundled CLI may not support `app-server --listen` on every
 version, so it is probed before use.
+
+## The operations layer in the same first run (2.0, in progress)
+
+`doctor.js --operations` adds the operations layer's host checks to the
+same report: it runs `ops/install.sh --dry-run host`, which only reads (App
+Nap, power, the launchd units, the mailroom bridges, the Oracle lock), and
+lists what it finds as owner actions with provider `operations`; none of
+them blocks a lane. Without an operations profile the one action is to run
+`ops/bootstrap.sh`, the guided first run of that layer. `setup.js
+--apply-host` is the consent for `ops/install.sh host --apply`; it runs on
+its own, after the same read-only check, and only when there is host work
+to do; `--dry-run` shows what it would run. The in-app steps that only a
+person can do stay owner actions. Tested with fakes and a sandbox profile
+only (2026-11-20).

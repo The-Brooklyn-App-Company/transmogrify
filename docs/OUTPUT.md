@@ -121,7 +121,8 @@ identify the pending step and one plain reason such as `consent-required`,
 With `--apply-host` setup reports only the operations layer's `host`: its
 `state` (`ready`, `needsOwner`, `wouldApply`, `applied`, `failed`,
 `timedOut`, or, refused, `absent`, `unconfigured`), the `pending` host item
-count, and the `inAppSteps` that only a person can do.
+count, the `manualSteps` the apply cannot fix (such as turning system sleep
+off), and the `inAppSteps` that only a person can do.
 
 The `plan` fields are defined in [Doctor explanation](#doctor-explanation).
 The plan remains measured rather than inferred: setup reruns the doctor after

@@ -50,13 +50,42 @@ function runSh(script, args, env, timeoutMs, dependencies = {}) {
   });
 }
 
-// Parse the host table: rows of item, state, action; "N item(s) need you.";
-// then "[to do]" lines for the in-app steps.
+// States the host table counts as done (install.sh host_row).
+const DONE_STATE = /^(ok|set|created|installed|updated|loaded|removed|off \(opt-in)/;
+
+// One table row: printf '%-34s %-40s %s' (item, state, action); a wider cell
+// pushes the rest right, so fall back to splitting on runs of two spaces.
+function parseRow(line) {
+  const cell = (value) => (value === '-' ? '' : value);
+  const fixed = /^(.{34}) (.{40}) (.*)$/.exec(line);
+  const fits = (value, width) => /\s$/.test(value) || value.trim().length === width;
+  if (fixed && fixed[1].trim() && fixed[2].trim() && fits(fixed[1], 34) && fits(fixed[2], 40)) {
+    return { item: fixed[1].trim(), state: fixed[2].trim(), action: cell(fixed[3].trim()) };
+  }
+  const cells = line.trim().split(/ {2,}/);
+  if (cells.length < 2) return null;
+  return { item: cells[0], state: cells[1], action: cell(cells.slice(2).join(' ')) };
+}
+
+// Parse the host report: the table (header ITEM STATE ACTION), "N item(s)
+// need you.", then "[to do]" lines for the in-app steps. Rows that are not
+// done split into those `install.sh host --apply` fixes and manual ones.
 function parseHostReport(text) {
-  const pending = /^(\d+) item\(s\) need you\.$/m.exec(text);
-  const inApp = [...text.matchAll(/^ {2}\[to do\] (.+)$/gm)].map((match) => match[1].trim());
-  const done = [...text.matchAll(/^ {2}\[done\] {2}(.+)$/gm)].length;
-  return { pending: pending ? Number(pending[1]) : null, inApp, inAppDone: done };
+  const lines = text.split(/\r?\n/);
+  const pendingLine = lines.findIndex((line) => /^\d+ item\(s\) need you\.$/.test(line));
+  const header = lines.findIndex((line) => /^ITEM\s+STATE\s+ACTION$/.test(line));
+  const rows = header >= 0 && pendingLine > header
+    ? lines.slice(header + 1, pendingLine).filter((line) => line.trim()).map(parseRow).filter(Boolean) : [];
+  const open = rows.filter((row) => !DONE_STATE.test(row.state));
+  const applicable = open.filter((row) => /^would /.test(row.state) || /--apply\b/.test(row.action));
+  const manual = open.filter((row) => !applicable.includes(row))
+    .map((row) => `${row.item}: ${row.state}${row.action ? ` (${row.action})` : ''}`);
+  const inApp = lines.map((line) => /^ {2}\[to do\] (.+)$/.exec(line)).filter(Boolean).map((match) => match[1].trim());
+  const done = lines.filter((line) => /^ {2}\[done\] {2}/.test(line)).length;
+  return {
+    pending: pendingLine >= 0 ? Number(/^(\d+)/.exec(lines[pendingLine])[1]) : null,
+    applicable: applicable.length, manual, inApp, inAppDone: done,
+  };
 }
 
 // The read-only check. States: absent (no ops/ beside the skill),
@@ -74,6 +103,8 @@ async function opsHostCheck(env = process.env, dependencies = {}) {
   return {
     state: report.pending === 0 && report.inApp.length === 0 ? 'ready' : 'needsOwner',
     pending: report.pending,
+    applicable: report.applicable,
+    manualSteps: report.manual,
     inAppSteps: report.inApp,
   };
 }
@@ -86,7 +117,9 @@ function opsOwnerActions(check) {
   if (check.state === 'unconfigured') return [action('operations-unconfigured')];
   if (check.state === 'failed') return [action('operations-check-failed')];
   if (check.state !== 'needsOwner') return [];
-  const actions = check.pending > 0 ? [action('operations-host-pending')] : [];
+  // --apply-host is offered only for what it can fix; the rest is manual.
+  const actions = check.applicable > 0 ? [action('operations-host-pending')] : [];
+  for (const step of check.manualSteps || []) actions.push(action('operations-manual', step));
   for (const step of check.inAppSteps || []) actions.push(action('operations-in-app', step));
   return actions;
 }
@@ -103,6 +136,7 @@ async function opsHostApply(env = process.env, dependencies = {}) {
     applied: result.code === 0,
     state: result.code === 0 ? 'applied' : (result.timedOut ? 'timedOut' : 'failed'),
     pending: report.pending,
+    manualSteps: report.manual,
     inAppSteps: report.inApp,
   };
 }

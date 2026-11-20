@@ -37,8 +37,17 @@ const present = { existsSync: () => true };
 
 test('the host report parses into pending items and in-app steps', () => {
   assert.deepEqual(parseHostReport(REPORT), {
-    pending: 1, inApp: ['Codex sidebar: pin the threads of the operators active on Codex, and the Mailroom.'], inAppDone: 1,
+    pending: 1, applicable: 1, manual: [],
+    inApp: ['Codex sidebar: pin the threads of the operators active on Codex, and the Mailroom.'], inAppDone: 1,
   });
+  const sleepy = REPORT.replace('1 item(s)', '2 item(s)').replace(
+    'power                              ok (system sleep off)                    -',
+    'power                              system sleeps after 10 min               turn system sleep off in Settings (check only here)');
+  const parsed = parseHostReport(sleepy);
+  assert.deepEqual([parsed.applicable, parsed.manual],
+    [1, ['power: system sleeps after 10 min (turn system sleep off in Settings (check only here))']]);
+  const manualOnly = opsOwnerActions({ state: 'needsOwner', pending: 1, applicable: 0, manualSteps: parsed.manual, inAppSteps: [] });
+  assert.deepEqual(manualOnly.map((a) => a.reason), ['operations-manual'], '--apply-host is not offered for manual work');
   assert.equal(parseHostReport('garbage').pending, null);
 });
 
@@ -72,7 +81,7 @@ test('the doctor adds the operations checks only when asked, and they never bloc
   let checked = 0;
   const withOps = await doctorReport(t, {
     target: 'codex', persisted: true, desktopState: 'attached', operations: true,
-    opsHostCheck: async () => { checked += 1; return { state: 'needsOwner', pending: 2, inAppSteps: [] }; },
+    opsHostCheck: async () => { checked += 1; return { state: 'needsOwner', pending: 2, applicable: 2, manualSteps: [], inAppSteps: [] }; },
   });
   assert.equal(checked, 1);
   assert.equal(withOps.operations.state, 'needsOwner');
@@ -87,16 +96,16 @@ test('setup applies the host steps only on --apply-host, alone, after a read-onl
   assert.equal(parseSetupArgs(['--repo-root', '/tmp/r', '--apply-host']).applyHost, true);
   assert.throws(() => parseSetupArgs(['--repo-root', '/tmp/r', '--apply-host', '--sign-in']), /one consent at a time/);
   let applied = 0;
-  const needs = async () => ({ state: 'needsOwner', pending: 3, inAppSteps: ['pin it'] });
+  const needs = async () => ({ state: 'needsOwner', pending: 3, applicable: 2, manualSteps: ['power: sleeps'], inAppSteps: ['pin it'] });
   const apply = async () => { applied += 1; return { applied: true, state: 'applied', pending: 0, inAppSteps: ['pin it'] }; };
   const dry = await runHostSetup({ dryRun: true }, {}, { opsHostCheck: needs, opsHostApply: apply });
   assert.deepEqual([dry.ok, dry.host.state, applied], [true, 'wouldApply', 0]);
   const done = await runHostSetup({ dryRun: false }, {}, { opsHostCheck: needs, opsHostApply: apply });
   assert.deepEqual([done.ok, done.host.state, done.host.inAppSteps, applied], [true, 'applied', ['pin it'], 1]);
   const nothing = await runHostSetup({ dryRun: false }, {}, {
-    opsHostCheck: async () => ({ state: 'needsOwner', pending: 0, inAppSteps: ['pin it'] }), opsHostApply: apply,
+    opsHostCheck: async () => ({ state: 'needsOwner', pending: 1, applicable: 0, manualSteps: ['power: sleeps'], inAppSteps: ['pin it'] }), opsHostApply: apply,
   });
-  assert.deepEqual([nothing.ok, applied], [true, 1], 'nothing to apply: the apply never runs');
+  assert.deepEqual([nothing.ok, nothing.host.manualSteps, applied], [true, ['power: sleeps'], 1], 'only manual work: the apply never runs');
   const refused = await runHostSetup({ dryRun: false }, {}, { opsHostCheck: async () => ({ state: 'unconfigured' }), opsHostApply: apply });
   assert.deepEqual([refused.ok, refused.code, refused.refusal.reason, applied], [false, 'POLICY_REFUSAL', 'operations-unconfigured', 1]);
   const failing = await runHostSetup({ dryRun: false }, {}, {

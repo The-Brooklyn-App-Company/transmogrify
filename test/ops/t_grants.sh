@@ -392,4 +392,28 @@ test_an_interrupted_render_rolls_back() {
   assert_eq "$(cat "$T/proj/alpha/.codex/config.toml")" 'model = "m"'
 }
 
+test_an_include_with_a_modifier_is_refused() {
+  gsetup
+  sed -i.bak 's/^- @include own-merges$/- [only: oracle] @include own-merges/' "$T/home/operators/GRANTS.md"
+  run grants.sh validate
+  assert_rc 2
+  assert_has "$T/err" "@include stands alone"
+}
+
+test_existing_text_is_kept_byte_for_byte() {
+  gsetup
+  mkdir -p "$T/proj/alpha/.codex"
+  printf 'model = "m"\n\n\n\n' >"$T/proj/alpha/.codex/config.toml"
+  cp "$T/proj/alpha/.codex/config.toml" "$T/before"
+  run grants.sh render-codex --actor alpha
+  assert_rc 0
+  head -c "$(wc -c <"$T/before")" "$T/proj/alpha/.codex/config.toml" | cmp -s - "$T/before" || _fail "the existing text changed"
+  printf '\n[tail]\nx = 1\n\n\n' >>"$T/proj/alpha/.codex/config.toml"
+  sed -i.bak 's/^- Production deploys\.$/- Production deploys or promotions./' "$T/home/operators/GRANTS.md"
+  run grants.sh render-codex --actor alpha
+  assert_rc 0
+  assert_eq "$(tail -c 16 "$T/proj/alpha/.codex/config.toml" | od -c | head -n 1 | tr -s ' ')" \
+    "$(printf '\n[tail]\nx = 1\n\n\n' | od -c | head -n 1 | tr -s ' ')" "text after the block kept"
+}
+
 ao_test_main "$0"

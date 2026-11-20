@@ -376,17 +376,19 @@ async function runHostSetup(options, env = process.env, dependencies = {}) {
       refusal: { what: 'Apply the operations host steps.', consent: 'apply-host', reason: `operations-${check.state}` },
     });
   }
-  if (check.state === 'ready' || check.pending === 0) {
-    return publicResult({ ...base, ok: true, host: { state: check.state, pending: 0, inAppSteps: check.inAppSteps || [] } });
+  const manualSteps = check.manualSteps || [];
+  if (check.state === 'ready' || !(check.applicable > 0)) {
+    // Nothing --apply can fix: report what is left for a person, apply nothing.
+    return publicResult({ ...base, ok: true, host: { state: check.state, pending: check.pending || 0, manualSteps, inAppSteps: check.inAppSteps || [] } });
   }
   if (options.dryRun) {
-    return publicResult({ ...base, ok: true, host: { state: 'wouldApply', pending: check.pending, inAppSteps: check.inAppSteps } });
+    return publicResult({ ...base, ok: true, host: { state: 'wouldApply', pending: check.pending, manualSteps, inAppSteps: check.inAppSteps } });
   }
   const applied = await (dependencies.opsHostApply || opsHostApply)(env, dependencies.opsHostDependencies || {});
   return publicResult({
     ...base, ok: applied.applied,
     ...(applied.applied ? {} : { code: 'PROVIDER_UNAVAILABLE', message: publicErrorMessage('PROVIDER_UNAVAILABLE') }),
-    host: { state: applied.state, pending: applied.pending, inAppSteps: applied.inAppSteps || [] },
+    host: { state: applied.state, pending: applied.pending, manualSteps: applied.manualSteps || [], inAppSteps: applied.inAppSteps || [] },
   });
 }
 

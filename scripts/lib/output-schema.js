@@ -98,7 +98,7 @@ const SCHEMAS = Object.freeze({
     code: true, message: true, plan: SETUP_PLAN, completed: SETUP_STEP,
     refusal: { what: true, consent: true, reason: true },
     apps: { claude: true, codex: true, nextSession: true },
-    host: { state: true, pending: true, inAppSteps: true },
+    host: { state: true, pending: true, manualSteps: true, inAppSteps: true },
   },
   spawn: laneShape({
     acknowledgedBy: true, inputReceiptSource: true, completedStatus: true, presentation: true,

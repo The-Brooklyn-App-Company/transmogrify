@@ -320,6 +320,8 @@ def validate(src, reg):
                         for k in [x.strip() for x in m.group(1).split(",")]:
                             if k not in keys:
                                 errs.append(p + "[only: %s] names a key outside the actors" % k)
+                    if "@include" in b and not re.fullmatch(r"@include +\S+", b):
+                        errs.append(p + "'%s': @include stands alone (no [only:] or [no-include])" % b[:60])
                     m = re.fullmatch(r"@include +(\S+)", b)
                     if m:
                         t = byid.get(m.group(1))
@@ -726,13 +728,34 @@ def block_policy(block):
     return toml_unstring(m.group(1)) if m else None
 
 
+def managed_span(text):
+    """(begin, end) line indexes of the managed block, or None; markers count only outside TOML strings."""
+    lines, top = text.split("\n"), toplevel_lines(text)
+    begins = [i for i, line in enumerate(lines) if line == BEGIN and top[i]]
+    ends = [i for i, line in enumerate(lines) if line == END and top[i]]
+    return (begins[0], ends[0]) if begins and ends else None
+
+
 def compose(existing, block):
-    rest, _ = split_managed(existing)
-    rest = rest.rstrip("\n")
-    new = (rest + "\n" if rest else "") if block is None else (rest + "\n\n" if rest else "") + block + "\n"
-    # Everything outside the managed block must survive byte for byte, and the block must read back as written.
+    """The new file: the existing managed block replaced in place (or the block appended after a blank line),
+    every other byte kept as it was. Verified by splitting the result again."""
+    rest, old = split_managed(existing)
+    if old is not None:
+        b, e = managed_span(existing)
+        lines = existing.split("\n")
+        new = "\n".join(lines[:b] + (block.split("\n") if block is not None else []) + lines[e + 1:])
+        expect = rest
+    elif block is None:
+        return existing
+    else:
+        base = existing
+        if base and not base.endswith("\n"):
+            base += "\n"
+        if base.strip():
+            base += "\n"
+        new, expect = base + block + "\n", base
     again, blk = split_managed(new)
-    if again.rstrip("\n") != rest or blk != block:
+    if again != expect or blk != block:
         raise Fail("internal check failed: the text outside the managed block would change")
     return new
 
@@ -912,9 +935,9 @@ def render_codex(src, reg, key, out_dir=None, dry=False, readback=True):
     if before is not None:
         bak = "%s.bak-%s-grants" % (path, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         os.replace(write_temp(bak, before, mode), bak)
-    replace_if_unchanged(write_temp(path, new, mode), path, before)
     why = ""
     try:
+        replace_if_unchanged(write_temp(path, new, mode), path, before)
         _, blk = split_managed(current(path) or "")
         if policy is not None and (blk is None or block_policy(blk) != policy):
             raise Fail("the written block does not decode to the rendered policy")
@@ -922,8 +945,8 @@ def render_codex(src, reg, key, out_dir=None, dry=False, readback=True):
             ok, why = resolve_verdict(app_server_read(home), home, sha(policy))
             if not ok:
                 raise Fail("written but not resolved (%s)" % why)
-    except BaseException as e:  # any failure or interruption after the write restores the previous file
-        msg = rollback(path, bak, before, new)
+    except BaseException as e:  # any failure or interruption once the write may have landed restores the file
+        msg = rollback(path, bak, before, new) if current(path) == new else "nothing written"
         if not isinstance(e, Exception):
             print("codex %s: interrupted; %s" % (key, msg), file=sys.stderr)
             raise

@@ -136,8 +136,11 @@ in order and record the outcomes in the ROADMAP run record.
 
 1. Leak guard. With the maintainer's private denylist (kept outside the
    repository; `TRANSMOGRIFY_LEAK_DENYLIST` or the profile's
-   `leak_denylist`), `sh ops/check.sh leaks` prints nothing on the release
-   commit. It reports only `file:line: RULE`, so the output can be shared.
+   `leak_denylist`), `sh ops/check.sh leaks --require-denylist` prints no
+   finding on the release commit; it fails (exit 2) when no denylist is
+   loaded, so the step cannot pass vacuously, and its stderr line says how
+   many denylist rules ran. It reports only `file:line: RULE`, so the
+   output can be shared.
    Fix every hit before going on; `leak-ok: RULE` on a line is for a
    reviewed false positive only.
 2. Acceptance. Run the acceptance matrix, or record a dated exception in

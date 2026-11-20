@@ -51,16 +51,20 @@
 #          company-specific reaches the tree. Scans every tracked file (the
 #          working copy, contents and names) and the staged copy of every
 #          staged file (`staged:` in the output) with generic rules:
-#            L01 a home folder (/Users/NAME, /home/NAME) that is not a
+#            L01 a home folder (/Users/NAME, escaped or under /Volumes;
+#                -Users-NAME-; C:\Users\NAME; /home/NAME) that is not a
 #                fictional one (example, test, tester, owner, private, me,
 #                person, user, you, runner, someone, name, shared)
 #            L02 an e-mail address other than reserved example domains,
 #                provider noreply addresses, git SSH users and the project
 #                contact (package.json's author email)
 #            L03 a Slack channel, user or team id (C, D, G, T, U or W, a
-#                digit, then uppercase letters and digits; 9 to 12 long)
-#            L04 an API key or token shape (sk-, gh?_, github_pat_, xox?-,
-#                AKIA, AIza) or a PEM private key header
+#                digit, then uppercase letters and digits; 9 to 12 long;
+#                not inside a long base64 run)
+#            L04 an API key or token shape (sk-, sk_live_, gh?_,
+#                github_pat_, glpat-, npm_, lin_api_, xox?-, xapp-, AKIA,
+#                ASIA, AIza, a JWT, a Slack webhook URL) or a PEM private key
+#                header
 #            L05 a Keychain item named in a security(1) call
 #          and, with a private denylist, D<n> for a match of its line n
 #          (case-insensitive; `=word` matches whole words; a `!phrase` line
@@ -69,10 +73,14 @@
 #          comes from TRANSMOGRIFY_LEAK_DENYLIST, else the profile's
 #          leak_denylist; it must live outside the repository and is never
 #          committed. Output is `file:line: RULE` only, never the matched
-#          text or a denylist line. A line carrying `leak-ok: RULE` is
-#          exempt from RULE. --staged scans only what is staged (the
-#          pre-commit hook, install.sh precommit); --no-denylist runs the
-#          generic rules only (CI).
+#          text or a denylist line (a denylist match in a file name prints
+#          that name). One stderr line says how many denylist rules ran. A
+#          line carrying `leak-ok: RULE` is exempt from RULE. Tracked
+#          symlinks are scanned as their target path, never followed.
+#          --staged scans only what is staged (the pre-commit hook,
+#          install.sh precommit); --no-denylist runs the generic rules only
+#          (CI); --require-denylist fails (exit 2) without denylist rules (the
+#          release check and a maintainer's hook).
 # host     An always-on macOS host (reads the profile when there is one;
 #          read-only). App Nap: every desktop app in host_apps that has run
 #          here must have NSAppSleepDisabled set (fix: install.sh host, then
@@ -527,9 +535,40 @@ CHECK_LEAK_HOMES='example examples test tests tester owner private me person use
 check_leak_scan() {
   case $1 in /*) _lf=$1 ;; *) _lf=./$1 ;; esac
   AO_N=$2 AO_P=$3 AO_C=$4 AO_H=$CHECK_LEAK_HOMES awk '
+    # exempt(rule): the line carries `leak-ok: RULE` with no letter or digit
+    # after the id (leak-ok: D12 does not exempt D1).
+    function exempt(rule,   t, k, c) {
+      t = $0
+      while ((k = index(t, "leak-ok: " rule)) > 0) {
+        c = substr(t, k + 9 + length(rule), 1)
+        if (c !~ /[A-Za-z0-9]/) return 1
+        t = substr(t, k + 1)
+      }
+      return 0
+    }
     function hit(rule) {
-      if (index($0, "leak-ok: " rule) || (rule in seen)) return
+      if ((rule in seen) || exempt(rule)) return
       print n ":" FNR ": " rule; seen[rule] = 1
+    }
+    function home(name) { if (!(tolower(name) in homes)) hit("L01") }
+    # b64run(line, start, len): the length of the run of base64 characters
+    # around a token; a long run is a hash or a blob, not an id.
+    function b64run(line, st, len,   i, j) {
+      i = st; while (i > 1 && substr(line, i - 1, 1) ~ /[A-Za-z0-9+\/=]/) i--
+      j = st + len; while (j <= length(line) && substr(line, j, 1) ~ /[A-Za-z0-9+\/=]/) j++
+      return j - i
+    }
+    # jwt(line): three dot-separated base64url parts after "eyJ".
+    function jwt(line,   t, k, parts, np, x) {
+      t = line
+      while ((k = index(t, "eyJ")) > 0) {
+        t = substr(t, k)
+        x = t; sub(/[^A-Za-z0-9_.-].*$/, "", x)
+        np = split(x, parts, ".")
+        if (np >= 3 && length(parts[1]) >= 10 && length(parts[2]) >= 10 && length(parts[3]) >= 10) return 1
+        t = substr(t, 4)
+      }
+      return 0
     }
     function slackid(t,   i, c, d, l) {
       if (substr(t, 2, 1) !~ /[0-9]/) return 0
@@ -560,10 +599,12 @@ check_leak_scan() {
       nh = split(ENVIRON["AO_H"], hl, " "); for (i = 1; i <= nh; i++) homes[hl[i]] = 1
       while ((getline p < ENVIRON["AO_P"]) > 0) {
         nd++
+        sub(/\r$/, "", p); sub(/[ \t]+$/, "", p)
         p = tolower(p); w = 0
         if (p ~ /^[ \t]*$/ || p ~ /^[ \t]*#/) continue
-        if (substr(p, 1, 1) == "!") { if (length(p) > 1) allow[++na] = substr(p, 2); continue }
+        if (substr(p, 1, 1) == "!") { p = substr(p, 2); if (p !~ /^[ \t]*$/) allow[++na] = p; continue }
         if (substr(p, 1, 1) == "=") { p = substr(p, 2); w = 1 }
+        if (p ~ /^[ \t]*$/) continue
         deny[nd] = p; word[nd] = w
       }
       low = blank(tolower(n))
@@ -571,42 +612,69 @@ check_leak_scan() {
     }
     {
       split("", seen)
-      # L01: a home folder that is not one of the fictional ones.
+      # L01: a home folder that is not one of the fictional ones: /Users/NAME
+      # anywhere (also escaped, \/Users\/NAME, and under /Volumes or
+      # /System/Volumes/Data), its dash encoding -Users-NAME- (project
+      # folder names), C:\Users\NAME, and /home/NAME at the start of a path.
+      rest = $0; gsub(/\\/, "", rest)
+      while (match(rest, /\/Users\/[A-Za-z0-9._-]+/)) {
+        seg = substr(rest, RSTART + 7, RLENGTH - 7); rest = substr(rest, RSTART + RLENGTH)
+        home(seg)
+      }
       rest = $0
-      while (match(rest, /\/(Users|home)\/[A-Za-z0-9._-]+/)) {
-        pre = RSTART > 1 ? substr(rest, RSTART - 1, 1) : ""
+      while (match(rest, /-Users-[A-Za-z0-9._]+-/)) {
+        seg = substr(rest, RSTART + 7, RLENGTH - 8); rest = substr(rest, RSTART + RLENGTH - 1)
+        home(seg)
+      }
+      rest = $0
+      while (match(rest, /[A-Za-z]:\\+Users\\+[A-Za-z0-9._-]+/)) {
         seg = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
-        sub(/^\/(Users|home)\//, "", seg)
-        if (pre ~ /[A-Za-z0-9_}.$-]/) continue
-        if (!(tolower(seg) in homes)) { hit("L01"); break }
+        sub(/^.*\\/, "", seg)
+        home(seg)
+      }
+      rest = $0
+      while (match(rest, /\/home\/[A-Za-z0-9._-]+/)) {
+        pre = RSTART > 1 ? substr(rest, RSTART - 1, 1) : ""
+        seg = substr(rest, RSTART + 6, RLENGTH - 6); rest = substr(rest, RSTART + RLENGTH)
+        if (pre !~ /[A-Za-z0-9_}.$-]/) home(seg)
       }
       # L02: an e-mail address other than a reserved domain, a provider noreply
-      # address, a git SSH user and the project contact.
+      # address, the SSH user of the public git hosts and the project contact (a
+      # handle at users.noreply.github.com names a GitHub account).
       rest = $0
       while (match(rest, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+/)) {
         addr = tolower(substr(rest, RSTART, RLENGTH)); rest = substr(rest, RSTART + RLENGTH)
         if (addr ~ /@([a-z0-9-]+\.)*(example\.(com|org|net)|example|test|invalid|localhost)$/) continue
-        if (addr ~ /^git@/ || addr ~ /^noreply@(anthropic|openai|github)\.com$/ || addr ~ /@users\.noreply\.github\.com$/) continue
+        if (addr ~ /^git@(github\.com|gitlab\.com|bitbucket\.org)$/ || addr ~ /^noreply@(anthropic|openai|github)\.com$/) continue
         if (contact != "" && addr == contact) continue
         hit("L02"); break
       }
-      # L03 Slack ids and L04 key shapes, token by token.
+      # L03: Slack ids, on alphanumeric tokens (SLACK_CHANNEL=..., /archives/...,
+      # slack-...), unless the token sits in a long base64 run (a hash).
+      rest = $0; off = 0
+      while (match(rest, /[A-Za-z0-9]+/)) {
+        st = off + RSTART; t = substr(rest, RSTART, RLENGTH); l = RLENGTH
+        off += RSTART + RLENGTH - 1; rest = substr(rest, RSTART + RLENGTH)
+        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && b64run($0, st, l) < 40) hit("L03")
+      }
+      # L04: API keys and tokens by shape.
       rest = $0
       while (match(rest, /[A-Za-z0-9_-]+/)) {
-        b = RSTART > 1 ? substr(rest, RSTART - 1, 1) : ""
         t = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
-        a = substr(rest, 1, 1)
         l = length(t)
-        # Inside base64 (an integrity hash, a blob) a run of capitals is not an id.
-        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && b !~ /[\/+=]/ && a !~ /[\/+=]/) hit("L03")
         if ((substr(t, 1, 3) == "sk-" && l >= 24) ||
-            (substr(t, 1, 4) ~ /^gh[opsu]_$/ && l >= 40) ||
+            (t ~ /^[rs]k_(live|test)_/ && l >= 24) ||
+            (substr(t, 1, 4) ~ /^gh[oprsu]_$/ && l >= 40) ||
             (substr(t, 1, 11) == "github_pat_" && l >= 40) ||
+            (substr(t, 1, 6) == "glpat-" && l >= 20) ||
+            (substr(t, 1, 4) == "npm_" && l >= 36) ||
+            (substr(t, 1, 8) == "lin_api_" && l >= 40) ||
             (substr(t, 1, 5) ~ /^xox[abprs]-$/ && l >= 20) ||
-            (substr(t, 1, 4) == "AKIA" && l == 20 && allup(t)) ||
+            (substr(t, 1, 5) == "xapp-" && l >= 20) ||
+            (substr(t, 1, 4) ~ /^(AKIA|ASIA)$/ && l == 20 && allup(t)) ||
             (substr(t, 1, 4) == "AIza" && l == 39)) hit("L04")
       }
-      if (index($0, "PRIVATE KEY-----")) hit("L04") # leak-ok: L04 (the rule itself)
+      if (index($0, "PRIVATE KEY-----") || index($0, "hooks.slack.com/services/") || jwt($0)) hit("L04") # leak-ok: L04 (the rule itself)
       # L05: a Keychain item named in a security(1) call: a quoted name, or a
       # bare one on a shell line; a $variable or <placeholder> is fine.
       i = 0
@@ -639,7 +707,14 @@ check_leaks_each() {
   _pat=$1 _con=$2
   shift 2
   _rc=0
+  _lnk=$(ao_tmp leak-link)
   for _f in "$@"; do
+    # A tracked symlink is its target path (what git stores), never followed.
+    if [ -L "$_f" ]; then
+      readlink "$_f" >"$_lnk" 2>/dev/null || { ao_warn "cannot read the link $_f"; _rc=2; continue; }
+      check_leak_scan "$_lnk" "$_f" "$_pat" "$_con" || _rc=2
+      continue
+    fi
     [ -f "$_f" ] || continue
     [ -r "$_f" ] || { ao_warn "cannot read $_f"; _rc=2; continue; }
     grep -qI . -- "$_f" 2>/dev/null
@@ -664,17 +739,32 @@ check_leaks_staged() {
   return "$_rc"
 }
 
-# check_leaks [--staged] [--no-denylist]
+# check_realfile PATH  PATH with every symlink resolved (the file itself and
+# its folders), for the inside-the-repository test.
+check_realfile() {
+  _rf=$1 _rn=0
+  while [ -L "$_rf" ] && [ "$_rn" -lt 40 ]; do
+    _rt=$(readlink "$_rf") || return 1
+    case $_rt in /*) _rf=$_rt ;; *) _rf=$(dirname -- "$_rf")/$_rt ;; esac
+    _rn=$((_rn + 1))
+  done
+  [ ! -L "$_rf" ] || return 1
+  printf '%s/%s\n' "$(CDPATH='' cd -- "$(dirname -- "$_rf")" && pwd -P)" "${_rf##*/}"
+}
+
+# check_leaks [--staged] [--no-denylist | --require-denylist]
 check_leaks() {
-  _ls_staged='' _ls_deny=1
+  _ls_staged='' _ls_deny=1 _ls_req=''
   while [ $# -gt 0 ]; do
     case $1 in
       --staged) _ls_staged=1 ;;
       --no-denylist) _ls_deny='' ;;
-      *) ao_die "$AO_E_USAGE" "usage: check.sh leaks [--staged] [--no-denylist]" ;;
+      --require-denylist) _ls_req=1 ;;
+      *) ao_die "$AO_E_USAGE" "usage: check.sh leaks [--staged] [--no-denylist | --require-denylist]" ;;
     esac
     shift
   done
+  [ -z "$_ls_req" ] || [ -n "$_ls_deny" ] || ao_die "$AO_E_USAGE" "--require-denylist and --no-denylist exclude each other"
   _top=$(git rev-parse --show-toplevel 2>/dev/null) || ao_die "$AO_E_USAGE" "check.sh leaks runs inside a git checkout"
   _top=$(CDPATH='' cd -- "$_top" && pwd -P)
   patterns=$(ao_tmp leak-patterns)
@@ -687,11 +777,20 @@ check_leaks() {
     fi
     if [ -n "$_dl" ]; then
       [ -f "$_dl" ] && [ -r "$_dl" ] || ao_die "$AO_E_USAGE" "the leak denylist is not a readable file (TRANSMOGRIFY_LEAK_DENYLIST or the profile's leak_denylist)"
-      _dd=$(CDPATH='' cd -- "$(dirname -- "$_dl")" && pwd -P)
-      case $_dd/ in "$_top"/*) ao_die "$AO_E_USAGE" "the leak denylist must live outside this repository (it is never committed)" ;; esac
+      _dr=$(check_realfile "$_dl") || ao_die "$AO_E_USAGE" "cannot resolve the leak denylist's real location"
+      case $_dr in "$_top"/*) ao_die "$AO_E_USAGE" "the leak denylist must live outside this repository (it is never committed)" ;; esac
       # Line numbers are kept: the rule id is D<line>; the text never prints.
       cp "$_dl" "$patterns" || ao_die "$AO_E_USAGE" "cannot read the leak denylist"
     fi
+  fi
+  # One line on stderr, counts only, so a run without the denylist is visible.
+  _nr=$(sed -e 's/\r$//' "$patterns" | awk '!/^[ \t]*$/ && !/^[ \t]*#/ && !/^!/ { n++ } END { print n + 0 }')
+  _na=$(sed -e 's/\r$//' "$patterns" | awk '/^![ \t]*[^ \t]/ { n++ } END { print n + 0 }')
+  if [ "$_nr" -gt 0 ]; then
+    printf 'leaks: denylist: %s rules, %s allowed phrases\n' "$_nr" "$_na" >&2
+  else
+    printf 'leaks: no denylist: generic rules only\n' >&2
+    [ -z "$_ls_req" ] || ao_die "$AO_E_USAGE" "--require-denylist: no denylist rules (set TRANSMOGRIFY_LEAK_DENYLIST or the profile's leak_denylist)"
   fi
   _con=$(sed -n 's/^ *"email": *"\([^"]*\)".*/\1/p' "$_top/package.json" 2>/dev/null | head -n 1)
   hits=$(ao_tmp leak-hits)

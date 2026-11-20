@@ -15,8 +15,8 @@ only when a task needs them.
 - Fictional examples only: no real people, companies, hosts, accounts,
   paths or incidents, and no AI attribution.
 - Before every commit: the leak guard, `sh ops/check.sh leaks` (install it
-  as the pre-commit hook with `sh ops/install.sh precommit`; the private
-  denylist stays outside the repository).
+  as the pre-commit hook with `sh ops/install.sh precommit --denylist FILE
+  --require-denylist`; the private denylist stays outside the repository).
 - Before every pull request: `npm test`, `sh ops/check.sh kit`, `shellcheck`
   (the file list in `.github/workflows/ci.yml`) and `sh test/ops/run.sh`
   (sh and dash).

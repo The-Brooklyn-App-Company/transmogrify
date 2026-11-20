@@ -12,7 +12,7 @@
 #        install.sh [--dry-run] timers [--launchd | --systemd]
 #        install.sh [--dry-run] bridge claude|codex [--home DIR] [--name NAME]
 #        install.sh [--dry-run] host [--apply]
-#        install.sh [--dry-run] precommit [REPO]
+#        install.sh [--dry-run] precommit [--denylist FILE] [--require-denylist] [REPO]
 #
 # --dry-run lists every directory, file, link, worktree and timer the
 # command would create, and changes nothing. Without it the same list is
@@ -581,14 +581,32 @@ inst_skills() {
 
 # ---------------------------------------------------------------- precommit
 
-# inst_precommit [REPO]  The leakage guard as REPO's git pre-commit hook
-# (default: this checkout): every commit runs `check.sh leaks --staged`, so
-# nothing owner- or company-specific is committed by accident. An existing
-# hook this kit did not write is left alone and reported.
+# inst_precommit [--denylist FILE] [--require-denylist] [REPO]  The leakage
+# guard as REPO's git pre-commit hook (default: this checkout): every commit
+# runs `check.sh leaks --staged`, so nothing owner- or company-specific is
+# committed by accident. --denylist names the private denylist for this
+# checkout's hook only (it must live outside REPO; nothing else changes);
+# --require-denylist makes the hook refuse to commit without one. An
+# existing hook this kit did not write is left alone and reported.
 INST_HOOK_MARK='transmogrify-leak-guard'
+inst_shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 inst_precommit() {
-  [ $# -le 1 ] || ao_die "$AO_E_USAGE" "usage: install.sh precommit [REPO]"
+  _pd='' _preq=''
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --denylist) [ $# -ge 2 ] || ao_die "$AO_E_USAGE" "--denylist needs a file"; _pd=$(inst_abs "$2"); shift ;;
+      --require-denylist) _preq=1 ;;
+      -*) ao_die "$AO_E_USAGE" "usage: install.sh precommit [--denylist FILE] [--require-denylist] [REPO]" ;;
+      *) break ;;
+    esac
+    shift
+  done
+  [ $# -le 1 ] || ao_die "$AO_E_USAGE" "usage: install.sh precommit [--denylist FILE] [--require-denylist] [REPO]"
   _pr=$(inst_abs "${1:-$KIT}")
+  if [ -n "$_pd" ]; then
+    [ -f "$_pd" ] && [ -r "$_pd" ] || ao_die "$AO_E_USAGE" "the denylist is not a readable file: $_pd"
+    case $(inst_physical "$(dirname -- "$_pd")")/ in "$(inst_physical "$_pr")"/*) ao_die "$AO_E_USAGE" "the denylist must live outside $_pr" ;; esac
+  fi
   git -C "$_pr" rev-parse --git-dir >/dev/null 2>&1 || ao_die "$AO_E_USAGE" "not a git checkout: $_pr"
   _hk=$(git -C "$_pr" rev-parse --git-path hooks/pre-commit) || ao_die "$AO_E_FAIL" "cannot find the hooks folder of $_pr"
   case $_hk in /*) ;; *) _hk=$_pr/$_hk ;; esac
@@ -598,7 +616,8 @@ inst_precommit() {
     printf '# %s (install.sh precommit): stop a commit that stages owner- or\n' "$INST_HOOK_MARK"
     printf '# company-specific text. The private denylist comes from\n'
     printf '# TRANSMOGRIFY_LEAK_DENYLIST or the profile'"'"'s leak_denylist.\n'
-    printf "exec sh '%s' leaks --staged\n" "$(printf '%s' "$KIT/ops/check.sh" | sed "s/'/'\\\\''/g")"
+    [ -z "$_pd" ] || printf 'TRANSMOGRIFY_LEAK_DENYLIST=%s\nexport TRANSMOGRIFY_LEAK_DENYLIST\n' "$(inst_shq "$_pd")"
+    printf 'exec sh %s leaks --staged%s\n' "$(inst_shq "$KIT/ops/check.sh")" "${_preq:+ --require-denylist}"
   } >"$_want"
   if [ -f "$_hk" ] && cmp -s "$_want" "$_hk"; then
     printf 'keep    %s (already installed)\n' "$_hk"

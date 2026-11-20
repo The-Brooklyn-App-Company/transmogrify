@@ -279,7 +279,7 @@ test_check_leaks_generic_rules() {
     printf 'mail %s\n' "alice@""corp.zz"
     printf 'contact %s, noreply %s\n' "help@""project.zz" "noreply@""anthropic.com"
     printf 'channel %s\n' "C0""1ABCDE2FG"
-    printf 'integrity sha512-abc/%s+def\n' "U2""MHZ63HAJVE"
+    printf 'integrity sha512-4LCcse/%s+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==\n' "U2""MHZ63HAJVE"
     printf 'key %s\n' "sk-""abcdefghijklmnopqrstuvwx"
     printf 'aws %s\n' "AKIA""ABCDEFGHIJKLMNOP"
     printf '%s\n' "-----BEGIN RSA ""PRIVATE"" KEY-----"
@@ -368,6 +368,111 @@ test_check_leaks_staged_only_and_the_precommit_hook() {
   run install.sh precommit "$T/repo"
   assert_rc 1
   assert_has "$T/err" "was not written by this kit; left alone"
+}
+
+# ao_timeout_run CMD...  Run CMD, killed after 20 s (a hang fails the test).
+ao_timeout_run() {
+  "$@" &
+  _tp=$!
+  ( sleep 20; kill "$_tp" 2>/dev/null ) &
+  _tk=$!
+  wait "$_tp"
+  _tr=$?
+  kill "$_tk" 2>/dev/null
+  return "$_tr"
+}
+
+test_check_leaks_more_forms() {
+  leak_repo || return 0
+  {
+    printf 'env SLACK_CHANNEL=%s\n' "C0""6ABCDEF12"
+    printf 'url https://app.slack.com/archives/%s\n' "C0""6ABCDEF12"
+    printf 'name slack-%s\n' "C0""6ABCDEF12"
+    printf 'user %s=\n' "U0""6ABCDEF12"
+    printf 'escaped "\\/Users\\/%s\\/x"\n' "alice"
+    printf 'project -Users-%s-Projects-x\n' "alice"
+    printf 'mount /System/Volumes/Data/Users/%s/x\n' "alice"
+    printf 'win C:\\Users\\%s\\x\n' "alice"
+    printf 'hook https://hooks.slack.com/%s/T000/B000/XXXX\n' "services"
+    printf 'jwt %s.%s.%s\n' "eyJ""hbGciOiJIUzI1NiJ9" "eyJzdWIiOiIxMjM0NTY3ODkwIn0" "abcdefghijklmnop"
+    printf 'stripe %s\n' "sk_""live_abcdefghijklmnopqrstu"
+    printf 'gitlab %s\n' "glpat""-abcdefghijklmnopqrst"
+    printf 'mail %s\n' "12345+alice@users.""noreply.github.com"
+    printf 'fine %s and example C0 tokens CHANGELOG2\n' "git@""github.com"
+  } >"$T/repo/more.md"
+  (cd "$T/repo" && git add -A)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  for l in 1 2 3 4; do assert_has "$T/out" "more.md:$l: L03"; done
+  for l in 5 6 7 8; do assert_has "$T/out" "more.md:$l: L01"; done
+  for l in 9 10 11 12; do assert_has "$T/out" "more.md:$l: L04"; done
+  assert_has "$T/out" "more.md:13: L02"
+  assert_lacks "$T/out" "more.md:14:"
+  assert_has "$T/err" "leaks: no denylist: generic rules only"
+  # A tracked symlink is scanned as its target path, not followed.
+  rm "$T/repo/more.md"
+  ln -s "/Users/""alice/notes.md" "$T/repo/link.md"
+  (cd "$T/repo" && git add -A && git commit -qm link)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  assert_has "$T/out" "link.md:1: L01"
+}
+
+test_check_leaks_denylist_edges() {
+  leak_repo || return 0
+  mkdir -p "$T/private"
+  # CRLF and trailing blanks are trimmed; a bare `! ` line is ignored (it used to hang).
+  printf 'walrus\r\n=zed   \n! \n' >"$T/private/deny"
+  printf 'a walrus\nzed here\nnothing\n' >"$T/repo/n.md"
+  (cd "$T/repo" && git add -A)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/deny ao_timeout_run "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  assert_has "$T/out" "n.md:1: D1"
+  assert_has "$T/out" "n.md:2: D2"
+  assert_has "$T/err" "leaks: denylist: 2 rules, 0 allowed phrases"
+  # leak-ok: D12 does not exempt D1.
+  printf 'a walrus leak-ok: D12\na walrus leak-ok: D1\n' >"$T/repo/n.md"
+  (cd "$T/repo" && git add -A)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/deny "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  assert_has "$T/out" "n.md:1: D1"
+  assert_lacks "$T/out" "n.md:2:"
+  # A link outside the repository to a denylist inside it is refused.
+  cp "$T/private/deny" "$T/repo/inside.txt"
+  ln -s "$T/repo/inside.txt" "$T/private/link"
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST=$T/private/link "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 2
+  assert_has "$T/err" "must live outside this repository"
+  # --require-denylist cannot pass vacuously.
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --require-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 2
+  assert_has "$T/err" "--require-denylist: no denylist rules"
+}
+
+test_precommit_hook_carries_this_checkouts_denylist() {
+  leak_repo || return 0
+  mkdir -p "$T/private"
+  printf '=walrus\n' >"$T/private/deny"
+  run install.sh precommit --denylist "$T/private/deny" --require-denylist "$T/repo"
+  assert_rc 0
+  assert_has "$T/repo/.git/hooks/pre-commit" "TRANSMOGRIFY_LEAK_DENYLIST='$T/private/deny'"
+  assert_has "$T/repo/.git/hooks/pre-commit" "leaks --staged --require-denylist"
+  printf 'the walrus\n' >"$T/repo/w.md"
+  (cd "$T/repo" && git add w.md && TRANSMOGRIFY_LEAK_DENYLIST='' git commit -qm w >"$T/out" 2>&1)
+  rc=$?
+  [ "$rc" -ne 0 ] || _fail "the hook let a denylisted word through"
+  assert_has "$T/out" "staged:w.md:1: D1"
+  assert_lacks "$T/out" "walrus"
+  # A denylist inside the repository is refused.
+  rm "$T/repo/.git/hooks/pre-commit"
+  cp "$T/private/deny" "$T/repo/deny.txt"
+  run install.sh precommit --denylist "$T/repo/deny.txt" "$T/repo"
+  assert_rc 2
+  assert_has "$T/err" "must live outside"
 }
 
 ao_test_main "$0"

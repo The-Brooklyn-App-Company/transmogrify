@@ -58,9 +58,11 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   shapes, Keychain item names) over every tracked file and every staged
   copy, plus an optional private denylist (`TRANSMOGRIFY_LEAK_DENYLIST` or
   the profile's `leak_denylist`) that must live outside the repository and
-  is never quoted: output is `file:line: RULE` only. It runs in CI (generic
-  rules), in the pre-commit hook `install.sh precommit` installs, and first
-  in the release checklist.
+  is never quoted: output is `file:line: RULE` only, with one stderr line of
+  denylist counts; `--require-denylist` fails without one. It runs in CI
+  (generic rules), in the pre-commit hook `install.sh precommit` installs
+  (`--denylist FILE --require-denylist` for a maintainer's checkout), and
+  first in the release checklist.
 - **K-30: agents act as the authorized user.** Commits, pull requests,
   comments and messages made on the human's authority carry no agent or
   model tag, trailer or signature unless the profile sets

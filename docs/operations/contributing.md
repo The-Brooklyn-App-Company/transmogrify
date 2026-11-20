@@ -36,7 +36,8 @@ ops/check.sh privacy --denylist <your local list>  # never commit the list
   companies, hosts, accounts, paths or incidents. No AI attribution in
   commits or text. `sh ops/check.sh leaks` checks it: generic rules in CI,
   plus your private denylist (outside the repository) on your machine and
-  in the pre-commit hook (`sh ops/install.sh precommit`).
+  in the pre-commit hook (`sh ops/install.sh precommit --denylist FILE
+  --require-denylist`, which keeps the path in this checkout's hook only).
 - **Keep it small.** The kit should stay readable in one sitting. Prefer
   removing a rule that no longer prevents a real mistake to adding one
   ([K-32](../../kit/KIT.md)).

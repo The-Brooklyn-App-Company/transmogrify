@@ -31,6 +31,14 @@ At the start of every session, after a compaction, and whenever unsure:
 - Contributor work happens only in your own worktree, on `@KEY@/<topic>`
   branches (K-16).
 
+## Build checklist (K-11)
+
+1. List the user surfaces this touches (screens, pages, commands, messages).
+2. Build and test every layer those surfaces need, the UI included.
+3. Review it (K-19, K-20).
+4. Walk it end to end in staging or the real environment, with
+   screenshots; only then is it done.
+
 ## Files
 
 | File | Holds |

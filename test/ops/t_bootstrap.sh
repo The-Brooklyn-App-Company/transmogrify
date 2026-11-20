@@ -124,4 +124,24 @@ test_choices_are_validated_and_marks_are_fixed() {
   assert_rc 2
 }
 
+test_grants_are_written_into_client_settings_only_on_consent() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  mkdir -p "$T/claude"
+  printf '{"model": "x"}\n' >"$T/claude/settings.json"
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --yes --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS \
+    --set "grants_claude_settings=$T/claude/settings.json" --set "grants_codex_bin=$TESTS_DIR/fakes/fake-codex-grants"
+  sed '/\[only: beta\]/d' "$TESTS_DIR/fixtures/GRANTS.example.md" >"$T/ops/oracle/operators/GRANTS.md"
+  # No terminal and no --yes: not consent; nothing is written.
+  run bootstrap.sh --home "$T/ops/oracle"
+  assert_has "$T/out" "6. Approvals that follow an operator"
+  assert_has "$T/out" "Not written (no consent)"
+  assert_lacks "$T/claude/settings.json" "[grant:"
+  # --yes given: written.
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$T/claude/settings.json" "[grant:own-merges]"
+  assert_has "$T/claude/settings.json" '"model": "x"'
+}
+
 ao_test_main "$0"

@@ -22,7 +22,10 @@ State the human’s intended outcome and how this task contributes. Apply kit ru
 
 ## Acceptance criteria
 
-1.
+1. User surfaces this touches: `<screens, pages, commands, messages>` (K-11).
+2.
+3. Walked end to end in staging or the real environment, with screenshots;
+   half a feature, or a backend without its UI, is not done.
 
 ## Constraints
 

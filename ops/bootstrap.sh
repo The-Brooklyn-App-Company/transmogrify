@@ -26,6 +26,11 @@
 #   4. install.sh sync OTHER  the toehold: every home gets the other
 #                             client's files
 #   5. the Oracle's session id and the Oracle lock (on your word)
+#   6. grants.sh render-claude / render-codex --all  the owner's standing
+#                             grants written into each client's approval
+#                             layer (the Oracle home's .codex included),
+#                             only on consent: a yes at the terminal, or
+#                             --yes given explicitly
 # Then the checklist: each in-app step with what to do and the check that
 # proves it (a registry id, the Codex watcher's heartbeat, a test note's
 # delivery); steps no script can see are confirmed with `bootstrap.sh mark`.
@@ -183,7 +188,30 @@ bs_run() {
     ao_confirm "Make $_client the one active Oracle (session $(bs_sid "$AO_ORACLE_KEY"))?"; then
     sh "$AO_SCRIPTS/switch.sh" oracle-lock take "$_client" --session "$(bs_sid "$AO_ORACLE_KEY")" </dev/null | sed 's/^/   /'
   fi
+  bs_grants
   bs_checklist_loop
+}
+
+# bs_grants  Step 6: the owner's standing grants rendered into each client's
+# own approval layer, written only on consent: a yes at the terminal, or
+# --yes given explicitly. Running without a terminal is not consent here.
+bs_grants() {
+  _gf=$(ao_cfg_path grants_file operators/GRANTS.md)
+  [ -f "$_gf" ] || return 0
+  sh "$AO_SCRIPTS/grants.sh" check --no-resolve --findings </dev/null >/dev/null 2>&1 && return 0
+  ao_explain "6. Approvals that follow an operator" \
+    "Your standing grants ($_gf) are written into each client's own approval layer:" \
+    "Claude Code's autoMode.allow, and a managed [auto_review] block in each home's .codex" \
+    "(the Oracle home's too, for grants marked for Codex). Only tagged entries and the" \
+    "managed block change, after a backup. This writes client settings, so it asks first."
+  sh "$AO_SCRIPTS/grants.sh" render-claude --dry-run </dev/null 2>&1 | sed 's/^/   /'
+  sh "$AO_SCRIPTS/grants.sh" render-codex --all --dry-run </dev/null 2>&1 | sed 's/^/   /'
+  if { [ -n "$AO_GUIDED" ] || [ -n "${_yes-}" ]; } && ao_confirm "Write these approvals into the client settings listed above?"; then
+    sh "$AO_SCRIPTS/grants.sh" render-claude </dev/null 2>&1 | sed 's/^/   /'
+    sh "$AO_SCRIPTS/grants.sh" render-codex --all </dev/null 2>&1 | sed 's/^/   /'
+  else
+    echo "   Not written (no consent): run bootstrap.sh at a terminal or with --yes, or grants.sh render-claude and render-codex --all yourself."
+  fi
 }
 
 # ---------------------------------------------------------------- checklist

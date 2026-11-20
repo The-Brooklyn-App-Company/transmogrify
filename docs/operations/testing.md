@@ -16,14 +16,14 @@ run live yet.
 | --- | --- |
 | Full suite, sh and dash | PASS: all 18 files under sh and dash, 346 cases per shell (692 in all), macOS, 2026-11-19; no network, no model calls |
 | New tests | `t_mailroom.sh`: Claude tier 1 against a fake peer socket (warm delivery with the session's receipt, cold target and kill switch handed to the bridge with the step, a mention that is not a receipt, claims a dead watcher left), the Codex watcher queueing on a turn-complete line of a fake rollout (no read for unrelated lines, release with `no-rollout` or `queue-cap`), tier rows with latency and step, metrics with tier shares and p50/p90, fingerprint and canary (one alarm per cause, unique canary names), the degradation alarm and its clearing, tier 4 push once per outage, the Claude app restart waking the bridge then returning to the Oracle. `t_lane.sh`: a switch through every step, refusals, cold handoff, ACK by token from the right client, holds with owner and expiry, the mailroom pause, the Oracle lock, hygiene's grants-against-permissions diff. `t_install.sh`: `host --apply` with a fake `launchctl` (units installed, loaded, stale units and duty files replaced with a backup, in-app steps marked done). `t_mailroom.sh` also: unknown Codex sends reconciled against the target's rollout (late receipt settled, absence escalated once, an unconfirmed escalation alarmed and stopped, metrics). `t_operator.sh`: create with both clients' models decided at creation, refusal without a model decision, the owner-only model change (refused without words or from the operator's own session), archive to verified bundles with the row retired last, an unresponsive thread detected and revived, a dead one replaced with the lane switch opened. `t_bootstrap.sh`: the unattended first run (home, profile, the Codex app paths found, host, toehold, lock, checklist through the test note's delivery), invalid choices refused. `t_recover.sh`: the current-state block instead of a notes tail, the Codex sources, `clear` silent |
-| shellcheck, `check.sh kit` | Clean; `kit/KIT.md` is within its 11000-byte budget |
+| shellcheck, `check.sh kit` | Clean; `kit/KIT.md` is within its 11100-byte budget |
 | Cross-family review | Earlier design: three rounds (13, 7 and 6 findings), all fixed. Final design: two rounds by the other model family through `review-run.sh` (8 findings, then 6), all fixed with regression tests; round-2 fixes not re-reviewed (round cap for this release) |
 | Live mailroom | **Not run** (below) |
 
 ## Mailroom live acceptance
 
 Run on the always-on host with both desktop apps and both Mailrooms set up
-([docs/mailroom.md](docs/mailroom.md#set-it-up)). Record the client
+([docs/operations/mailroom.md](mailroom.md#set-it-up)). Record the client
 versions, the delivered-log rows and the times (in your local timezone).
 
 | # | Do | Expect |
@@ -108,7 +108,7 @@ identifies the returned review artifact; maintainer approval gates publication.
 # Testing the experimental handoff layer
 
 The lease, mailboxes, approvals ledger and takeover
-([docs/handoff.md](docs/handoff.md)) are **experimental**. This page
+([docs/operations/handoff.md](handoff.md)) are **experimental**. This page
 says how to test them: the automated suite, then a live test on one
 low-risk operator. The automated suite sends nothing outside your machine;
 the live test uses your two clients (their own model requests), one
@@ -118,9 +118,9 @@ doorbell fallback notification through it.
 ## 1. Automated suite (no models, no network)
 
 ```sh
-tests/run.sh                       # every test, under sh and dash
-tests/run.sh tests/t_lease.sh tests/t_ask.sh tests/t_mail.sh   # this layer only
-shellcheck -x scripts/*.sh scripts/lib/*.sh tests/*.sh
+test/ops/run.sh                       # every test, under sh and dash
+test/ops/run.sh test/ops/t_lease.sh test/ops/t_ask.sh test/ops/t_mail.sh   # this layer only
+shellcheck -x ops/*.sh ops/lib/*.sh test/ops/*.sh
 ```
 
 The takeover, settle and unlock tests drive a pseudo-terminal with
@@ -141,7 +141,7 @@ K=~/src/agent-operations; H=~/ops/demo; cd "$H"
 
 1. `.operator/` must be git-ignored in the home: `git check-ignore -q .operator/lease && echo ok`.
 2. Apply the settings patterns from
-   [handoff.md#settings-patterns-apply-them-yourself](docs/handoff.md#settings-patterns-apply-them-yourself)
+   [handoff.md#settings-patterns-apply-them-yourself](handoff.md#settings-patterns-apply-them-yourself)
    to both clients (Claude Code deny rules; Codex rules file).
 3. `$K/scripts/lease.sh init` and `$K/scripts/lease.sh status` (expect
    `lease: none`).
@@ -194,7 +194,7 @@ Record every step's result (pass, fail, surprise) in the operator's notes.
   generation).
 - Report: which steps passed, any surprise, and the client versions
   (`claude --version`, `codex --version`), so the validation table in
-  docs/handoff.md can be dated.
+  docs/operations/handoff.md can be dated.
 
 ## 3. Second client and drift
 
@@ -213,10 +213,10 @@ permission prompt of either client, multi-machine use, automatic failover.
 
 ## Complete final test coverage
 
-`tests/run.sh` passed all 13 files under both shells after the guard repair:
+`test/ops/run.sh` passed all 13 files under both shells after the guard repair:
 279 cases per shell. The last two review fixes affected relay startup validation
 and addressability only; the subsequent command
-`tests/run.sh tests/t_relay.sh tests/t_mail.sh tests/t_tick.sh tests/t_install.sh`
+`test/ops/run.sh test/ops/t_relay.sh test/ops/t_mail.sh test/ops/t_tick.sh test/ops/t_install.sh`
 passed 97 cases per shell, including three additional relay cases. Two existing
 lease-routing functions were also rerun successfully per shell. Together these
 cover 282 distinct final cases per shell; duplicate reruns are not extra tests.

@@ -9,19 +9,19 @@ and exit codes.
 
 | Script | Job |
 | --- | --- |
-| `bootstrap.sh` | The guided first run: the Oracle on the client you start with, the always-on host, a toehold in the other client, then a checklist of the few in-app steps, each with its check ([first run](../docs/hosts-and-ci.md#first-run)) |
-| `operator.sh` | The operator routines as guided scripts with verifiers: `create` (models for both clients decided at creation), `archive` (worktrees to verified local bundles), `model` (the owner-only model change), `session`, `recover` (an unresponsive Codex thread), `verify`, `mark` ([conventions](../docs/conventions.md#operator-routines)) |
+| `bootstrap.sh` | The guided first run: the Oracle on the client you start with, the always-on host, a toehold in the other client, then a checklist of the few in-app steps, each with its check ([first run](../docs/operations/hosts-and-ci.md#first-run)) |
+| `operator.sh` | The operator routines as guided scripts with verifiers: `create` (models for both clients decided at creation), `archive` (worktrees to verified local bundles), `model` (the owner-only model change), `session`, `recover` (an unresponsive Codex thread), `verify`, `mark` ([conventions](../docs/operations/conventions.md#operator-routines)) |
 | `install.sh` | Create the Oracle home, operator homes, mailroom bridge homes, skill links and the tick and relay units; `host [--apply]` sets up an always-on host, turnkey (check then set, units loaded, bridge homes, then the in-app steps); `sync <client>` brings every home up to date for a second client; `--dry-run` lists everything first |
-| `lane.sh` | Switch an operator between clients as a scripted checklist with a verifier (`switch`, `verify`, `mark`, `ack`); `side` for the parked-side guard; `check`; holds with an owner, expiry and reason; the Oracle lock ([conventions](../docs/conventions.md)) |
+| `lane.sh` | Switch an operator between clients as a scripted checklist with a verifier (`switch`, `verify`, `mark`, `ack`); `side` for the parked-side guard; `check`; holds with an owner, expiry and reason; the Oracle lock ([conventions](../docs/operations/conventions.md)) |
 | `hygiene.sh` | The nightly, model-free hygiene check: expired holds, open switches and routines, unresponsive threads, uncommitted work, budgets, standing grants against permission rules |
 | `tick.sh` | Scheduled heartbeat: stall watchdog, period hooks, then the relay and the mailroom supervisor |
 | `relay.sh` | Move new inbox notes to the archive and route a pointer, never the note text: a ring for the app's bridge, or a direct delivery |
-| `mailroom.sh` | **Experimental.** The [mailroom](../docs/mailroom.md): `cycle` (relay unit), `supervise` (timed tiers, unknown-send reconciliation, thread recovery, re-arms, fingerprint and canaries, degradation alarms, tier 4), `wait` and `file` (Claude bridge), `arm-codex` (Codex bridge), `status`, `metrics` (tier shares, p50/p90) |
+| `mailroom.sh` | **Experimental.** The [mailroom](../docs/operations/mailroom.md): `cycle` (relay unit), `supervise` (timed tiers, unknown-send reconciliation, thread recovery, re-arms, fingerprint and canaries, degradation alarms, tier 4), `wait` and `file` (Claude bridge), `arm-codex` (Codex bridge), `status`, `metrics` (tier shares, p50/p90) |
 | `mailroom-wait.py`, `mailroom-codex-watcher.cjs` | **Experimental.** The tier-1 watchers: kqueue for Claude (opt-in model-free socket send to warm sessions); the Codex app's own tool server for Codex (native send; queue on the target's turn-complete event) |
-| `recover-context.sh` | SessionStart hook on either client: a recovery digest capped at 8 KB, with the operator's bounded current-state block ([client capabilities](../docs/client-capabilities.md#recovery-on-both-clients)) |
+| `recover-context.sh` | SessionStart hook on either client: a recovery digest capped at 8 KB, with the operator's bounded current-state block ([client capabilities](../docs/operations/client-capabilities.md#recovery-on-both-clients)) |
 | `worker-run.sh` | One cheap read-only worker job; result to an inbox unless `NOTHING` |
 | `review-run.sh` | One independent review pass by a reviewer role |
-| `cross-review.sh` | Weekly review of every operator by the other model family (from `OP_PROVIDER`), and the switch-in audit report after a move to the other family ([K-22](../kit/KIT.md), [handoff](../docs/handoff.md#switch-in-audit)) |
+| `cross-review.sh` | Weekly review of every operator by the other model family (from `OP_PROVIDER`), and the switch-in audit report after a move to the other family ([K-22](../kit/KIT.md), [handoff](../docs/operations/handoff.md#switch-in-audit)) |
 | `status.sh` | One line per operator: activity, quiet list, inbox depth, switch-in audit; profile warnings; `--drift` reports mismatches between the clients with their fixes |
 | `inbox-put.sh` | Atomic note into an inbox, for hooks and adapters |
 | `jobs.sh` | Validate explicit schedule snapshots and plan safe owning-side job cutovers; no scheduler apply |
@@ -29,7 +29,7 @@ and exit codes.
 | `pr-watch.sh` | Deterministic change-only PR snapshots into the owning inbox; see `--help` |
 | `check.sh` | Links, duplicate rule text, skill shape, home layout, privacy scan, host settings (App Nap, launchd priority) |
 | `drift-check.sh` | Weekly audit: `check.sh dupes` plus a worker pass with `drift-prompt.md` |
-| `lease.sh` | **Experimental.** Advisory lease per operator: holder, standby, takeover ([handoff](../docs/handoff.md)) |
+| `lease.sh` | **Experimental.** Advisory lease per operator: holder, standby, takeover ([handoff](../docs/operations/handoff.md)) |
 | `mail.sh` | **Experimental.** File mailboxes in each home; `ring-all` for a tick hook |
 | `doorbell-claude.sh`, `doorbell-codex.sh` | **Experimental.** "You have mail", never the mail; a mailroom ring when the mailroom is on |
 | `ask.sh` | **Experimental.** Asks and the approvals ledger, bound to the lease |
@@ -39,17 +39,17 @@ and exit codes.
 ## Quickstart
 
 Normally `install.sh` does steps 1 and 2; see
-[install and bootstrap](../docs/operators-and-repos.md#install-and-bootstrap).
+[install and bootstrap](../docs/operations/operators-and-repos.md#install-and-bootstrap).
 
 1. Copy one of `../profiles/*.profile` to `~/.config/agent-operations/profile`
    (or anywhere, and set `AO_PROFILE`). Keep it out of git. Set
    `oracle_home` and replace every `CHANGE-ME`.
 2. In the Oracle home, create `operators/REGISTRY.tsv` (below) with a row
    for the Oracle and each operator.
-3. Check it: `scripts/status.sh`, then `scripts/tick.sh --dry-run`.
-4. Drop a test note: `echo hello | scripts/inbox-put.sh <key> test`, then
-   `scripts/relay.sh` and confirm the session got the pointer.
-5. Install the tick unit: `scripts/install.sh timers`.
+3. Check it: `ops/status.sh`, then `ops/tick.sh --dry-run`.
+4. Drop a test note: `echo hello | ops/inbox-put.sh <key> test`, then
+   `ops/relay.sh` and confirm the session got the pointer.
+5. Install the tick unit: `ops/install.sh timers`.
 
 ## The Oracle home
 
@@ -62,7 +62,7 @@ key.
 | `operators/WATCHDOG-QUIET.tsv` | `quiet_list` | Dated watchdog exemptions |
 | `inbox/<key>/*.md` | `inbox_dir` | New notes waiting for a session; `.claimed/` holds notes being archived (an atomic rename, so a later note under the same name is untouched); `.relay-pending` lists archived notes whose pointer is not yet confirmed |
 | `inbox/sent/` | `sent_dir` | Archived notes, `<stamp>-<key>-<name>.md`; must be on a filesystem with hard links |
-| `inbox/.mailroom/{claude,codex}/` | `bridge_dir` | Experimental [mailroom](../docs/mailroom.md) rings, their `delivered/` folder and log, and the watchers' `.watcher/` state |
+| `inbox/.mailroom/{claude,codex}/` | `bridge_dir` | Experimental [mailroom](../docs/operations/mailroom.md) rings, their `delivered/` folder and log, and the watchers' `.watcher/` state |
 | `hooks/{every,hourly,daily,weekly}/` | `hooks_dir` | Tick hooks; optional `hooks/gate` |
 | `~/.local/state/agent-operations/` | `state_dir` | Logs, stamps, locks, backoff, cross-review state and registry switch-in audit records (`audit/`) (machine-local; keep out of git and backups) |
 
@@ -86,7 +86,7 @@ family (`claude`, `codex`, `custom`, `file-only`); empty means
 `relay_default`.
 
 The keys `mailroom-claude` and `mailroom-codex` are reserved for the
-[mailroom](../docs/mailroom.md) bridges (`install.sh bridge`): the relay,
+[mailroom](../docs/operations/mailroom.md) bridges (`install.sh bridge`): the relay,
 the watchdog and cross-review skip them, and the mailroom reads their ids
 from here.
 
@@ -134,8 +134,8 @@ Unknown keys warn; keys starting with `x_` are free for local hooks.
 | `secrets` | `os` | Secrets slot: `os` (macOS keychain; libsecret on Linux), `none`, or an adapter path called as `<adapter> get <name>` |
 | `tracker`, `chat`, `githost`, `ci` | `none` | Integration slots, recorded for agents and adapters; the scripts do not read them yet |
 | `attribution` | `none` | AI attribution in commits: `none` or `disclose`; read by agents, not scripts |
-| `lease_stale`, `doorbell_codex`, `doorbell_rering_min` | `4h`, `off`, `60` | Experimental lease layer (see [handoff](../docs/handoff.md)) |
-| `relay_bridge` | `on` | Experimental [mailroom](../docs/mailroom.md): `on` rings the in-app bridges for claude and codex rows with a session id, with the transports as timed fallbacks; `off` delivers through the transports directly |
+| `lease_stale`, `doorbell_codex`, `doorbell_rering_min` | `4h`, `off`, `60` | Experimental lease layer (see [handoff](../docs/operations/handoff.md)) |
+| `relay_bridge` | `on` | Experimental [mailroom](../docs/operations/mailroom.md): `on` rings the in-app bridges for claude and codex rows with a session id, with the transports as timed fallbacks; `off` delivers through the transports directly |
 | `bridge_dir` | `<inbox_dir>/.mailroom` | Ring folders |
 | `bridge_codex_node`, `bridge_codex_server` | none | The node binary and the `codex-app-tools/server.mjs` bundled in the Codex desktop app, for `mailroom.sh arm-codex` |
 | `bridge_claude_t1` | `off` | `socket`: the Claude watcher delivers to warm sessions model-free (tier 1; undocumented client interface, see the mailroom doc); `off`: the bridge model sends every ring |
@@ -248,8 +248,8 @@ An optional executable `hooks/gate` is asked before acting on an operator:
 hold with an owner and an expiry (`lane.sh hold`, `<state_dir>/holds/<key>`)
 holds the operator before the gate is asked. Optional `hooks/wake <client>
 <session>` warms a cold session and `hooks/push <text>` reaches the owner at
-the mailroom's tier 4 ([mailroom](../docs/mailroom.md)). An
-operator whose home has a lease (experimental, [handoff](../docs/handoff.md))
+the mailroom's tier 4 ([mailroom](../docs/operations/mailroom.md)). An
+operator whose home has a lease (experimental, [handoff](../docs/operations/handoff.md))
 is routed to the holder, and held without asking the gate while its lease
 names no holder. Which client and session own an operator is decided in one
 function, `ao_operator_resolve` in `lib/registry.sh`.
@@ -262,7 +262,7 @@ command that loads it. By hand, replace a template's `@NAME@` placeholders:
 ```sh
 sed -e "s|@LABEL@|org.example.agent-operations.tick|g" \
     -e "s|@KIT_DIR@|$KIT|g" -e "s|@PROFILE@|$PROFILE|g" -e "s|@LOG_DIR@|$LOGS|g" \
-    scripts/units/tick.plist.in > ~/Library/LaunchAgents/org.example.agent-operations.tick.plist
+    ops/units/tick.plist.in > ~/Library/LaunchAgents/org.example.agent-operations.tick.plist
 ```
 
 `tick.plist.in` runs the tick every 10 minutes under `/bin/sh` (macOS).
@@ -304,8 +304,8 @@ a command's descendants only where the shell allows job control without a
 terminal (bash's `sh`, as on macOS); dash signals the direct child, so
 Linux hosts should keep coreutils `timeout`. Used tools beyond POSIX:
 `head -c`, `mktemp`, `flock`/`lockf`, and `timeout`/`gtimeout` when
-present. `shellcheck -x scripts/*.sh scripts/lib/*.sh tests/*.sh
-adapters/*.sh` is clean. `tests/run.sh` runs the suite under every
+present. `shellcheck -x ops/*.sh ops/lib/*.sh test/ops/*.sh
+ops/adapters/*.sh` is clean. `test/ops/run.sh` runs the suite under every
 installed shell with fake agent CLIs: no network, no model calls.
 
 ## PR watcher
@@ -327,7 +327,7 @@ repo's `worktrees.noindex` container. The helper verifies a sticky macOS Time
 Machine exclusion with no sudo, plus child readback before checkout churn.
 Native app-managed and historical seats are not relocated. Unique work and
 irreplaceable state need independent backed-up custody; excluding a container
-is not proof of restore safety. See [the manual](../MANUAL.md).
+is not proof of restore safety. See [the manual](../docs/operations/manual.md).
 
 ## Codex queue settings
 
@@ -368,12 +368,12 @@ availability or authorization on a deployment.
 
 ## Job inventory planner
 
-Copy [the synthetic sample](../templates/oracle/JOBS.tsv) into a private home
+Copy [the synthetic sample](templates/oracle/JOBS.tsv) into a private home
 and replace it with actual scheduler IDs/state. `jobs.sh check REGISTRY` validates
 its nine-field TSV schema. `jobs.sh plan REGISTRY OWNER claude|codex` returns
 advisory actions ordered disable, enable, nochange. No native API calls or
 scheduler changes occur. Neutral timers stay unchanged; paused intent is
 preserved; unknown/mismatched state and active unmirrored old-side jobs block
 before any plan output. A supplied enabled snapshot is not live readback.
-See [the manual](../MANUAL.md#job-registry-and-provider-cutover) for cutover and
+See [the manual](../docs/operations/manual.md#job-registry-and-provider-cutover) for cutover and
 unshipped automation boundaries.

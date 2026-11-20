@@ -7,4 +7,4 @@ Description=agent-operations relay and mailroom safety nets
 [Service]
 Type=oneshot
 Environment="AO_PROFILE=@PROFILE@"
-ExecStart=/bin/sh "@KIT_DIR@/scripts/mailroom.sh" cycle
+ExecStart=/bin/sh "@KIT_DIR@/ops/mailroom.sh" cycle

@@ -127,7 +127,7 @@ drift_row() {
 # drift_main  The --drift report.
 drift_main() {
   drifted=0 clients=''
-  kit_version=$(cat "$AO_SCRIPTS/../VERSION" 2>/dev/null) || kit_version=
+  kit_version=$(ao_kit_version "$AO_SCRIPTS/..") || kit_version=
   ao_registry_each drift_clients_row
   [ -n "$tsv" ] || printf 'clients in use:%s; kit %s\n' "${clients:- none}" "${kit_version:-unknown}"
   ao_registry_each drift_row
@@ -173,7 +173,7 @@ status_warnings() {
   if [ "$AO_MR_ON" = on ]; then
     for _s in claude codex; do
       ! ao_mr_bridge "$_s" || ao_mr_watcher_up "$_s" ||
-        ao_warn "mailroom: the $_s bridge watcher is not armed (mailroom.sh status; docs/mailroom.md)"
+        ao_warn "mailroom: the $_s bridge watcher is not armed (mailroom.sh status; docs/operations/mailroom.md)"
     done
   fi
   [ "$(ao_cfg cross_review on)" != off ] || return 0

@@ -1,7 +1,7 @@
 #!/bin/sh
 # recover-context.sh - the recovery digest, for a SessionStart hook on
 # either client: one client-neutral renderer; each client registers it its
-# own way (templates/home/settings/README.md, docs/client-capabilities.md).
+# own way (ops/templates/home/settings/README.md, docs/operations/client-capabilities.md).
 #
 # Usage: recover-context.sh [--cap BYTES] [DIR]
 #
@@ -26,10 +26,10 @@
 # 2,500 tokens at most (documented, not measured here). So this prints a
 # digest, never whole files, and cuts it at BYTES (default 8000, about
 # 2,000 tokens). The read-first order comes first, so a cut never loses it.
-# BYTES may only lower the cap. tests/t_recover.sh fails above it.
+# BYTES may only lower the cap. test/ops/t_recover.sh fails above it.
 #
 # A hook is not proof that recovery happened: until it is verified on a
-# client (TESTING.md), the read-first order is what the session follows.
+# client (docs/operations/testing.md), the read-first order is what the session follows.
 #
 # Environment: AO_PROFILE. Without a readable profile it prints nothing.
 #

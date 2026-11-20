@@ -5,13 +5,13 @@
 # lease.sh (library) - EXPERIMENTAL provider handoff: the advisory lease,
 # operator homes, markers and the approval ledger helpers.
 #
-# Sourced after core.sh. Used by scripts/lease.sh, mail.sh, ask.sh and the
+# Sourced after core.sh. Used by ops/lease.sh, mail.sh, ask.sh and the
 # doorbells, and by ao_operator_resolve (registry.sh) to route an operator
 # to the provider and session that hold its lease.
 #
 # An operator home holds operator.conf (flat key=value, parsed literally)
 # and a git-ignored, machine-local .operator/ directory:
-#   .operator/lease          the lease, written only by scripts/lease.sh
+#   .operator/lease          the lease, written only by ops/lease.sh
 #   .operator/lease.lock/    the lease lock (mkdir); never broken by a script
 #   .operator/inbox/{tmp,new,cur,done}/   the mailbox (mail.sh)
 #   .operator/markers/       dispatch markers; settled/ keeps settled ones
@@ -111,7 +111,7 @@ ao_proc_state() {
 # ao_client_pid PROVIDER  Print "PID START" of the client process that runs
 # this command, where the client exposes it, else nothing. Claude Code sets
 # CLAUDE_PID for tool commands (observed, not documented; see
-# docs/handoff.md). Codex exposes no process id.
+# docs/operations/handoff.md). Codex exposes no process id.
 ao_client_pid() {
   case $1 in
     claude)

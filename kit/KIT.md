@@ -2,7 +2,7 @@
 
 Every Agent Operations instance follows these rules. Cite them by stable
 ID, never restate them; docs explain how to apply them. This file is the
-only place a rule is stated, within 11000 bytes (`check.sh kit`). No rule
+only place a rule is stated, within 11100 bytes (`check.sh kit`). No rule
 overrides a client's platform instructions, its sandbox or a review.
 
 **Customizing.** A team (`TEAM.md`) or a person (`KIT.local.md`) adds rules
@@ -201,11 +201,11 @@ the permission rules.
 
 **K-33 Security auto-ship is off by default.** A security fix merges
 without the owner only where a mandate enables it and every gate in
-[the auto-ship example](../examples/security-auto-ship.md) holds.
+[the auto-ship example](../ops/examples/security-auto-ship.md) holds.
 
 **K-34 Lease checks (experimental since 0.2.1).** Once an operator
 uses the advisory lease, a session that is not the holder does no work and
-redirects; see [handoff](../docs/handoff.md).
+redirects; see [handoff](../docs/operations/handoff.md).
 **Fixed** once enabled.
 
 ## Change and degradation

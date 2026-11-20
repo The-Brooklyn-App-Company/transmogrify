@@ -1,6 +1,6 @@
 # Local, machine-specific files never belong in the kit.
 *.local
 *.local.*
-!templates/oracle/KIT.local.md
+!ops/templates/oracle/KIT.local.md
 .env
 .env.*

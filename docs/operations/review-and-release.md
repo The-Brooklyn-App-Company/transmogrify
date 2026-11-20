@@ -3,16 +3,16 @@
 ## Delegation
 
 Delegated work travels as a written packet built from
-[templates/packets/delegation.md](../templates/packets/delegation.md), so
+[ops/templates/packets/delegation.md](../../ops/templates/packets/delegation.md), so
 any capable client can run it without one conversation's memory: the goal
-and how it serves the human's outcome ([K-11](../kit/KIT.md)), the exact
+and how it serves the human's outcome ([K-11](../../kit/KIT.md)), the exact
 base commit, scope and paths not to touch, acceptance criteria,
 constraints, stop criteria and the return format. Include only the context
 the task needs.
 
 A delegate uses the owner's existing subscription. If quota or access runs
 out it stops and reports; it never switches to API keys, another plan or
-another provider ([K-26](../kit/KIT.md)).
+another provider ([K-26](../../kit/KIT.md)).
 
 The implementer works on a scoped branch from the base commit, runs every
 locally reproducible check that CI runs, and returns notes: what changed,
@@ -27,8 +27,8 @@ green, and never add production seams only for tests.
 
 ## Review
 
-Review is independent ([K-19](../kit/KIT.md)) and bounded
-([K-20](../kit/KIT.md)).
+Review is independent ([K-19](../../kit/KIT.md)) and bounded
+([K-20](../../kit/KIT.md)).
 
 1. **Verify the source.** Before a review, confirm the working directory,
    repository, branch and exact commit. Keep that checkout unchanged while
@@ -37,10 +37,10 @@ Review is independent ([K-19](../kit/KIT.md)) and bounded
 2. **Brief neutrally.** The packet holds the acceptance criteria, the exact
    head and the diff or paths. Ask the reviewer to find problems, not to
    confirm the work, and never pass on the implementer's reasoning.
-3. **Run it boxed.** `scripts/review-run.sh <packet> <out> [<worktree>] [<effort>]`
+3. **Run it boxed.** `ops/review-run.sh <packet> <out> [<worktree>] [<effort>]`
    runs the profile's reviewer read-only, ephemeral, with stdin closed, a
    hard timeout and effectful tool servers switched off
-   ([K-25](../kit/KIT.md)). It writes the review only on success, so a stale
+   ([K-25](../../kit/KIT.md)). It writes the review only on success, so a stale
    file from an earlier round is never mistaken for a new verdict, and
    prints the `review_family` to record with the result.
 4. **Settle every finding** with location, severity (P0 to P3), evidence and
@@ -90,7 +90,7 @@ either.
 
 ## Cross-model accountability
 
-On by default ([K-22](../kit/KIT.md)). Each model family has blind spots
+On by default ([K-22](../../kit/KIT.md)). Each model family has blind spots
 the other is better at catching, so every operator's work is also read,
 every week, by the family it does not run on: Claude Code operators by a
 Codex reviewer and Codex operators by a Claude Code reviewer, and the
@@ -105,9 +105,9 @@ Oracle's home along with them.
 | Triage | The operator settles each finding within a working day, as in [Review](#review): fixed, rejected with a reason, or deferred with an owner |
 | Switch-in audit | When an operator moves to the other family (registry `client`, or a lease handoff), the incoming family's reviewer audits the last 30 days once and the report is written to the operator's `audits/`. The incoming session triages it, commits it and records it with `lease.sh audit-done`; until then `status.sh` shows the audit pending and, with a lease, new dispatches and asks refuse ([handoff](handoff.md#switch-in-audit)). The weekly direction flips with the family |
 | One family only | A different model of the same family reviews, the result is marked `same-family`, and `status.sh` warns until both families are configured |
-| Cost and bounds | `scripts/cross-review.sh` runs from an hourly tick hook and reviews at most `cross_review_per_run` operators per run, each under `cross_review_timeout`, so the week's reviews spread out and never hold the tick for long. `cross_review=off` turns the reviews off; switches are still recorded |
+| Cost and bounds | `ops/cross-review.sh` runs from an hourly tick hook and reviews at most `cross_review_per_run` operators per run, each under `cross_review_timeout`, so the week's reviews spread out and never hold the tick for long. `cross_review=off` turns the reviews off; switches are still recorded |
 
-**Learning loop.** At the weekly rule review ([K-32](../kit/KIT.md)), look
+**Learning loop.** At the weekly rule review ([K-32](../../kit/KIT.md)), look
 across the digests: a finding that recurs becomes a change to a kit rule, a
 team rule or a mandate, recorded by ID, never a pile of one-off incident
 rules.
@@ -131,14 +131,14 @@ records the exception and its next action.
 operational work: migrations, configuration, feature flags, jobs, prompt
 activation. A change with rollout effects carries its versioned scripts and
 tests and fills the activation section of
-[templates/packets/release-record.md](../templates/packets/release-record.md):
+[ops/templates/packets/release-record.md](../../ops/templates/packets/release-record.md):
 compatibility, ordering, idempotency, recovery and the permissions needed.
 
 **Promotion** has one owner, the exact source commit and artifact, the
 target environment and the ordered activations, recorded in the
 repository's existing release record. Do not start a parallel tracker.
 
-**Match the target** before any effect ([K-28](../kit/KIT.md)): service,
+**Match the target** before any effect ([K-28](../../kit/KIT.md)): service,
 account or tenant, project, environment, resource and acting principal, from
 read-only evidence on the actual execution route. A valid credential or a
 reachable deployment can belong to the wrong target. A mismatch stops the
@@ -147,21 +147,21 @@ effect; it does not authorize switching accounts.
 **Close out.** The owner executes the plan, verifies the changed production
 behaviour, completes each activation and owns recovery until the release
 settles. Record each state separately, since each is a different rung of
-the claims ladder ([K-10](../kit/KIT.md)): CI green, merged, artifact built,
+the claims ladder ([K-10](../../kit/KIT.md)): CI green, merged, artifact built,
 staging verified, runtime verified, accepted by the intended user through
 their real route. An administrator's smoke test proves only what it
 exercised.
 
 **Authority.** Release approval covers that release. Production promotion
 needs the release owner's yes unless a written standing grant names it
-([K-07](../kit/KIT.md)); widening what reaches production without asking
+([K-07](../../kit/KIT.md)); widening what reaches production without asking
 needs the owner's words naming that change. Sign-in, outbound email,
-purchases and spend stay separate decisions ([K-03](../kit/KIT.md),
-[K-06](../kit/KIT.md)).
+purchases and spend stay separate decisions ([K-03](../../kit/KIT.md),
+[K-06](../../kit/KIT.md)).
 
 **Security fixes** may ship without waiting for the owner only under the
-opt-in gates in [the auto-ship example](../examples/security-auto-ship.md)
-([K-33](../kit/KIT.md)).
+opt-in gates in [the auto-ship example](../../ops/examples/security-auto-ship.md)
+([K-33](../../kit/KIT.md)).
 
 ## Teams
 

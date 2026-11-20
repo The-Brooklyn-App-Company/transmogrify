@@ -22,7 +22,7 @@
 #                         write and run nothing
 #   -h, --help            this text
 #
-# Meant for <hooks_dir>/weekly/ (see examples/hooks/).
+# Meant for <hooks_dir>/weekly/ (see ops/examples/hooks/).
 # Globs in drift_files must not contain whitespace.
 #
 # Environment: AO_PROFILE.

@@ -15,7 +15,7 @@ case ${1-} in
   notify)
     [ $# -ge 3 ] || { echo "usage: none.sh notify URGENCY TEXT" >&2; exit 3; }
     printf '[%s] %s\n' "$2" "$3" |
-      "$here/../scripts/inbox-put.sh" "${AO_ORACLE_KEY:-oracle}" notify >/dev/null || exit 3 ;;
+      "$here/../inbox-put.sh" "${AO_ORACLE_KEY:-oracle}" notify >/dev/null || exit 3 ;;
   get) exit 2 ;;
   -h | --help) sed -n '2,/^[^#]/{/^#/!d;s/^# \{0,1\}//;p;}' "$0" ;;
   *) echo "none.sh: unknown verb '${1-}'" >&2; exit 3 ;;

@@ -1,7 +1,7 @@
 # Profile: claude-only. Claude Code runs every role.
 # Copy it outside git (default: ~/.config/agent-operations/profile) and edit;
 # install.sh oracle does this for you. Every key and its default:
-# scripts/README.md#profile. Values are literal; only a leading ~/ expands.
+# ops/README.md#profile. Values are literal; only a leading ~/ expands.
 # Replace every CHANGE-ME.
 
 oracle_home=~/ops/oracle
@@ -36,7 +36,7 @@ reviewer_claude_model=CHANGE-ME-other-claude-model
 reviewer_claude_timeout=900
 cross_review=on
 
-# Mailroom (experimental, docs/mailroom.md): the relay writes rings for the
+# Mailroom (experimental, docs/operations/mailroom.md): the relay writes rings for the
 # in-app bridges (install.sh bridge claude|codex); the supervisor falls back
 # to the relay transports above. off = deliver through the transports.
 relay_bridge=on

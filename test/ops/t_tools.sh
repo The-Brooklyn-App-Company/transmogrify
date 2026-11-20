@@ -108,7 +108,7 @@ test_check_dupes() {
 
 test_check_skills() {
   mkdir -p "$T/skills/good" "$T/skills/bad"
-  printf -- '---\nname: good\n---\nSee docs/architecture.md#roles.\n' >"$T/skills/good/SKILL.md"
+  printf -- '---\nname: good\n---\nSee docs/operations/architecture.md#roles.\n' >"$T/skills/good/SKILL.md"
   printf -- '---\nname: bad\n---\nAll the rules inline.\n' >"$T/skills/bad/SKILL.md"
   run check.sh skills "$T/skills"
   assert_rc 1
@@ -258,8 +258,8 @@ test_check_home() {
 test_scripts_and_hooks_are_executable() {
   # Hooks and scripts call each other directly, so each must carry its
   # executable bit (and the tests otherwise run them through a shell).
-  for f in "$SCRIPTS"/*.sh "$SCRIPTS"/../adapters/*.sh "$SCRIPTS"/../examples/hooks/*/* \
-    "$SCRIPTS"/../examples/tracker-linear/*.sh; do
+  for f in "$SCRIPTS"/*.sh "$SCRIPTS"/adapters/*.sh "$SCRIPTS"/examples/hooks/*/* \
+    "$SCRIPTS"/examples/tracker-linear/*.sh; do
     [ -x "$f" ] || _fail "not executable: ${f#"$SCRIPTS"/}"
   done
 }

@@ -25,7 +25,7 @@
 #              once).
 #   mailroom   a delivered log over 5000 rows (rotate it)
 # --note also writes the findings to the Oracle's inbox when there are any
-# (for a daily tick hook: examples/hooks/daily/30-hygiene).
+# (for a daily tick hook: ops/examples/hooks/daily/30-hygiene).
 #
 # Environment: AO_PROFILE.
 #
@@ -60,7 +60,7 @@ hy_switches() {
   done
   for _s in "$AO_STATE/mailroom/unhealthy"/*; do
     [ -f "$_s" ] || continue
-    hy "switches: Codex thread ${_s##*/} is marked unresponsive: operator.sh list (thread recovery, docs/mailroom.md)"
+    hy "switches: Codex thread ${_s##*/} is marked unresponsive: operator.sh list (thread recovery, docs/operations/mailroom.md)"
   done
   _mr=$(ao_cfg_path bridge_dir "$AO_INBOX/.mailroom")
   [ ! -e "$_mr/claude/.watcher/t1-off" ] ||

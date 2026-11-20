@@ -14,16 +14,16 @@ here is fictional.
 ```sh
 git clone <kit-url> ~/src/agent-operations && cd ~/src/agent-operations
 git checkout v0.2.0
-scripts/install.sh --dry-run oracle ~/ops/oracle
-scripts/install.sh oracle ~/ops/oracle
-$EDITOR ~/.config/agent-operations/profile      # from profiles/both.profile
-scripts/install.sh operator web --name "[OPS] Web" --client claude \
+ops/install.sh --dry-run oracle ~/ops/oracle
+ops/install.sh oracle ~/ops/oracle
+$EDITOR ~/.config/agent-operations/profile      # from ops/profiles/both.profile
+ops/install.sh operator web --name "[OPS] Web" --client claude \
   --owns git@git.example.com:juniper/app-web.git \
   --contributes git@git.example.com:juniper/infra.git
-scripts/install.sh operator infra --embedded --name "[OPS] Infra" --client codex \
+ops/install.sh operator infra --embedded --name "[OPS] Infra" --client codex \
   --owns git@git.example.com:juniper/infra.git
-scripts/check.sh home ~/ops/oracle ~/ops/web ~/ops/oracle/operators/infra
-scripts/install.sh timers
+ops/check.sh home ~/ops/oracle ~/ops/web ~/ops/oracle/operators/infra
+ops/install.sh timers
 ```
 
 ## What exists afterwards

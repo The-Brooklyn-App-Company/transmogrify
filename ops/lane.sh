@@ -37,7 +37,7 @@
 #               (model.<client>, effort.<client>; operator.sh create)
 #   Marks of these four carry --evidence: the app's own readback (a sidebar
 #   listing, the session's model as the app shows it), or `gap: ...` when
-#   the app gives none (docs/client-capabilities.md). A receipt or an ACK
+#   the app gives none (docs/operations/client-capabilities.md). A receipt or an ACK
 #   proves receipt, not that the app is set up.
 #   switch-in   a move to the other model family has its switch-in audit
 #               recorded (lease.sh audit-done, K-22); same family: passes
@@ -45,7 +45,7 @@
 #               it ran `lane.sh ack KEY TOKEN` (from Codex the thread id must
 #               match), or a note to the Oracle quotes the token
 # pins-* pass by themselves when neither side of the switch is that client.
-# See docs/conventions.md.
+# See docs/operations/conventions.md.
 #
 # side       Print `<client> <session> <name>` for KEY: the parked-side
 #            guard in each home's AGENTS.md runs it first.

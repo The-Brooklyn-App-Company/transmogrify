@@ -6,7 +6,7 @@ Usage: /usr/bin/python3 -I mailroom-wait.py DIR
        /usr/bin/python3 -I mailroom-wait.py --fingerprint
        /usr/bin/python3 -I mailroom-wait.py --receipt TRANSCRIPT RING
 
-Run through `mailroom.sh wait claude` (docs/mailroom.md). Watches DIR with
+Run through `mailroom.sh wait claude` (docs/operations/mailroom.md). Watches DIR with
 a kqueue vnode push notification (zero CPU while waiting, no polling).
 
 Tier 2 only (DIR): as soon as a ring (a visible *.md file) waits, each is

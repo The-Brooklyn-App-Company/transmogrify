@@ -53,7 +53,7 @@
 #           every minute) for this machine (launchd on macOS, systemd user
 #           units elsewhere) into your user's unit folder and prints the
 #           commands that load them. Both run as ProcessType Standard.
-# bridge    Needs the profile. EXPERIMENTAL (docs/mailroom.md). Creates a
+# bridge    Needs the profile. EXPERIMENTAL (docs/operations/mailroom.md). Creates a
 #           mailroom bridge's own home (default: beside the Oracle home,
 #           mailroom-CLIENT) with the bridge's whole duty in its AGENTS.md,
 #           and its registry row under the reserved key mailroom-CLIENT
@@ -93,7 +93,7 @@ AO_SCRIPTS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 . "$AO_SCRIPTS/lib/core.sh"
 
 KIT=$(CDPATH='' cd -- "$AO_SCRIPTS/.." && pwd)
-TPL=$KIT/templates
+TPL=$KIT/ops/templates
 dry_run=
 failures=0
 # Paths this run created, one per line, for inst_commit.
@@ -230,7 +230,7 @@ inst_client() {
 }
 
 inst_kit_facts() {
-  kit_version=$(cat "$KIT/VERSION" 2>/dev/null) || kit_version=unknown
+  kit_version=$(ao_kit_version "$KIT") || kit_version=unknown
   kit_commit=$(git -C "$KIT" rev-parse --short HEAD 2>/dev/null) || kit_commit=unknown
 }
 
@@ -251,7 +251,7 @@ inst_oracle() {
     esac
     shift
   done
-  [ -r "$KIT/profiles/$example.profile" ] || ao_die "$AO_E_USAGE" "no profile example '$example' (see profiles/)"
+  [ -r "$KIT/ops/profiles/$example.profile" ] || ao_die "$AO_E_USAGE" "no profile example '$example' (see ops/profiles/)"
   # The Oracle's client follows the profile example unless given.
   if [ -z "$v_client" ]; then
     case $example in codex-only) v_client=codex ;; custom) v_client=custom ;; *) v_client=claude ;; esac
@@ -271,7 +271,7 @@ inst_oracle() {
     inst_render "$TPL/oracle/$_f" "$home/$_f"
   done
   inst_render "$TPL/home/gitignore.template" "$home/.gitignore"
-  inst_render "$KIT/examples/hooks/hourly/60-cross-review" "$home/hooks/hourly/60-cross-review" 755
+  inst_render "$KIT/ops/examples/hooks/hourly/60-cross-review" "$home/hooks/hourly/60-cross-review" 755
   reg=$home/operators/REGISTRY.tsv
   if ! inst_exists "$reg"; then
     _before=$failures
@@ -284,9 +284,9 @@ inst_oracle() {
   if inst_exists "$profile"; then
     printf 'keep    %s (exists; check its oracle_home)\n' "$profile"
   else
-    inst_say "create  $profile (from profiles/$example.profile)"
+    inst_say "create  $profile (from ops/profiles/$example.profile)"
     if [ -z "$dry_run" ] && ! { sed "s|^oracle_home=.*|oracle_home=$(inst_sed_value "$(inst_tilde "$home")")|" \
-        "$KIT/profiles/$example.profile" | inst_publish "$profile" &&
+        "$KIT/ops/profiles/$example.profile" | inst_publish "$profile" &&
       chmod 600 "$profile"; }; then
       ao_warn "cannot write $profile"
       failures=$((failures + 1))
@@ -595,21 +595,21 @@ inst_timers() {
 
   if [ "$kind" = launchd ]; then
     unit=$HOME/Library/LaunchAgents/$label.plist
-    inst_unit "$KIT/scripts/units/tick.plist.in" "$unit"
+    inst_unit "$KIT/ops/units/tick.plist.in" "$unit"
     label=local.agent-operations.relay
     runit=$HOME/Library/LaunchAgents/$label.plist
     watch=$(ao_tmp watch)
     inst_watch_paths >"$watch"
-    inst_unit "$KIT/scripts/units/relay.plist.in" "$runit" "$watch"
+    inst_unit "$KIT/ops/units/relay.plist.in" "$runit" "$watch"
     load="launchctl bootstrap gui/\$(id -u) $unit
   launchctl bootstrap gui/\$(id -u) $runit"
   else
     unit=$HOME/.config/systemd/user/agent-operations-tick.service
-    inst_unit "$KIT/scripts/units/tick.service.in" "$unit"
-    inst_unit "$KIT/scripts/units/tick.timer.in" "${unit%.service}.timer"
+    inst_unit "$KIT/ops/units/tick.service.in" "$unit"
+    inst_unit "$KIT/ops/units/tick.timer.in" "${unit%.service}.timer"
     runit=$HOME/.config/systemd/user/agent-operations-relay.service
-    inst_unit "$KIT/scripts/units/relay.service.in" "$runit"
-    inst_unit "$KIT/scripts/units/relay.timer.in" "${runit%.service}.timer"
+    inst_unit "$KIT/ops/units/relay.service.in" "$runit"
+    inst_unit "$KIT/ops/units/relay.timer.in" "${runit%.service}.timer"
     load="systemctl --user daemon-reload && systemctl --user enable --now agent-operations-tick.timer agent-operations-relay.timer"
   fi
   cat <<EOF
@@ -637,7 +637,7 @@ inst_watch_paths() {
 inst_bridge() {
   case ${1-} in claude | codex) v_client=$1 ;; *) ao_die "$AO_E_USAGE" "usage: install.sh bridge claude|codex [--home DIR] [--name NAME]" ;; esac
   shift
-  # Both bridges are titled Mailroom (docs/conventions.md); the registry
+  # Both bridges are titled Mailroom (docs/operations/conventions.md); the registry
   # key says which app.
   v_key=mailroom-$v_client home='' v_team=none v_name=Mailroom
   while [ $# -gt 0 ]; do
@@ -726,7 +726,7 @@ host_unit() {
   _watch=$(ao_tmp watch)
   : >"$_watch"
   [ "$1" != relay ] || inst_watch_paths >"$_watch" 2>/dev/null
-  inst_unit_text "$KIT/scripts/units/$1.plist.in" "$_watch" >"$_want" || { host_row "unit $1" FAILED "cannot render"; failures=$((failures + 1)); return; }
+  inst_unit_text "$KIT/ops/units/$1.plist.in" "$_watch" >"$_want" || { host_row "unit $1" FAILED "cannot render"; failures=$((failures + 1)); return; }
   _dom=gui/$(id -u)
   if [ -f "$_f" ] && cmp -s "$_want" "$_f"; then
     if launchctl print "$_dom/$label" >/dev/null 2>&1; then host_row "unit $1" "ok (loaded)"
@@ -885,7 +885,7 @@ inst_host() {
   fi
   printf '\n%s item(s) need you.\n' "$host_todo"
   [ -n "$_prof" ] || return 0
-  # The few steps only a person can do, in the apps (docs/conventions.md).
+  # The few steps only a person can do, in the apps (docs/operations/conventions.md).
   _cs=0 _xs=0
   _r=$(awk -F'\t' '$1 == "mailroom-claude" { print $4; exit }' "$AO_REGISTRY" 2>/dev/null)
   case $_r in '' | - | pending) ;; *) _cs=1 ;; esac

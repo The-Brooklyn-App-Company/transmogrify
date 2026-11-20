@@ -14,7 +14,7 @@
 <dict>
   <key>Label</key><string>@LABEL@</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/sh</string><string>@KIT_DIR@/scripts/mailroom.sh</string><string>cycle</string></array>
+  <array><string>/bin/sh</string><string>@KIT_DIR@/ops/mailroom.sh</string><string>cycle</string></array>
   <key>EnvironmentVariables</key>
   <dict><key>AO_PROFILE</key><string>@PROFILE@</string></dict>
   <key>WatchPaths</key>

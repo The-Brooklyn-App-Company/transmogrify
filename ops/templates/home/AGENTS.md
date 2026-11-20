@@ -10,7 +10,7 @@ specific to this operator. Keep it short; detail lives in the files below.
 
 At the start of every session, after a compaction, and whenever unsure:
 
-0. **Parked-side guard.** Run `sh @KIT_DIR@/scripts/lane.sh side @KEY@`.
+0. **Parked-side guard.** Run `sh @KIT_DIR@/ops/lane.sh side @KEY@`.
    If it names the other client (or another session), you are the parked
    side: reply "parked: the active side is <client>" and stop (K-13).
 1. Read `MANDATE.md` (scope, finish line, standing grants) and the

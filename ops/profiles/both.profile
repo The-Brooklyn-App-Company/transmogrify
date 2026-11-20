@@ -1,7 +1,7 @@
 # Profile: both. Claude Code and Codex, so review is cross-family.
 # Copy it outside git (default: ~/.config/agent-operations/profile) and edit;
 # install.sh oracle does this for you. Every key and its default:
-# scripts/README.md#profile. Values are literal: no quotes needed, no
+# ops/README.md#profile. Values are literal: no quotes needed, no
 # variables; only a leading ~/ expands. Replace every CHANGE-ME: an unset
 # model would silently use the client's default, so the examples fail
 # loudly instead.
@@ -48,7 +48,7 @@ reviewer_codex_effort=high
 reviewer_codex_timeout=900
 cross_review=on
 
-# Mailroom (experimental, docs/mailroom.md): the relay writes rings for the
+# Mailroom (experimental, docs/operations/mailroom.md): the relay writes rings for the
 # in-app bridges (install.sh bridge claude|codex); the supervisor falls back
 # to the relay transports above. off = deliver through the transports.
 relay_bridge=on

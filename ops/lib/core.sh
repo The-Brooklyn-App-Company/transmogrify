@@ -135,6 +135,15 @@ ao_is_name() {
 }
 
 # ao_is_uint STRING  True for a non-negative decimal integer.
+# ao_kit_version ROOT  The release version of the Transmogrify checkout at
+# ROOT, from its package.json (one version for both layers). Fails when it
+# cannot be read.
+ao_kit_version() {
+  _kv=$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$1/package.json" 2>/dev/null | head -n 1)
+  [ -n "$_kv" ] || return 1
+  printf '%s\n' "$_kv"
+}
+
 ao_is_uint() {
   case $1 in '' | *[!0-9]*) return 1 ;; esac
   return 0
@@ -178,7 +187,8 @@ review_family cross_review cross_review_timeout cross_review_per_run
 cross_review_days tracker chat githost ci secrets attribution
 lease_stale doorbell_codex doorbell_rering_min
 relay_bridge bridge_dir bridge_codex_node bridge_codex_server bridge_claude_t1
-wake_link host_apps host_latency_jobs host_launchd_dirs owner_tz archive_dir'
+wake_link host_apps host_latency_jobs host_launchd_dirs owner_tz archive_dir
+grants_file grants_accepted grants_claude_settings grants_codex_bin'
 # Host defaults (install.sh host, check.sh host): desktop apps whose App Nap
 # is turned off, launchd label patterns that must not run as Background,
 # and the launchd folders scanned.
@@ -214,7 +224,7 @@ ao_profile_path() {
 # variables. Never sources or evaluates the file's contents: values are
 # assigned verbatim (one surrounding pair of quotes is stripped).
 ao_profile_parse() {
-  [ -r "$1" ] || ao_die "$AO_E_USAGE" "profile not readable: $1 (set AO_PROFILE; examples in profiles/)"
+  [ -r "$1" ] || ao_die "$AO_E_USAGE" "profile not readable: $1 (set AO_PROFILE; examples in ops/profiles/)"
   # Only the file may set profile values: drop any AO_C_* from the
   # environment first.
   for _ao_v in $(env | sed -n 's/^\(AO_C_[A-Za-z0-9_]*\)=.*/\1/p'); do

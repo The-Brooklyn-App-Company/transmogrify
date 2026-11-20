@@ -11,7 +11,7 @@ settings file next to the project). Fill in the paths and commands.
 ```json
 {
   "permissions": {
-    "allow": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(<kit-dir>/scripts/status.sh:*)"],
+    "allow": ["Bash(git status:*)", "Bash(git diff:*)", "Bash(<kit-dir>/ops/status.sh:*)"],
     "ask": ["Bash(git push:*)"],
     "deny": ["Bash(git push --force:*)", "Read(<secrets-dir>/**)"]
   }
@@ -29,7 +29,7 @@ the session to read the full files first. Register it for this home:
   "hooks": {
     "SessionStart": [
       { "matcher": "compact|resume",
-        "hooks": [{ "type": "command", "command": "<kit-dir>/scripts/recover-context.sh" }] }
+        "hooks": [{ "type": "command", "command": "<kit-dir>/ops/recover-context.sh" }] }
     ]
   }
 }
@@ -40,11 +40,11 @@ sources `startup|resume|compact|fork` in Codex's hooks configuration, and
 trust it when Codex asks (non-managed hooks need trust). The digest stays
 under about 2,000 tokens. The exact Codex registration format is not
 verified by the kit; until a live recovery passes, the session re-reads its
-files itself (the kit's `docs/client-capabilities.md`).
+files itself (the kit's `docs/operations/client-capabilities.md`).
 
 ### Mailroom home
 
-The Claude Mailroom (the kit's `docs/mailroom.md`) needs `Bash(<kit-dir>/scripts/mailroom.sh:*)` (or `Bash(sh <kit-dir>/scripts/mailroom.sh:*)`)
+The Claude Mailroom (the kit's `docs/operations/mailroom.md`) needs `Bash(<kit-dir>/ops/mailroom.sh:*)` (or `Bash(sh <kit-dir>/ops/mailroom.sh:*)`)
 in its allow list and nothing else beyond `SendMessage`.
 
 ## Codex

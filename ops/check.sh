@@ -13,8 +13,8 @@
 #
 # kit      Run in a kit checkout (CI does): links over every tracked
 #          Markdown file and skills over skills/ must pass, and
-#          kit/KIT.md must stay within its byte budget (11000); duplicate
-#          rule text across kit/, docs/ and skills/ is reported as a warning.
+#          kit/KIT.md must stay within its byte budget (11100); duplicate
+#          rule text across kit/, docs/operations/ and skills/ is reported as a warning.
 # links    Every relative Markdown link [text](target) in the given files
 #          (default: the Markdown files git tracks here) must name an
 #          existing file or directory, and a #fragment must match a heading
@@ -26,7 +26,7 @@
 #          Code blocks, table rules and link targets are ignored. Output, one
 #          finding per line: `file:line, file:line: "sentence..."`.
 # skills   Thin skills: reports every SKILL.md under DIR longer than N lines
-#          (default 60) or with no pointer into docs/ or templates/.
+#          (default 60) or with no pointer into docs/operations/ or ops/templates/.
 # home     A kit-managed operator home: AGENTS.md and MANDATE.md exist;
 #          CLAUDE.md, if present, only imports AGENTS.md (`@AGENTS.md`);
 #          operator.conf, if present, has only key, session.<client>,
@@ -64,7 +64,7 @@ AO_SCRIPTS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 . "$AO_SCRIPTS/lib/core.sh"
 
 # The rules file's byte budget (check.sh kit).
-AO_KIT_BUDGET=11000
+AO_KIT_BUDGET=11100
 
 # check_need_number OPTION VALUE...  Die unless VALUE is an integer.
 check_need_number() {
@@ -149,7 +149,7 @@ check_skills() {
       _bad=1
     fi
     if ! grep -Eq '(docs|templates)/' "$_s"; then
-      printf '%s: no pointer into docs/ or templates/\n' "$_s"
+      printf '%s: no pointer into docs/operations/ or ops/templates/\n' "$_s"
       _bad=1
     fi
   done <"$skills"
@@ -282,7 +282,7 @@ check_kit() {
     printf 'kit/KIT.md is %s bytes, over its budget of %s: replace rather than add (K-32)\n' "$_kb" "$AO_KIT_BUDGET"
     _rc=$AO_E_FAIL
   fi
-  set -- kit/KIT.md docs/*.md skills/*/SKILL.md
+  set -- kit/KIT.md docs/operations/*.md skills/*/SKILL.md
   if ! _d=$(check_dupes "$@"); then
     printf 'warning: duplicated rule text (keep one home, point to it):\n%s\n' "$_d"
   fi

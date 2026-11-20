@@ -1,7 +1,7 @@
 # Handoff permission patterns (both clients)
 
 For an operator with a session on each client (experimental handoff layer,
-see the kit's `docs/handoff.md`). The kit never edits client settings: apply
+see the kit's `docs/operations/handoff.md`). The kit never edits client settings: apply
 these yourself, in each client's settings for this home.
 
 ## Claude Code
@@ -19,9 +19,9 @@ match exact leading tokens only; the scripts refuse these verbs inside an
 agent's tool shell anyway.
 
 ```
-prefix_rule(pattern=["@KIT_DIR@/scripts/lease.sh", "takeover"], decision="forbidden")
-prefix_rule(pattern=["sh", "@KIT_DIR@/scripts/lease.sh", "takeover"], decision="forbidden")
-prefix_rule(pattern=["@KIT_DIR@/scripts/lease.sh", ["unlock", "settle"]], decision="forbidden")
+prefix_rule(pattern=["@KIT_DIR@/ops/lease.sh", "takeover"], decision="forbidden")
+prefix_rule(pattern=["sh", "@KIT_DIR@/ops/lease.sh", "takeover"], decision="forbidden")
+prefix_rule(pattern=["@KIT_DIR@/ops/lease.sh", ["unlock", "settle"]], decision="forbidden")
 ```
 
 ## Both

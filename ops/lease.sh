@@ -741,7 +741,7 @@ do_status() {
     echo "switch-in audit: $L_audit (report ${L_audit_report:--} at ${L_audit_note:--})"
   fi
   if [ -d "$H_OP/lease.lock" ]; then echo "lock: present ($H_OP/lease.lock)"; else echo "lock: free"; fi
-  echo "takeover: terminal-only on every client (no client validated for a fresh permission prompt; docs/handoff.md)"
+  echo "takeover: terminal-only on every client (no client validated for a fresh permission prompt; docs/operations/handoff.md)"
   if [ -n "$o_evidence" ]; then
     echo "work repos:"
     inflight | sed 's/^/  /'

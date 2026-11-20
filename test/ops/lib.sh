@@ -1,7 +1,7 @@
 # shellcheck shell=sh disable=SC2034,SC2016
 # (SC2034: the globals below are read by the test files.)
 # lib.sh - tiny test harness for the kit's shell scripts. Sourced by each
-# tests/t_*.sh file, which defines test_* functions and ends with
+# test/ops/t_*.sh file, which defines test_* functions and ends with
 # `ao_test_main "$0"`. Each test runs in a subshell with a fresh sandbox:
 #   $T            sandbox root (removed afterwards)
 #   $T/home       the Oracle home (registry, inbox, hooks)
@@ -13,7 +13,7 @@
 # $AO_TEST_SHELL (default: sh).
 
 TESTS_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-SCRIPTS=$(CDPATH='' cd -- "$TESTS_DIR/../scripts" && pwd)
+SCRIPTS=$(CDPATH='' cd -- "$TESTS_DIR/../../ops" && pwd)
 AO_TEST_SHELL=${AO_TEST_SHELL:-sh}
 TAB=$(printf '\t')
 

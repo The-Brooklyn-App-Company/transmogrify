@@ -1,9 +1,9 @@
 #!/bin/sh
 # run.sh - run the test suite under every available POSIX shell.
 #
-# Usage: tests/run.sh [TEST_FILE...]
+# Usage: test/ops/run.sh [TEST_FILE...]
 #
-# Runs each tests/t_*.sh (or the files given) once per shell in
+# Runs each test/ops/t_*.sh (or the files given) once per shell in
 # AO_TEST_SHELLS (default: "sh dash"; shells that are not installed are
 # skipped). No network, no model calls: the agent CLIs are fakes.
 #

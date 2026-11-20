@@ -109,7 +109,7 @@ After sending, print SENT. If SendMessage fails, print FAILED and the error."
 # warning: never re-sent); else the reason nothing was delivered. Lines
 # that are not JSON are ignored; every tool_use block in every assistant
 # event is counted. The tool result's text is JSON with "success": true in
-# Claude Code 2.1.322 (see tests/fixtures/).
+# Claude Code 2.1.322 (see test/ops/fixtures/).
 _vendor_claude_receipt() {
   jq -nrR --arg to "$2" --rawfile msg "$3" '
     def norm: sub("^\\s+"; "") | sub("\\s+$"; "");

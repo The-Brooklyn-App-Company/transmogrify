@@ -40,3 +40,38 @@ jobs:
             bash -n "$file"
           done
       - run: npm pack --dry-run
+
+  # The operations layer (ops/): POSIX sh under sh and dash, shellcheck and
+  # the kit's own gate. No network and no model calls: the agent CLIs are
+  # fakes (test/ops/fakes).
+  ops:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tools
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -q && sudo apt-get install -yq dash shellcheck jq
+          else
+            command -v shellcheck >/dev/null || brew install shellcheck
+            command -v jq >/dev/null || brew install jq
+          fi
+          dash -c 'echo dash ok' && shellcheck --version | head -2 && jq --version
+      - name: check.sh kit
+        run: sh ops/check.sh kit
+      - name: shellcheck
+        shell: bash
+        run: |
+          shellcheck ops/*.sh ops/lib/*.sh ops/adapters/*.sh \
+            ops/examples/hooks/*/* ops/examples/tracker-linear/*.sh \
+            test/ops/*.sh test/ops/fakes/fake-agent
+      - name: Kit suite (sh and dash)
+        run: AO_TEST_SHELLS="sh dash" sh test/ops/run.sh

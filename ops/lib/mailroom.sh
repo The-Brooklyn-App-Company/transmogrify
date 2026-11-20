@@ -2,7 +2,7 @@
 # (SC2034: AO_MR_* globals set here are read by relay.sh and mailroom.sh.)
 # mailroom.sh - the cross-app mailroom: rings, the delivered log, events, the
 # degradation ladders' timed tiers and the bridge supervisor. EXPERIMENTAL
-# since 0.3.1 (docs/mailroom.md).
+# since 0.3.1 (docs/operations/mailroom.md).
 #
 # Sourced after core.sh, registry.sh and vendor.sh, and after ao_load.
 #
@@ -432,7 +432,7 @@ _ao_mr_t1_stranded() {
       # The transcript cannot be read: no evidence either way. Kept, never
       # resent; one alarm (K-28).
       _mr_am=$(_ao_mr_marker alarmed "t1-unknown-$_mr_b")
-      if [ ! -f "$_mr_am" ] && _ao_mr_alarm "mailroom-unknown-claude" "Mailroom: $_mr_b was sent to a Claude session at tier 1 but the session's transcript cannot be read to confirm it; it is kept and not resent. Check the target session (docs/mailroom.md)."; then
+      if [ ! -f "$_mr_am" ] && _ao_mr_alarm "mailroom-unknown-claude" "Mailroom: $_mr_b was sent to a Claude session at tier 1 but the session's transcript cannot be read to confirm it; it is kept and not resent. Check the target session (docs/operations/mailroom.md)."; then
         _ao_mr_touch "$_mr_am"
         ao_mr_event unknown claude "$_mr_b" "transcript unreadable; kept, not resent"
       fi
@@ -453,7 +453,7 @@ _ao_mr_rings() {
       if [ "$_mr_side" = claude ]; then _mr_t=t3-headless; else _mr_t=t3-cli-queue; fi
       ao_mr_file "$_mr_side" "${_mr_c##*/}" "$_mr_t" - unknown "${_mr_c%/*}" interrupted || continue
       ao_mr_event unknown "$_mr_side" "${_mr_c##*/}" "interrupted fallback; not sent again"
-      _ao_mr_alarm "mailroom-unknown-$_mr_side" "Mailroom: a fallback for ${_mr_c##*/} was interrupted; it may or may not have arrived and is not sent again. Check the target (docs/mailroom.md)." ||
+      _ao_mr_alarm "mailroom-unknown-$_mr_side" "Mailroom: a fallback for ${_mr_c##*/} was interrupted; it may or may not have arrived and is not sent again. Check the target (docs/operations/mailroom.md)." ||
         ao_warn "could not raise the unknown-delivery alarm"
     done
     # Unknown outcomes the Codex watcher recorded: reconciled against the
@@ -505,7 +505,7 @@ _ao_mr_rings() {
       [ "$_mr_key" != "$AO_ORACLE_KEY" ] || continue
       _mr_am=$(_ao_mr_marker alarmed "$_mr_b")
       if [ "$_mr_age" -ge "$AO_MR_ALARM" ] && [ ! -e "$_mr_am" ]; then
-        if _ao_mr_alarm "mailroom-ring-waiting-$_mr_side" "Mailroom: $_mr_side ring $_mr_b has waited ${_mr_age}s and is not delivered. Check that the $_mr_side desktop app is running and its mailroom bridge is armed (docs/mailroom.md). Events: $AO_MR_LOG"; then
+        if _ao_mr_alarm "mailroom-ring-waiting-$_mr_side" "Mailroom: $_mr_side ring $_mr_b has waited ${_mr_age}s and is not delivered. Check that the $_mr_side desktop app is running and its mailroom bridge is armed (docs/operations/mailroom.md). Events: $AO_MR_LOG"; then
           _ao_mr_touch "$_mr_am"
           ao_mr_event alarm "$_mr_side" "$_mr_b" "waited ${_mr_age}s"
         fi
@@ -537,7 +537,7 @@ _ao_mr_unknowns() {
     _mr_b=${_mr_e##*/}
     ao_mr_row codex "$_mr_b" t3-cli-queue resolve unknown - escalation-interrupted
     ao_mr_event unknown codex "$_mr_b" "escalation interrupted; not sent again"
-    _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the one escalation of $_mr_b was interrupted; it may or may not have arrived and is not sent again (docs/mailroom.md)." ||
+    _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the one escalation of $_mr_b was interrupted; it may or may not have arrived and is not sent again (docs/operations/mailroom.md)." ||
       ao_warn "could not raise the unknown-delivery alarm"
     rm -f "$_mr_e"
   done
@@ -563,7 +563,7 @@ _ao_mr_unknowns() {
     _mr_d=$AO_MR_DIR/codex/delivered/$_mr_b
     if [ -z "$_mr_roll" ] || [ ! -f "$_mr_d" ]; then
       ao_mr_event unknown codex "$_mr_b" "outcome unknown and the target's record is unreadable; not sent again"
-      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the Codex watcher could not confirm $_mr_b and the target thread's record cannot be read, so it is not sent again. Check the target thread (docs/mailroom.md)." &&
+      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the Codex watcher could not confirm $_mr_b and the target thread's record cannot be read, so it is not sent again. Check the target thread (docs/operations/mailroom.md)." &&
         rm -f "$_mr_u"
       continue
     fi
@@ -572,7 +572,7 @@ _ao_mr_unknowns() {
     # thread) gets a new ring instead of the old thread.
     if ! _ao_mr_owner "$_mr_b"; then
       ao_mr_event unknown codex "$_mr_b" "absent from the target, and its operator is no longer in the registry; not sent again"
-      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: $_mr_b never reached its thread and its operator is no longer in the registry, so it is not sent again (docs/mailroom.md)." &&
+      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: $_mr_b never reached its thread and its operator is no longer in the registry, so it is not sent again (docs/operations/mailroom.md)." &&
         rm -f "$_mr_u"
       continue
     fi
@@ -606,7 +606,7 @@ _ao_mr_unknowns() {
     elif grep -q 'queue acceptance unconfirmed' "$_mr_out" 2>/dev/null; then
       ao_mr_row codex "$_mr_b" t3-cli-queue resolve unknown - unknown-absent
       ao_mr_event unknown codex "$_mr_b" "escalation unconfirmed; not sent again"
-      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: $_mr_b was absent from its target thread after an unconfirmed send, and the one CLI queue that followed was not confirmed either. It is not sent again; the thread may be unresponsive (docs/mailroom.md, thread recovery)." ||
+      _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: $_mr_b was absent from its target thread after an unconfirmed send, and the one CLI queue that followed was not confirmed either. It is not sent again; the thread may be unresponsive (docs/operations/mailroom.md, thread recovery)." ||
         ao_warn "could not raise the unknown-delivery alarm"
       rm -f "$_mr_ed/$_mr_b"
       _mr_uf=1
@@ -650,7 +650,7 @@ _ao_mr_threads() {
         ao_warn "could not raise the thread alarm"
       ao_timeout 120 sh "$AO_SCRIPTS/operator.sh" recover "$_mr_key" --auto </dev/null >>"$AO_STATE/routine.log" 2>&1 || true
     else
-      _ao_mr_alarm "mailroom-thread-$_mr_t" "Mailroom: the Codex thread $_mr_t looks unresponsive and is not an operator's; check it in the app (docs/mailroom.md, thread recovery)." ||
+      _ao_mr_alarm "mailroom-thread-$_mr_t" "Mailroom: the Codex thread $_mr_t looks unresponsive and is not an operator's; check it in the app (docs/operations/mailroom.md, thread recovery)." ||
         ao_warn "could not raise the thread alarm"
     fi
   done
@@ -732,7 +732,7 @@ _ao_mr_ring_codex() {
   if grep -q 'queue acceptance unconfirmed' "$_mr_out" 2>/dev/null; then
     ao_mr_file codex "$_mr_b" t3-cli-queue queue unknown "${_mr_c%/*}" "$_mr_why" || ao_warn "cannot file $_mr_b"
     ao_mr_event unknown codex "$_mr_b" "direct queue unconfirmed; not sent again: $(tr '\n' ' ' <"$_mr_out" | cut -c 1-200)"
-    _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the direct queue of $_mr_b was not confirmed; it may or may not have arrived and is not sent again. Check the target thread (docs/mailroom.md)." ||
+    _ao_mr_alarm "mailroom-unknown-codex" "Mailroom: the direct queue of $_mr_b was not confirmed; it may or may not have arrived and is not sent again. Check the target thread (docs/operations/mailroom.md)." ||
       ao_warn "could not raise the unknown-delivery alarm"
     return 1
   fi
@@ -835,7 +835,7 @@ _ao_mr_tier4() {
   [ ! -f "$_mr_om" ] || return 0
   # Marked before the push, so a crash mid-push never repeats it.
   _ao_mr_touch "$_mr_om" "$AO_T_EPOCH $_mr_over" || return 0
-  if _ao_mr_push "Mailroom: the Oracle has not received an alarm for 15+ minutes ($_mr_over). Check the always-on host and its desktop apps (docs/mailroom.md)."; then
+  if _ao_mr_push "Mailroom: the Oracle has not received an alarm for 15+ minutes ($_mr_over). Check the always-on host and its desktop apps (docs/operations/mailroom.md)."; then
     ao_mr_event push - - "Oracle unreachable 15+ min ($_mr_over): pushed the owner"
   else
     ao_mr_event push-failed - - "Oracle unreachable 15+ min ($_mr_over); no hooks/push or chat adapter reached the owner"
@@ -906,7 +906,7 @@ _ao_mr_bridge_check() {
     read -r _mr_since <"$_mr_down" 2>/dev/null
     ao_is_uint "${_mr_since:-x}" || _mr_since=$AO_T_EPOCH
     if [ $((AO_T_EPOCH - _mr_since)) -ge $((AO_MR_REARM_GRACE * 2)) ] && [ ! -e "$_mr_bam" ] &&
-      _ao_mr_alarm "mailroom-bridge-down-$1" "Mailroom: the $1 desktop app is not running and opening it did not bring it back. Open it yourself; its bridge then re-arms (docs/mailroom.md, restart recovery)."; then
+      _ao_mr_alarm "mailroom-bridge-down-$1" "Mailroom: the $1 desktop app is not running and opening it did not bring it back. Open it yourself; its bridge then re-arms (docs/operations/mailroom.md, restart recovery)."; then
       _ao_mr_touch "$_mr_bam" && ao_mr_event alarm "$1" - "app not running"
     fi
     return 0
@@ -918,7 +918,7 @@ _ao_mr_bridge_check() {
   if [ "$_mr_lkey" = "$_mr_key" ]; then
     # Re-armed already for this app process: alarm once if still down.
     [ $((AO_T_EPOCH - _mr_last)) -ge "$AO_MR_REARM_GRACE" ] && [ ! -e "$_mr_bam" ] || return 0
-    if _ao_mr_alarm "mailroom-bridge-down-$1" "Mailroom: the $1 bridge ($MR_B_NAME) is still not armed after a re-arm. Open the $1 desktop app and send its bridge 'Re-arm' (docs/mailroom.md, restart recovery)."; then
+    if _ao_mr_alarm "mailroom-bridge-down-$1" "Mailroom: the $1 bridge ($MR_B_NAME) is still not armed after a re-arm. Open the $1 desktop app and send its bridge 'Re-arm' (docs/operations/mailroom.md, restart recovery)."; then
       _ao_mr_touch "$_mr_bam" && ao_mr_event alarm "$1" - "bridge still down after re-arm"
     fi
     return 0
@@ -1018,7 +1018,7 @@ _ao_mr_canary_check() {
   ao_mr_event canary-failed "$1" "$_mr_cn" "step $_mr_step"
   _mr_am=$(_ao_mr_marker alarmed "canary-$1-$(printf '%s' "$_mr_ver" | cksum | cut -d ' ' -f 1)")
   [ ! -e "$_mr_am" ] || return 0
-  _ao_mr_alarm "mailroom-degraded-$1" "Mailroom: the $1 canary after a version change failed at step $_mr_step (fingerprint: ${_mr_ver:-unknown}). Deliveries continue by the slower tiers, with higher latency, until the first tier ($_mr_first) works again. History: $AO_STATE/mailroom-versions.tsv (docs/mailroom.md, degradation)." &&
+  _ao_mr_alarm "mailroom-degraded-$1" "Mailroom: the $1 canary after a version change failed at step $_mr_step (fingerprint: ${_mr_ver:-unknown}). Deliveries continue by the slower tiers, with higher latency, until the first tier ($_mr_first) works again. History: $AO_STATE/mailroom-versions.tsv (docs/operations/mailroom.md, degradation)." &&
     _ao_mr_touch "$_mr_am" "$AO_T_EPOCH"
 }
 
@@ -1062,7 +1062,7 @@ _ao_mr_degraded() {
   _mr_am=$(_ao_mr_marker alarmed "degraded-$1-$_mr_step-$(printf '%s' "${_mr_ver:-unknown}" | cksum | cut -d ' ' -f 1)")
   [ ! -e "$_mr_am" ] || return 0
   if [ "$_mr_good" -gt 0 ]; then _mr_last=$(ao_utc "$_mr_good"); else _mr_last=never; fi
-  _ao_mr_alarm "mailroom-degraded-$1" "Mailroom: two $1 deliveries in a row missed the first tier ($(ao_mr_first_tier "$1")) at step $_mr_step; they were still delivered by a slower tier, with higher latency. Fingerprint: ${_mr_ver:-unknown}. Last first-tier delivery (UTC): $_mr_last. Rows: $AO_MR_DIR/$1/delivered/log.tsv; summary: mailroom.sh metrics (docs/mailroom.md, degradation)." &&
+  _ao_mr_alarm "mailroom-degraded-$1" "Mailroom: two $1 deliveries in a row missed the first tier ($(ao_mr_first_tier "$1")) at step $_mr_step; they were still delivered by a slower tier, with higher latency. Fingerprint: ${_mr_ver:-unknown}. Last first-tier delivery (UTC): $_mr_last. Rows: $AO_MR_DIR/$1/delivered/log.tsv; summary: mailroom.sh metrics (docs/operations/mailroom.md, degradation)." &&
     _ao_mr_touch "$_mr_am" "$AO_T_EPOCH" && ao_mr_event degraded "$1" - "step $_mr_step"
 }
 

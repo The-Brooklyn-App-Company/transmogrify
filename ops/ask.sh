@@ -91,7 +91,7 @@ asks_init() {
   cat >"$ASKS" <<'EOF' || ao_die "$AO_E_FAIL" "cannot create $ASKS"
 # Asks
 
-Written by scripts/ask.sh; one row per ask. Status: open, reserved, used,
+Written by ops/ask.sh; one row per ask. Status: open, reserved, used,
 held (may have happened: verify the target), void.
 
 | id | generation | epoch | action | target | revision | risk | rollback | status |

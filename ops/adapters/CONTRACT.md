@@ -38,6 +38,6 @@ network.
 | secrets | `get <name>` | the secret, on stdout only, for the process that asked |
 
 A hook calls an adapter and turns what it finds into inbox notes with
-`scripts/inbox-put.sh`; it never forwards adapter output to a model
+`ops/inbox-put.sh`; it never forwards adapter output to a model
 unfiltered. Test an adapter with `none.sh` as the template for its exit
 codes.

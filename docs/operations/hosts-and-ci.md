@@ -2,7 +2,7 @@
 
 ## Scheduling
 
-One OS timer runs `scripts/tick.sh` every 10 minutes: launchd on macOS,
+One OS timer runs `ops/tick.sh` every 10 minutes: launchd on macOS,
 a systemd user timer on Linux (shipped, untested). Each tick, under a lock:
 
 1. **Stall watchdog.** Inside the work window (`watchdog_days`,
@@ -24,16 +24,16 @@ supervisor) whenever a note lands in a registry inbox folder and every 60
 seconds, so cross-app messages wait seconds, not a tick. Both units run at
 load (login or reboot) as `ProcessType` Standard.
 
-`scripts/install.sh timers` renders both units for this machine into your
+`ops/install.sh timers` renders both units for this machine into your
 user's launchd or systemd folder and prints the commands that load them;
 loading them is your step, so no agent installs a persistent job on its own.
 Both belong in `SCHEDULES.md` like every other timed job
-([K-24](../kit/KIT.md)). After adding an operator, render the relay unit
+([K-24](../../kit/KIT.md)). After adding an operator, render the relay unit
 again so it watches the new inbox (`install.sh host` reports a stale one).
 
 ## Scheduled work
 
-Order every recurring job by cost ([K-23](../kit/KIT.md)): a free script
+Order every recurring job by cost ([K-23](../../kit/KIT.md)): a free script
 checks first; a cheap worker classifies only what the script found; a
 session runs only to act.
 
@@ -41,8 +41,8 @@ session runs only to act.
 window or triggering event, input validity and the lock. If nothing is
 eligible and every read was fresh and healthy, end quietly.
 
-**Cheap workers.** `scripts/worker-run.sh <job> <recipient> <prompt>` runs
-the worker role once, boxed ([K-25](../kit/KIT.md)). The prompt tells the
+**Cheap workers.** `ops/worker-run.sh <job> <recipient> <prompt>` runs
+the worker role once, boxed ([K-25](../../kit/KIT.md)). The prompt tells the
 model to answer exactly `NOTHING` when there is nothing worth reporting:
 then nothing is written. Any other answer becomes a note in the recipient's
 inbox. A failure, a timeout, an empty answer or a missing role becomes a
@@ -80,14 +80,14 @@ sessions sit idle, and urgent alerts need a push route to the human.
 
 ### First run
 
-`scripts/bootstrap.sh` is the one command a new adopter runs, from a
+`ops/bootstrap.sh` is the one command a new adopter runs, from a
 terminal, ideally inside the client they want the Oracle on. It explains
 each step before doing it and asks only for the choices that are yours: the
 client you start on (detected when it can be), the Oracle home, which
 clients you use, your timezone (`owner_tz`; times are reported in it, logs
 stay UTC), the profile's model choices, and making this client the one
 active Oracle. The rest it does with the kit's own scripts
-([K-36](../kit/KIT.md)): `install.sh oracle`; the profile, including the
+([K-36](../../kit/KIT.md)): `install.sh oracle`; the profile, including the
 Codex app's bundled node and tool server found inside the app bundle;
 `install.sh host --apply` (below); `install.sh sync` for a toehold in the
 other client; the Oracle's session id (`operator.sh session`) and the lock.
@@ -105,12 +105,12 @@ without questions (options and defaults only).
 
 ### Always-on host
 
-`scripts/install.sh host --apply` sets the host up in one command, check
-then set, and is safe to run again ([K-36](../kit/KIT.md)): it prints one row
+`ops/install.sh host --apply` sets the host up in one command, check
+then set, and is safe to run again ([K-36](../../kit/KIT.md)): it prints one row
 per item with its state and what is left, then the few steps only a person
 can do in the apps, each marked done or to do. Without `--apply` it changes
 only App Nap and folders and says what `--apply` would do.
-`scripts/check.sh host` repeats the launchd checks read-only; run it after
+`ops/check.sh host` repeats the launchd checks read-only; run it after
 any change to the host or its jobs.
 
 | Item | Check | Set (with `--apply`) |
@@ -119,9 +119,9 @@ any change to the host or its jobs.
 | Power | `pmset -g` system sleep is 0 | Check only: change it in System Settings |
 | Mailroom folders | Present | Always created |
 | Units | The tick and relay units match their templates; the relay unit watches every registry inbox (WatchPaths generated from the registry); both are loaded | Rendered, replaced when stale (old copy in `<state_dir>/backup`), loaded with `launchctl bootstrap gui/<uid>` |
-| Bridge homes | Each has its lean duty file (`AGENTS.md`, rendered from `templates/mailroom/`) | Created with `install.sh bridge <client>`, or the duty file brought up to date |
+| Bridge homes | Each has its lean duty file (`AGENTS.md`, rendered from `ops/templates/mailroom/`) | Created with `install.sh bridge <client>`, or the duty file brought up to date |
 | Bridge ids | Rows `mailroom-claude` and `mailroom-codex` have session ids: the one file every script reads | In-app step |
-| Switches and holds | Claude tier 1 (`bridge_claude_t1`) and its kill switch; the supervisor pause and lane holds name an owner, an expiry and a reason ([K-07](../kit/KIT.md)) | Check only |
+| Switches and holds | Claude tier 1 (`bridge_claude_t1`) and its kill switch; the supervisor pause and lane holds name an owner, an expiry and a reason ([K-07](../../kit/KIT.md)) | Check only |
 | Retired probes | No hourly probe state left | Removed |
 | Oracle lock | `operators/ORACLE-LOCK` names the one active Oracle | `lane.sh oracle-lock take`, on the human's word |
 | launchd priority | No job matching `host_latency_jobs` sets `ProcessType` Background or Adaptive, or `LowPriorityIO` | Check only: edit the job |
@@ -143,7 +143,7 @@ backups and indexing. List your own such jobs in `host_latency_jobs`
 flags them, and add both desktop apps to your login items so a reboot
 brings the bridges back.
 
-**No routine permission prompts** ([K-27](../kit/KIT.md)). A dialog on an
+**No routine permission prompts** ([K-27](../../kit/KIT.md)). A dialog on an
 unattended host blocks work for hours. Treat each unexpected prompt as a
 defect.
 
@@ -162,10 +162,10 @@ defect.
   permission-dialog activity catches regressions; attribute each hit before
   acting on it. In zsh, `log` is a builtin: call `/usr/bin/log`.
 - **Secrets.** Read from the OS store by the process that needs them
-  ([K-05](../kit/KIT.md)). Reading a store item from a new binary can itself
+  ([K-05](../../kit/KIT.md)). Reading a store item from a new binary can itself
   raise a prompt: grant it once, deliberately.
 
-**Keep churn out** ([K-29](../kit/KIT.md)): the kit's state directory
+**Keep churn out** ([K-29](../../kit/KIT.md)): the kit's state directory
 (default `~/.local/state/agent-operations`), inboxes, caches, build output
 and virtual machines go in `.gitignore` and are excluded from backups and
 indexing when they are created.
@@ -197,7 +197,7 @@ queue to manage. Adapt the numbers to your own measurements.
   workflow needs re-admission. Never run fork pull requests on self-hosted
   runners.
 - Admitting a new repository widens the trust boundary: that is the human's
-  decision ([K-03](../kit/KIT.md)). New pins for already-admitted
+  decision ([K-03](../../kit/KIT.md)). New pins for already-admitted
   repositories can be routine under a standing grant.
 - Change a shared workflow in its own pull request and get its new commit
   admitted before callers move to it.

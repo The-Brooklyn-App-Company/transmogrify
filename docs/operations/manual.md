@@ -1,7 +1,7 @@
 # Setup and operating manual
 
 This walkthrough configures one personal instance with either client or both.
-It applies the rules in [KIT.md](kit/KIT.md); it does not grant access, turn on
+It applies the rules in [KIT.md](../../kit/KIT.md); it does not grant access, turn on
 paused jobs, or publish software. Start with one low-risk operator, prove its
 real delivery path, then repeat the same setup. Product versions and transport
 availability must be verified on the machine being installed.
@@ -40,33 +40,33 @@ account setup is an owner action; installation never initiates sign-in.
 git clone <kit-url> ~/src/agent-operations
 cd ~/src/agent-operations
 git checkout <reviewed-release-tag>
-scripts/bootstrap.sh     # guided: this section and section 5 in one run
+ops/bootstrap.sh     # guided: this section and section 5 in one run
 ```
 
-[`bootstrap.sh`](docs/hosts-and-ci.md#first-run) runs the steps below for
+[`bootstrap.sh`](hosts-and-ci.md#first-run) runs the steps below for
 you and ends with a checklist; the manual steps stay valid:
 
 ```sh
-scripts/install.sh --dry-run oracle ~/ops/oracle
-scripts/install.sh oracle ~/ops/oracle
+ops/install.sh --dry-run oracle ~/ops/oracle
+ops/install.sh oracle ~/ops/oracle
 ```
 
 Edit the profile the installer prints. Choose explicit role models; unresolved
 `CHANGE-ME` values must not become an accidental model or billing fallback.
-Use the relevant [profile](profiles/) and [integration guide](docs/profiles-and-integrations.md).
+Use the relevant [profile](../../ops/profiles/) and [integration guide](profiles-and-integrations.md).
 Do not copy credentials into the profile: use secret-store names if needed.
 
 Create an embedded operator, or omit `--embedded` for its own private home.
 `operator.sh create` is the guided routine: it asks for the model and effort
 on both clients (decided now, with you), runs the installer and walks the
-checklist ([routines](docs/conventions.md#operator-routines)):
+checklist ([routines](conventions.md#operator-routines)):
 
 ```sh
-scripts/operator.sh create web --embedded --owns git@git.example.com:sample/app-web.git
+ops/operator.sh create web --embedded --owns git@git.example.com:sample/app-web.git
 # or, without the routine:
-scripts/install.sh operator web --embedded --owns git@git.example.com:sample/app-web.git
-scripts/check.sh home ~/ops/oracle ~/ops/oracle/operators/web
-scripts/status.sh
+ops/install.sh operator web --embedded --owns git@git.example.com:sample/app-web.git
+ops/check.sh home ~/ops/oracle ~/ops/oracle/operators/web
+ops/status.sh
 ```
 
 The installer is resumable: preview existing files rather than overwriting
@@ -109,9 +109,9 @@ A successful command is not proof the operator read or acted on its message.
 ## 4. Add the second client without a second operator
 
 ```sh
-scripts/status.sh --drift
-scripts/install.sh --dry-run sync codex
-scripts/install.sh sync codex
+ops/status.sh --drift
+ops/install.sh --dry-run sync codex
+ops/install.sh sync codex
 ```
 
 Replace `codex` with `claude` for the other direction. Apply the printed settings
@@ -125,19 +125,19 @@ instance-specific ownership list must agree with the registry, not become a
 second conflicting source. Retain dormant session identities for recovery, but
 exclude them from dispatch. A pointer never transfers ownership (K-34).
 
-Switch an operator between clients with `scripts/lane.sh switch KEY --to
-CLIENT --session ID`, then `scripts/lane.sh verify KEY` until every step
+Switch an operator between clients with `ops/lane.sh switch KEY --to
+CLIENT --session ID`, then `ops/lane.sh verify KEY` until every step
 passes: handoff, routing, watchdog, labels, pins on both sides, models,
 switch-in audit and the incoming session's acknowledgement
-([conventions](docs/conventions.md#switching-an-operator-between-clients)).
+([conventions](conventions.md#switching-an-operator-between-clients)).
 The script is the checklist; no step is done from memory (K-36).
 
-Use [the lease procedure](docs/handoff.md) for warm handoff or owner-directed
+Use [the lease procedure](handoff.md) for warm handoff or owner-directed
 cold takeover. Lease ownership is advisory, not a hard OS security boundary.
 Only the holder acts; the standby redirects. Expiry alone does not justify
 stealing a running session. Preserve dispatch markers and unknown results,
 and complete the incoming-family audit before new work (K-22). Follow the live
-test in [TESTING.md](TESTING.md); do not claim untested takeover paths accepted.
+test in [docs/operations/testing.md](testing.md); do not claim untested takeover paths accepted.
 
 ### Cold handoff checklist
 
@@ -158,7 +158,7 @@ ship a correction after the test if required rather than inventing acceptance.
 ## 5. Wire the mailroom
 
 The design, its safety nets and its restart recovery are in
-[docs/mailroom.md](docs/mailroom.md). In short: same-app messages go direct
+[docs/operations/mailroom.md](mailroom.md). In short: same-app messages go direct
 with the app's own tool; cross-app messages and notes from scripts go
 through an inbox, the relay, a ring and the receiving app's in-app bridge;
 a model-free supervisor keeps both bridges armed. Every delivery walks a
@@ -167,12 +167,12 @@ an alarm and then a push to you): it gets slower, never stops, and each
 drop is logged and flagged once per cause. Lanes are never pre-woken.
 
 ```sh
-scripts/install.sh host                       # what it would do
-scripts/install.sh host --apply               # App Nap, folders, units loaded, bridge homes
+ops/install.sh host                       # what it would do
+ops/install.sh host --apply               # App Nap, folders, units loaded, bridge homes
 # then the in-app steps it lists: the two Mailrooms, their ids, pins
-printf '%s\n' 'A harmless setup fixture; no action requested.' | scripts/inbox-put.sh web setup-proof
-scripts/relay.sh --dry-run --key web
-scripts/relay.sh --key web && scripts/mailroom.sh status
+printf '%s\n' 'A harmless setup fixture; no action requested.' | ops/inbox-put.sh web setup-proof
+ops/relay.sh --dry-run --key web
+ops/relay.sh --key web && ops/mailroom.sh status
 ```
 
 Notes appear atomically. The relay archives notes with collision-safe names and
@@ -192,18 +192,18 @@ account and machine; exit 0 is queue submission only, and resume is not
 guaranteed. A display name never substitutes for a session ID. Keep a hard
 timeout and closed stdin; never use a model simply to ring a thread. The
 experimental lease mailbox's doorbells now ring the mailroom too
-([handoff](docs/handoff.md#mailboxes-and-doorbells)).
+([handoff](handoff.md#mailboxes-and-doorbells)).
 
 Prove both directions: Oracle to operator and operator to Oracle, and one
 message each way across the apps. Record note ID, ring name, the delivered
 log row (tier, mode, status, latency, step) and the recipient's
-acknowledgement. `scripts/mailroom.sh metrics` shows the share per tier. Then quit each app while idle and time how long the
+acknowledgement. `ops/mailroom.sh metrics` shows the share per tier. Then quit each app while idle and time how long the
 supervisor takes to re-arm its bridge untouched. A local fake proves
 routing logic; a natural event proves the installed path.
 
 ## 6. Turn on PR watching once per owned repository
 
-Use the deterministic [PR watcher](scripts/README.md#pr-watcher) from a tick hook,
+Use the deterministic [PR watcher](../../ops/README.md#pr-watcher) from a tick hook,
 with a named operator key and authorized repository. Its scope and CLI are
 listed in its help; preserve its state between invocations. An initial snapshot
 establishes baseline, unchanged snapshots do not create mail, and read failures
@@ -234,16 +234,16 @@ Copy the synthetic sample into the private home explicitly; installation does
 not yet create this optional registry:
 
 ```sh
-cp templates/oracle/JOBS.tsv ~/ops/oracle/JOBS.tsv
-scripts/jobs.sh check ~/ops/oracle/JOBS.tsv
-scripts/jobs.sh plan ~/ops/oracle/JOBS.tsv workshop codex
+cp ops/templates/oracle/JOBS.tsv ~/ops/oracle/JOBS.tsv
+ops/jobs.sh check ~/ops/oracle/JOBS.tsv
+ops/jobs.sh plan ~/ops/oracle/JOBS.tsv workshop codex
 ```
 
 The sample demonstrates the fictional `workshop` owner. Replace it with actual
 scheduler metadata and the real stable owner key before an operational plan.
 Each row has nine literal TSV fields: job ID, owner, executor side, cadence,
 model, desired intent, observed enabled snapshot, opaque native binding and
-mirror group. Use `scripts/jobs.sh --help` for validation bounds and token shape.
+mirror group. Use `ops/jobs.sh --help` for validation bounds and token shape.
 Desired `paused` is different from an enabled-intent inactive peer. Neutral
 system jobs are independent of the operator's client and stay unchanged.
 
@@ -265,10 +265,10 @@ system timers to avoid needing mirrored provider-native tasks at all.
 
 ## 7. Create and settle scoped worktrees
 
-Use `scripts/worktree.sh --help` for the creation helper:
+Use `ops/worktree.sh --help` for the creation helper:
 
 ```sh
-scripts/worktree.sh "$HOME/src/app-web" 20260101-layout web/layout <integration-ref>
+ops/worktree.sh "$HOME/src/app-web" 20260101-layout web/layout <integration-ref>
 ```
 
 Its arguments are canonical repo, dated slug, optional unused branch and start
@@ -344,10 +344,10 @@ finding. Same-family review is labelled, and cross-family review is sought where
 available. Weekly other-family audits cover source, notes, mandates and leftover
 work. Repeated findings improve one owning rule rather than multiply checklists.
 
-Before publishing, run the full [contribution gates](CONTRIBUTING.md), the local
+Before publishing, run the full [contribution gates](contributing.md), the local
 privacy denylist scan and a separate privacy-only review with no private source
 context. Record exact tested tree, commands, results and unverified paths in
-[TESTING.md](TESTING.md). A rendered timer is not loaded, a fake CLI is not live
+[docs/operations/testing.md](testing.md). A rendered timer is not loaded, a fake CLI is not live
 transport, and a queue acknowledgement is not a readback (K-10).
 
 The maintainer reviews, merges, tags and pushes under the actual release mandate.
@@ -359,7 +359,7 @@ and leave unrun platforms/profiles explicitly untested.
 
 As of November 18, 2026, installation/sync, advisory leases, pointer relay,
 worktree preflight, deterministic PR sensing and the job cutover planner have
-the evidence described in [TESTING.md](TESTING.md). The following are design
+the evidence described in [docs/operations/testing.md](testing.md). The following are design
 requirements, not installed automation or claims of native client parity:
 
 - **Ownership generation and drain (design, November 18, 2026; unshipped):**
@@ -376,7 +376,7 @@ requirements, not installed automation or claims of native client parity:
   so an in-flight run cannot duplicate or lose a due run. Preserve paused
   intent. The shipped planner does not reconcile occurrences.
 - **Deterministic wake recovery:** shipped as the experimental mailroom
-  supervisor in 0.3.1 ([docs/mailroom.md](docs/mailroom.md)), proven only
+  supervisor in 0.3.1 ([docs/operations/mailroom.md](mailroom.md)), proven only
   against fakes. Retire any model-backed polling fallback only after restart
   recovery has been proven on the installed path.
 - **Thread/sidebar parity:** maintain a private registry of stable lane key,

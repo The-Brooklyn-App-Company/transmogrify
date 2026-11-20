@@ -8,8 +8,8 @@ description: Use when declaring activation needs in a pull request, promoting a 
 `<kit>`: two levels above this skill's real path.
 Stop if it does not resolve.
 
-1. Read `<kit>/docs/review-and-release.md#release`.
-2. Fill the activation section of `<kit>/templates/packets/release-record.md`
+1. Read `<kit>/docs/operations/review-and-release.md#release`.
+2. Fill the activation section of `<kit>/ops/templates/packets/release-record.md`
    in the pull request.
 3. Use the repository's existing release record; never start a parallel one.
 4. Confirm the target and acting principal from the execution route before

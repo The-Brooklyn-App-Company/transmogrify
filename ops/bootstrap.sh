@@ -30,7 +30,7 @@
 # proves it (a registry id, the Codex watcher's heartbeat, a test note's
 # delivery); steps no script can see are confirmed with `bootstrap.sh mark`.
 # Guided, it waits for you and re-checks; unattended, it prints what is left.
-# docs/hosts-and-ci.md#first-run.
+# docs/operations/hosts-and-ci.md#first-run.
 #
 # --yes: no questions; choices come from the options and defaults (also the
 # behaviour when stdin is not a terminal). AO_APPS_DIR (default
@@ -207,8 +207,8 @@ bs_checklist() {
     case $_m in
       sign-in) _do="open each desktop app you use and sign in yourself (the kit never signs in for you)" ;;
       restart-apps) _do="quit and reopen each desktop app once, so App Nap stays off" ;;
-      pins) _do="pin the Oracle; Claude: active operators pinned, inactive ones in a section named \"Inactive Operators\"; Codex: the active threads and the Mailroom pinned (docs/conventions.md)" ;;
-      hooks) _do="register the recovery hook on each client (templates/home/settings/README.md; on Codex, trust the hook when it asks)" ;;
+      pins) _do="pin the Oracle; Claude: active operators pinned, inactive ones in a section named \"Inactive Operators\"; Codex: the active threads and the Mailroom pinned (docs/operations/conventions.md)" ;;
+      hooks) _do="register the recovery hook on each client (ops/templates/home/settings/README.md; on Codex, trust the hook when it asks)" ;;
     esac
     ao_step TODO "$_m" "$_do; then: bootstrap.sh mark $_m"
   done

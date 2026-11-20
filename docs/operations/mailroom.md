@@ -3,7 +3,7 @@
 **Experimental since 0.3.1.** How messages reach sessions across the two
 desktop apps without any model polling, how delivery degrades instead of
 stopping, and how the system recovers after an app restart or a reboot.
-Commands: `scripts/mailroom.sh --help`. Conventions (titles, pins, one
+Commands: `ops/mailroom.sh --help`. Conventions (titles, pins, one
 active side): [conventions](conventions.md). Which tool does what on each
 client: [client capabilities](client-capabilities.md).
 
@@ -19,14 +19,14 @@ keeps both bridges armed.**
 
 Messages are pointers only: the relay's fixed-shape message names the
 archived note files and a relay id, never the note text
-([K-01](../kit/KIT.md); [relay trust boundary](../scripts/README.md#clients)).
+([K-01](../../kit/KIT.md); [relay trust boundary](../../ops/README.md#clients)).
 A Codex ring is `steer` when a note's file name says `urgent` or `steer`,
 otherwise `queue`. Lanes are never pre-woken: a message is an operator's
 first wake. Only the two bridges, both titled **Mailroom**, are kept warm.
 
 ## Degradation ladders
 
-Every ring walks its side's ladder ([K-37](../kit/KIT.md)). A broken tier
+Every ring walks its side's ladder ([K-37](../../kit/KIT.md)). A broken tier
 never stops delivery: the ring drops to the next tier, which is slower,
 and the drop is logged on the delivery's row and flagged once per cause
 ([degradation reporting](#degradation-reporting)).
@@ -45,7 +45,7 @@ mentions the ring. Every sender claims a ring by an atomic rename before
 sending, so two paths never send it at the same moment. Delivery is
 at-least-once: the relay id is stable, so receivers drop repeats.
 
-**Unknown outcomes are reconciled, never retried blind** ([K-28](../kit/KIT.md)).
+**Unknown outcomes are reconciled, never retried blind** ([K-28](../../kit/KIT.md)).
 A send whose outcome is unknown (a timeout, a crash, a closed pipe) is
 filed `unknown`; 5 minutes later the supervisor reads the target's own
 record. Codex: the ring's `Doorbell [<ring>]` text in the thread's rollout
@@ -117,7 +117,7 @@ none. Events (rings, fallbacks, re-arms, alarms, canaries, pushes) go to
   1.9s), t2-bridge 6%, t3-cli-queue 2%"), the first tier's health,
   fallbacks, re-arms, canaries, alarms and pushes. Put the 24-hour line in
   the daily digest and the 168-hour line in the weekly review
-  ([example hook](../examples/hooks/weekly/55-mailroom-review)).
+  ([example hook](../../ops/examples/hooks/weekly/55-mailroom-review)).
 
 ## Degradation reporting
 
@@ -177,7 +177,7 @@ writes one note to the Oracle and opens the operator's recovery routine,
 A closed recovery writes a `resolve` row, so the old unknown sends no longer
 count against the thread. Prevention: models are set only at creation or
 through the app's own setting, never by a message to an idle thread
-([K-26](../kit/KIT.md)); the mailroom sends only pointers, never
+([K-26](../../kit/KIT.md)); the mailroom sends only pointers, never
 configuration.
 
 `wake_link` is the desktop app's own link to a session, with `{session}`
@@ -192,7 +192,7 @@ Pause the supervisor for maintenance with an owner, an expiry and a reason:
 
 ## Efficiency
 
-No model where a script will do ([K-23](../kit/KIT.md)): the relay, the
+No model where a script will do ([K-23](../../kit/KIT.md)): the relay, the
 supervisor, the fingerprint, the canaries and both tier-1 watchers run no
 model. With tier 1 working, the Claude Mailroom takes a turn only for cold
 targets and misses; the Codex Mailroom only to re-arm. A headless model run
@@ -229,7 +229,7 @@ without a session id always do.
 
 | Piece | Status |
 | --- | --- |
-| Relay rings, ladders, telemetry rows, metrics, supervisor (re-arm per app process, relaunch, deep-link wake and return, fingerprint, canary, degradation alarm, tier 4, unknown-send reconciliation, thread recovery), both watchers, installer, first run | Test suite (`tests/t_mailroom.sh`, `t_operator.sh`, `t_lane.sh`, `t_install.sh`, `t_bootstrap.sh`) against fakes: a fake peer socket, a fake app tool server, fake rollouts, `lsappinfo`, `open`, `launchctl`; macOS, 2026-11-19 |
+| Relay rings, ladders, telemetry rows, metrics, supervisor (re-arm per app process, relaunch, deep-link wake and return, fingerprint, canary, degradation alarm, tier 4, unknown-send reconciliation, thread recovery), both watchers, installer, first run | Test suite (`test/ops/t_mailroom.sh`, `t_operator.sh`, `t_lane.sh`, `t_install.sh`, `t_bootstrap.sh`) against fakes: a fake peer socket, a fake app tool server, fake rollouts, `lsappinfo`, `open`, `launchctl`; macOS, 2026-11-19 |
 | The pattern (relay, ring, bridge with a kqueue watcher, `SendMessage` by session id; a Codex watcher sending natively and steering mid-turn; a model-free socket send to a warm Claude session) | Observed in one private deployment, 2026-11-19; not yet this kit's code |
-| Live restart recovery, `SendMessage` to a cold session, deep-link wake, Codex queue on a real turn-complete event, thread recovery on a real thread | **Unverified**: the live acceptance tests in [TESTING.md](../TESTING.md#mailroom-live-acceptance) |
+| Live restart recovery, `SendMessage` to a cold session, deep-link wake, Codex queue on a real turn-complete event, thread recovery on a real thread | **Unverified**: the live acceptance tests in [docs/operations/testing.md](testing.md#mailroom-live-acceptance) |
 | Linux | No push watch (kqueue is macOS); the relay timer runs every minute. **Untested** |

@@ -17,7 +17,7 @@
 # tier 2 a bridge model turn, tier 3 headless or CLI queue, tier 4 an alarm
 # and then a push to the owner): it gets slower, never stops, and each drop
 # is logged and flagged once per cause. Lanes are never pre-woken. See
-# docs/mailroom.md.
+# docs/operations/mailroom.md.
 #
 # status     Per side: watcher state, first tier and its health, waiting
 #            rings (count, oldest age), the last delivery. Read-only.
@@ -254,8 +254,8 @@ mr_arm_codex() {
   fi
   _node=$(ao_cfg_path bridge_codex_node '')
   _server=$(ao_cfg_path bridge_codex_server '')
-  [ -n "$_node" ] && [ -x "$_node" ] || ao_die "$AO_E_USAGE" "bridge_codex_node must name the desktop app's bundled node (docs/mailroom.md)"
-  [ -n "$_server" ] && [ -r "$_server" ] || ao_die "$AO_E_USAGE" "bridge_codex_server must name the app's codex-app-tools server.mjs (docs/mailroom.md)"
+  [ -n "$_node" ] && [ -x "$_node" ] || ao_die "$AO_E_USAGE" "bridge_codex_node must name the desktop app's bundled node (docs/operations/mailroom.md)"
+  [ -n "$_server" ] && [ -r "$_server" ] || ao_die "$AO_E_USAGE" "bridge_codex_server must name the app's codex-app-tools server.mjs (docs/operations/mailroom.md)"
   mkdir -p "$AO_MR_DIR/codex/delivered" || ao_die "$AO_E_FAIL" "cannot create $AO_MR_DIR/codex"
   # One watcher: a kernel lock the watcher keeps through exec, released
   # when it dies however it dies.

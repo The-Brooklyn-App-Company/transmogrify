@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   launchd user agent for tick.sh (macOS). Template: replace every @NAME@
-  (see scripts/README.md#scheduling), save as
+  (see ops/README.md#scheduling), save as
   ~/Library/LaunchAgents/@LABEL@.plist, then:
     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/@LABEL@.plist
   @LABEL@     reverse-DNS label, e.g. org.example.agent-operations.tick
@@ -18,7 +18,7 @@
 <dict>
   <key>Label</key><string>@LABEL@</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/sh</string><string>@KIT_DIR@/scripts/tick.sh</string></array>
+  <array><string>/bin/sh</string><string>@KIT_DIR@/ops/tick.sh</string></array>
   <key>EnvironmentVariables</key>
   <dict><key>AO_PROFILE</key><string>@PROFILE@</string></dict>
   <key>StartInterval</key><integer>600</integer>

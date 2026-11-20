@@ -11,7 +11,7 @@
 # never put in the message, so the delivering model never sees it; the
 # receiving session reads the files itself, as data.
 #
-# Mailroom (relay_bridge=on, the default; EXPERIMENTAL, docs/mailroom.md):
+# Mailroom (relay_bridge=on, the default; EXPERIMENTAL, docs/operations/mailroom.md):
 # for a claude or codex row with an addressable session, the message is
 # written as a ring into <bridge_dir>/<client>/ and the receiving app's
 # in-app bridge hands it off; the notes' custody passes to the ring. A

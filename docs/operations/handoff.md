@@ -4,7 +4,7 @@
 > low-risk operator. It gives routing, a redirect from the wrong side and a
 > human-confirmed takeover with cold notes. It does **not** give hard
 > exclusion or safe resumption after a crash. Test it with
-> [`TESTING.md`](../TESTING.md) before relying on it.
+> [`docs/operations/testing.md`](testing.md) before relying on it.
 
 A planned move of an operator between clients runs as the scripted
 checklist in [conventions](conventions.md#switching-an-operator-between-clients)
@@ -18,10 +18,10 @@ kit scripts:
 
 | Piece | Script | File |
 | --- | --- | --- |
-| Lease | `scripts/lease.sh` | `.operator/lease` (git-ignored) |
-| Mailbox | `scripts/mail.sh` | `.operator/inbox/{tmp,new,cur,done}/` |
-| Doorbells | `scripts/doorbell-claude.sh`, `doorbell-codex.sh` | none |
-| Asks and approvals | `scripts/ask.sh` | `ASKS.md` (home), `APPROVALS.tsv` (Oracle home) |
+| Lease | `ops/lease.sh` | `.operator/lease` (git-ignored) |
+| Mailbox | `ops/mail.sh` | `.operator/inbox/{tmp,new,cur,done}/` |
+| Doorbells | `ops/doorbell-claude.sh`, `doorbell-codex.sh` | none |
+| Asks and approvals | `ops/ask.sh` | `ASKS.md` (home), `APPROVALS.tsv` (Oracle home) |
 | Handoff note | `lease.sh release` (warm), `lease.sh takeover` (cold) | `HANDOFF.md` |
 
 ## Threat model
@@ -111,7 +111,7 @@ prints every unacked item; `mail.sh ack ID --did TEXT` records what was done
 and moves it to `done/`. Delivery is at-least-once; handle by id.
 
 A doorbell only says "you have mail". `mail.sh ring-all` (from a tick hook,
-see `examples/hooks/every/40-doorbells`) rings each holder while it has
+see `ops/examples/hooks/every/40-doorbells`) rings each holder while it has
 mail, again only when the pending set or the holder changes, or after
 `doorbell_rering_min` (60). With the [mailroom](mailroom.md) on and an
 actual session id, a doorbell is a ring for that app's bridge, with the
@@ -185,8 +185,8 @@ epoch: 12   from: claude/9f2c61d0   at: 2030-01-01T09:00:00Z   kind: warm|cold
 
 ## Switch-in audit
 
-One mechanism with the weekly cross-review ([K-22](../kit/KIT.md),
-`scripts/cross-review.sh`, `lib/registry.sh`). When an operator moves to the
+One mechanism with the weekly cross-review ([K-22](../../kit/KIT.md),
+`ops/cross-review.sh`, `lib/registry.sh`). When an operator moves to the
 other model family, the incoming family must, **before any new work**,
 audit adversarially what the outgoing family left: unfinished work, cruft,
 leftover worktrees and branches, and drift between notes and reality.
@@ -219,7 +219,7 @@ transport is `file-only`; `cross-review.sh` picks every reviewer from
 When the second client (say Codex beside Claude Code) joins, or after the
 two have drifted apart:
 
-1. `scripts/install.sh --dry-run sync codex`, then without `--dry-run`. For
+1. `ops/install.sh --dry-run sync codex`, then without `--dry-run`. For
    every registry row it adds only what is missing: `AGENTS.md` (Codex
    reads it), `CLAUDE.md` importing it (Claude Code), `settings/README.md`
    and `settings/handoff.md`, and `session.codex=<name>` in
@@ -230,7 +230,7 @@ two have drifted apart:
    first client; with one, the new session is the standby until a release
    or a takeover.
 3. Apply `settings/handoff.md` to each client yourself.
-4. `scripts/status.sh --drift` compares the registry, the lease holders,
+4. `ops/status.sh --drift` compares the registry, the lease holders,
    each home's instruction pointers and `operator.conf`, and the kit pin,
    and prints each mismatch with its fix: a missing home or pointer, an
    operator one client does not know, a renamed session or key, a stale
@@ -326,9 +326,9 @@ absolute path or a wrapper is not covered: keep the script's own
 refusals):
 
 ```
-prefix_rule(pattern=["scripts/lease.sh", "takeover"], decision="forbidden")
-prefix_rule(pattern=["sh", "scripts/lease.sh", "takeover"], decision="forbidden")
-prefix_rule(pattern=["scripts/lease.sh", ["unlock", "settle"]], decision="forbidden")
+prefix_rule(pattern=["ops/lease.sh", "takeover"], decision="forbidden")
+prefix_rule(pattern=["sh", "ops/lease.sh", "takeover"], decision="forbidden")
+prefix_rule(pattern=["ops/lease.sh", ["unlock", "settle"]], decision="forbidden")
 ```
 
 ## Limits
@@ -356,6 +356,6 @@ prefix_rule(pattern=["scripts/lease.sh", ["unlock", "settle"]], decision="forbid
 
 ## Cold handoff recovery record
 
-Before switching the holder, follow the [cold handoff checklist](../MANUAL.md#cold-handoff-checklist).
+Before switching the holder, follow the [cold handoff checklist](manual.md#cold-handoff-checklist).
 Record the actual incoming readback and ownership suppression test; planned
 switches and existing headless fixtures do not establish live acceptance.

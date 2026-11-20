@@ -1,7 +1,7 @@
 # Profile: custom. Any CLI that can take a prompt file and write a result.
 # Copy it outside git (default: ~/.config/agent-operations/profile) and edit.
-# Every key and its default: scripts/README.md#profile. The command
-# contract (run / deliver / activity) is in scripts/lib/vendor-custom.sh.
+# Every key and its default: ops/README.md#profile. The command
+# contract (run / deliver / activity) is in ops/lib/vendor-custom.sh.
 # The kit enforces the timeout and closes stdin; your command must keep
 # `run` read-only.
 
@@ -29,7 +29,7 @@ reviewer_timeout=2400
 review_family=single-model
 cross_review=on
 
-# Mailroom (experimental, docs/mailroom.md): the relay writes rings for the
+# Mailroom (experimental, docs/operations/mailroom.md): the relay writes rings for the
 # in-app bridges (install.sh bridge claude|codex); the supervisor falls back
 # to the relay transports above. off = deliver through the transports.
 relay_bridge=on

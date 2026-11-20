@@ -5,7 +5,7 @@
 #
 # Usage: cross-review.sh [--dry-run] [--key KEY]
 #
-# Meant to run from an hourly tick hook (examples/hooks/hourly/): each run
+# Meant to run from an hourly tick hook (ops/examples/hooks/hourly/): each run
 # reviews at most cross_review_per_run operators (default 1), each under
 # cross_review_timeout seconds (default 600), so one slow review never holds
 # the tick for long and the week's reviews spread over the hours after

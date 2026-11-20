@@ -35,7 +35,7 @@ test_dry_run_lists_everything_and_writes_nothing() {
     SCHEDULES.md KIT.local.md .gitignore operators/REGISTRY.tsv hooks/hourly/60-cross-review; do
     assert_has "$T/out" "would create  $T/ops/oracle/$f"
   done
-  assert_has "$T/out" "would create  $T/cfg/profile (from profiles/both.profile)"
+  assert_has "$T/out" "would create  $T/cfg/profile (from ops/profiles/both.profile)"
   assert_has "$T/out" "would commit"
   assert_no_file "$T/ops"
   assert_no_file "$T/cfg"
@@ -47,7 +47,7 @@ test_oracle_home_is_created_and_committed() {
   h=$T/ops/oracle
   assert_has "$h/AGENTS.md" "You are the Oracle"
   assert_lacks "$h/AGENTS.md" "@KIT_DIR@"
-  assert_has "$h/KIT.local.md" "version: $(cat "$KIT_DIR/VERSION")"
+  assert_has "$h/KIT.local.md" "version: $(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$KIT_DIR/package.json")"
   assert_has "$h/KIT.local.md" "kit: $KIT_DIR"
   assert_eq "$(cat "$h/CLAUDE.md")" "@AGENTS.md"
   assert_has "$h/operators/REGISTRY.tsv" "oracle${TAB}Oracle${TAB}$h${TAB}pending${TAB}claude"
@@ -232,7 +232,7 @@ test_sync_brings_a_second_client_up_to_date() {
   assert_has "$T/err" "x: home $T/ops/gone not found"
   assert_eq "$(cat "$w/CLAUDE.md")" "@AGENTS.md"
   assert_has "$w/settings/handoff.md" "lease.sh*takeover*"
-  assert_has "$w/settings/handoff.md" "$KIT_DIR/scripts/lease.sh"
+  assert_has "$w/settings/handoff.md" "$KIT_DIR/ops/lease.sh"
   assert_has "$w/operator.conf" "session.codex=Web"
   assert_has "$T/out" 'web: start a codex session in '"$w"' and name it "Web".'
   assert_has "$T/out" "status.sh --drift"
@@ -272,7 +272,7 @@ test_drift_names_renames_pins_and_stale_ids() {
   assert_has "$T/out" "web: client: no session name for codex"
   assert_has "$T/out" "fix: install.sh sync codex"
   assert_has "$T/out" "web: session: registered session id sid-gone has no claude transcript"
-  assert_has "$T/out" "web: pin: AGENTS.md cites kit version 0.1.0, this checkout is $(cat "$KIT_DIR/VERSION")"
+  assert_has "$T/out" "web: pin: AGENTS.md cites kit version 0.1.0, this checkout is $(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$KIT_DIR/package.json")"
   assert_has "$T/out" "oracle: pin: KIT.local.md pins kit 0.1.0"
   assert_has "$T/out" "oracle: pin: KIT.local.md pins commit abc1234"
 }
@@ -326,7 +326,7 @@ test_timers_are_rendered_not_loaded() {
   run install.sh timers --launchd
   assert_rc 0
   p=$T/user/Library/LaunchAgents/local.agent-operations.tick.plist
-  assert_has "$p" "$KIT_DIR/scripts/tick.sh"
+  assert_has "$p" "$KIT_DIR/ops/tick.sh"
   assert_has "$p" "<string>$AO_PROFILE</string>"
   assert_eq "$(grep -cE '@(LABEL|KIT_DIR|PROFILE|LOG_DIR)@' "$p")" 0 "placeholders left"
   assert_has "$T/out" "launchctl bootstrap gui/"
@@ -338,15 +338,15 @@ test_timers_are_rendered_not_loaded() {
 
 test_none_adapter() {
   for v in poll pr-poll status link review-request; do
-    "$KIT_DIR/adapters/none.sh" "$v" a b </dev/null >"$T/out" 2>&1
+    "$KIT_DIR/ops/adapters/none.sh" "$v" a b </dev/null >"$T/out" 2>&1
     assert_eq "$?:$(wc -c <"$T/out" | tr -d ' ')" "0:0" "none.sh $v"
   done
-  "$KIT_DIR/adapters/none.sh" get x </dev/null
+  "$KIT_DIR/ops/adapters/none.sh" get x </dev/null
   assert_eq "$?" 2 "none.sh get"
-  "$KIT_DIR/adapters/none.sh" notify high "disk almost full" </dev/null
+  "$KIT_DIR/ops/adapters/none.sh" notify high "disk almost full" </dev/null
   assert_eq "$?" 0 "none.sh notify"
   assert_has "$(ls "$T/home/inbox/oracle"/*-notify.md)" "[high] disk almost full"
-  "$KIT_DIR/adapters/none.sh" bogus </dev/null 2>/dev/null
+  "$KIT_DIR/ops/adapters/none.sh" bogus </dev/null 2>/dev/null
   assert_eq "$?" 3 "none.sh bogus"
 }
 
@@ -375,30 +375,30 @@ esac
 exit 0
 EOF
   chmod +x "$T/bin/gh"
-  "$KIT_DIR/adapters/git-gh.sh" pr-poll o/r </dev/null >"$T/out" 2>"$T/err"
+  "$KIT_DIR/ops/adapters/git-gh.sh" pr-poll o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$?" 0 "pr-poll"
   assert_eq "$(cat "$T/out")" "7${TAB}abc123${TAB}OPEN${TAB}NONE${TAB}https://git.example.com/o/r/pull/7"
-  "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+  "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cat "$T/out")" "abc123${TAB}success${TAB}https://ci.example.com/1"
-  FAKE_RUNS=running "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+  FAKE_RUNS=running "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cut -f 2 "$T/out")" pending "a running check"
-  FAKE_RUNS=failed "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+  FAKE_RUNS=failed "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cut -f 2 "$T/out")" failure "a failed check"
-  FAKE_RUNS=paged "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+  FAKE_RUNS=paged "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cut -f 2 "$T/out")" failure "a failure on a later page"
   FAKE_STATUS='{"state":"failure","total_count":120,"statuses":[{"state":"success"}]}' \
-    "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+    "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cut -f 2 "$T/out")" failure "the combined status counts"
-  FAKE_STATUS='{"state":"pending","statuses":[]}' "$KIT_DIR/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
+  FAKE_STATUS='{"state":"pending","statuses":[]}' "$KIT_DIR/ops/adapters/git-gh.sh" status abc123 o/r </dev/null >"$T/out" 2>"$T/err"
   assert_eq "$(cut -f 2,3 "$T/out")" "success${TAB}https://ci.example.com/2" "actions-only commit"
-  "$KIT_DIR/adapters/git-gh.sh" review-request 7 sam o/r </dev/null
+  "$KIT_DIR/ops/adapters/git-gh.sh" review-request 7 sam o/r </dev/null
   assert_eq "$?" 0 "review-request"
   assert_has "$FAKE_LOG" "pr edit 7 --add-reviewer sam --repo o/r"
-  FAKE_GH=down "$KIT_DIR/adapters/git-gh.sh" pr-poll o/r </dev/null >"$T/out" 2>/dev/null
+  FAKE_GH=down "$KIT_DIR/ops/adapters/git-gh.sh" pr-poll o/r </dev/null >"$T/out" 2>/dev/null
   assert_eq "$?:$(wc -c <"$T/out" | tr -d ' ')" "2:0" "unavailable is not empty"
-  FAKE_GH=auth "$KIT_DIR/adapters/git-gh.sh" pr-poll o/r </dev/null 2>/dev/null
+  FAKE_GH=auth "$KIT_DIR/ops/adapters/git-gh.sh" pr-poll o/r </dev/null 2>/dev/null
   assert_eq "$?" 3 "signed out is misconfigured"
-  "$KIT_DIR/adapters/git-gh.sh" status 'not-a-sha' o/r </dev/null 2>/dev/null
+  "$KIT_DIR/ops/adapters/git-gh.sh" status 'not-a-sha' o/r </dev/null 2>/dev/null
   assert_eq "$?" 3 "bad sha"
 }
 
@@ -409,7 +409,7 @@ test_the_relay_unit_watches_every_inbox_and_runs_standard() {
   assert_rc 0
   r=$T/user/Library/LaunchAgents/local.agent-operations.relay.plist
   t=$T/user/Library/LaunchAgents/local.agent-operations.tick.plist
-  assert_has "$r" "<string>$KIT_DIR/scripts/mailroom.sh</string><string>cycle</string>"
+  assert_has "$r" "<string>$KIT_DIR/ops/mailroom.sh</string><string>cycle</string>"
   assert_has "$r" "<string>$T/ops/oracle/inbox/oracle</string>"
   assert_has "$r" "<string>$T/ops/oracle/inbox/web</string>"
   assert_lacks "$r" "@WATCH_PATHS@"

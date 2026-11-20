@@ -1,17 +1,17 @@
 # Conventions
 
 The working conventions for running sessions in two desktop apps at once,
-Claude Code and Codex. Rules are cited by ID ([kit/KIT.md](../kit/KIT.md));
+Claude Code and Codex. Rules are cited by ID ([kit/KIT.md](../../kit/KIT.md));
 this page says how to apply them, and which script applies each one.
 
 ## One active side
 
 | Convention | Where it lives | Applied by |
 | --- | --- | --- |
-| **One active side per operator** ([K-13](../kit/KIT.md)): exactly one client and session run an operator; the other side is parked | The registry row (`client`, `session`) | `lane.sh switch` and `verify`; `lane.sh check` |
+| **One active side per operator** ([K-13](../../kit/KIT.md)): exactly one client and session run an operator; the other side is parked | The registry row (`client`, `session`) | `lane.sh switch` and `verify`; `lane.sh check` |
 | **The parked side stays dormant**: it does not act, write or coordinate; asked anything, it replies "parked" and names the active side | The first recovery step of every home's `AGENTS.md` (`lane.sh side <key>`) | `install.sh operator` (the template) |
-| **One active Oracle** ([K-13](../kit/KIT.md)): one client holds the Oracle role at a time | `operators/ORACLE-LOCK` in the Oracle home (`holder=`, `session=`, `since=`) | `lane.sh oracle-lock take`, only on the human's word ([K-01](../kit/KIT.md)); `lane.sh check`, `install.sh host` |
-| **Delegation goes to workers, not to the standby Oracle** | [K-23](../kit/KIT.md) | `worker-run.sh` |
+| **One active Oracle** ([K-13](../../kit/KIT.md)): one client holds the Oracle role at a time | `operators/ORACLE-LOCK` in the Oracle home (`holder=`, `session=`, `since=`) | `lane.sh oracle-lock take`, only on the human's word ([K-01](../../kit/KIT.md)); `lane.sh check`, `install.sh host` |
+| **Delegation goes to workers, not to the standby Oracle** | [K-23](../../kit/KIT.md) | `worker-run.sh` |
 
 ## Messages
 
@@ -19,11 +19,11 @@ this page says how to apply them, and which script applies each one.
 | --- | --- |
 | **Same app goes direct**: Claude to Claude with `SendMessage`, Codex to Codex with `send_message_to_thread`, in real time. No inbox file, no bridge, no double delivery | The sessions themselves |
 | **Cross-app, and anything a script sends, goes through the mailroom**: a note in the recipient's inbox, then the relay, a ring, and the receiving app's bridge ([mailroom](mailroom.md)) | `inbox-put.sh`, `relay.sh`, the bridges |
-| **Messages are pointers**: the relay's fixed message names the archived note files and a relay id, never the note text ([K-01](../kit/KIT.md)) | `relay.sh` |
+| **Messages are pointers**: the relay's fixed message names the archived note files and a relay id, never the note text ([K-01](../../kit/KIT.md)) | `relay.sh` |
 | **Steer or queue**: a note whose file name says `urgent` or `steer` steers (lands mid-turn); every other note queues until the target's turn ends | `relay.sh` (the ring name), the Codex watcher |
 | **Lanes are never pre-woken** ([mailroom](mailroom.md#one-rule)) | The supervisor wakes only the bridges |
-| **Short handoffs**: a task handed to another session says the outcome, a reference to its scope and authority (the mandate section, the ask id), the exact artifact or head, the acceptance test, what is excluded, and where to return; uncertainty and the one next step stay in the sender's notes | [Delegation packet](../templates/packets/delegation.md) |
-| **Never a config-only message**: no message to an idle session exists only to change its model or settings ([K-26](../kit/KIT.md)) | `operator.sh model` |
+| **Short handoffs**: a task handed to another session says the outcome, a reference to its scope and authority (the mandate section, the ask id), the exact artifact or head, the acceptance test, what is excluded, and where to return; uncertainty and the one next step stay in the sender's notes | [Delegation packet](../../ops/templates/packets/delegation.md) |
+| **Never a config-only message**: no message to an idle session exists only to change its model or settings ([K-26](../../kit/KIT.md)) | `operator.sh model` |
 
 ## Sidebar and titles
 
@@ -43,7 +43,7 @@ close a switch until they are marked done.
 
 ## Operator routines
 
-Every routine is a guided script with a verifier ([K-36](../kit/KIT.md)):
+Every routine is a guided script with a verifier ([K-36](../../kit/KIT.md)):
 it explains, asks only for the human's choices, does what a script can,
 prints each in-app step with what to do, and closes only when every step
 passes. Re-running is safe; `operator.sh verify KEY` re-checks the open
@@ -71,14 +71,14 @@ own session ([client capabilities](client-capabilities.md#models)).
 
 ## Switching an operator between clients
 
-A switch is a scripted checklist ([K-36](../kit/KIT.md)): `lane.sh switch`
+A switch is a scripted checklist ([K-36](../../kit/KIT.md)): `lane.sh switch`
 opens it, `lane.sh verify` checks every step in order and does the ones a
 script can do, and the switch closes only when every step passes.
 
 ```sh
-scripts/lane.sh switch web --to codex --session <thread-id>
-scripts/lane.sh verify web          # repeat; it says what is left
-scripts/lane.sh mark web labels --evidence 'sidebar listing shows "Web"'
+ops/lane.sh switch web --to codex --session <thread-id>
+ops/lane.sh verify web          # repeat; it says what is left
+ops/lane.sh mark web labels --evidence 'sidebar listing shows "Web"'
 ```
 
 | Step | What passes it | Who |
@@ -90,7 +90,7 @@ scripts/lane.sh mark web labels --evidence 'sidebar listing shows "Web"'
 | pins-claude | Claude sidebar as in the table above | `mark --evidence` (passes by itself when no side is Claude) |
 | pins-codex | Codex sidebar as in the table above | `mark --evidence` (passes by itself when no side is Codex) |
 | models | The incoming session was created with the model and effort in `operator.conf` for its client | `mark --evidence` |
-| switch-in | A move to the other model family has its switch-in audit recorded ([K-22](../kit/KIT.md)) | Incoming session (`lease.sh audit-done`) |
+| switch-in | A move to the other model family has its switch-in audit recorded ([K-22](../../kit/KIT.md)) | Incoming session (`lease.sh audit-done`) |
 | ack | The incoming session ran `lane.sh ack KEY TOKEN` (from Codex, its thread id must match), or a note to the Oracle quotes the token | Incoming session |
 
 In-app marks carry evidence: the app's own readback, or `gap: <why>` where
@@ -102,7 +102,7 @@ asks of its own app, then confirms.
 ## Holds, pauses and switches
 
 Every hold, pause or kill switch names an owner and an expiry
-([K-07](../kit/KIT.md)); an expired one is not obeyed, and the nightly
+([K-07](../../kit/KIT.md)); an expired one is not obeyed, and the nightly
 hygiene check reports it.
 
 | What | File | Set and clear |
@@ -114,16 +114,16 @@ hygiene check reports it.
 ## Reporting
 
 - Times for people are in the owner's local timezone, with the date;
-  convert UTC logs before quoting them ([K-12](../kit/KIT.md)).
+  convert UTC logs before quoting them ([K-12](../../kit/KIT.md)).
 - A claim names the mechanism and says whether it matches the agreed
-  design ([K-10](../kit/KIT.md)); a delivery that went by a slower tier is
+  design ([K-10](../../kit/KIT.md)); a delivery that went by a slower tier is
   a deviation the metrics show ([mailroom](mailroom.md#telemetry)).
 - A rule derived from the human's words quotes them, dated, and is marked
-  derived until the human confirms it ([K-32](../kit/KIT.md)).
+  derived until the human confirms it ([K-32](../../kit/KIT.md)).
 
 ## Clean as you go
 
-The nightly `hygiene.sh` ([example hook](../examples/hooks/daily/30-hygiene))
+The nightly `hygiene.sh` ([example hook](../../ops/examples/hooks/daily/30-hygiene))
 lists what to clean: holds that expired or lack an owner, expiry or reason,
 switches and routines open over a day, Codex threads marked unresponsive, the tier-1 kill switch left on, uncommitted work in any home,
 an `AGENTS.md` over 8000 bytes, expired quiet-list rows, delivered logs to

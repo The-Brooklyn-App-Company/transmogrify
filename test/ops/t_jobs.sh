@@ -20,7 +20,7 @@ reject() {
 }
 
 test_jobs_template_validates() {
-  run jobs.sh check "$SCRIPTS/../templates/oracle/JOBS.tsv"
+  run jobs.sh check "$SCRIPTS/templates/oracle/JOBS.tsv"
   assert_rc 0
   assert_eq "$(cat "$T/out")" ''
 }

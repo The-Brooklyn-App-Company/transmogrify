@@ -198,7 +198,7 @@ op_verify_create() {
     if op_marked "$_mk"; then ao_step PASS "$_mk" "marked"; continue; fi
     case $_mk in
       title) _do="title the session \"$_nm\"" ;;
-      pin) _do="pin it in the $_cl sidebar (active operators are pinned; docs/conventions.md)" ;;
+      pin) _do="pin it in the $_cl sidebar (active operators are pinned; docs/operations/conventions.md)" ;;
     esac
     ao_step TODO "$_mk" "$_do, then: operator.sh mark $_key $_mk"
   done

@@ -115,7 +115,7 @@ main() {
   adapter=$(ao_cfg githost none)
   case $adapter in
     none) ao_die "$AO_E_USAGE" "configure githost=gh or an executable adapter path in AO_PROFILE" ;;
-    gh) adapter=$AO_SCRIPTS/../adapters/git-gh.sh ;;
+    gh) adapter=$AO_SCRIPTS/adapters/git-gh.sh ;;
     *) adapter=$(ao_expand_path "$adapter") ;;
   esac
   [ -f "$adapter" ] && [ -x "$adapter" ] ||

@@ -2,7 +2,7 @@
 
 The team layer: parameters, team rules and conventions shared by every
 member's instance. Changed only by pull request; see the kit's
-docs/architecture.md, section Teams.
+docs/operations/architecture.md, section Teams.
 
 kit: <kit tag this team is pinned to>
 maintainer: <name>

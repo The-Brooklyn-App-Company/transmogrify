@@ -38,6 +38,11 @@ is not a Codex identity). A worked, fictional example is
 
 ## Rendering
 
+The renderers write client settings, so the first run asks before it runs
+them: `bootstrap.sh` shows both dry runs and writes only on a yes at the
+terminal or an explicit `--yes` (running without a terminal is not
+consent). Afterwards, re-render by hand whenever the grants file changes.
+
 - **Claude Code:** `grants.sh render-claude` writes one `autoMode.allow`
   entry per live grant into the settings file (profile key
   `grants_claude_settings`; default `settings.json` in `CLAUDE_CONFIG_DIR`
@@ -47,7 +52,8 @@ is not a Codex identity). A worked, fictional example is
   Every other key and entry stays byte for byte, a backup is written first,
   and `--prune` removes tagged entries no longer in the file.
 - **Codex:** `grants.sh render-codex --all` writes a managed root
-  `[auto_review]` table into each home's own `.codex/config.toml` (never
+  `[auto_review]` table into each home's own `.codex/config.toml`, the
+  Oracle home's included when a `codex: yes` grant names the Oracle (never
   the user config, whose `[projects]` tables take only `trust_level`):
   `policy` is the bundled default reviewer policy verbatim, then the
   preamble and the clauses of the grants that name that actor. A local
@@ -62,7 +68,7 @@ is not a Codex identity). A worked, fictional example is
   from that home's `.codex` layer; otherwise, or when the render is
   interrupted, the previous file is restored. Markers, keys and tables count
   only outside TOML strings, and the text outside the managed block must
-  survive byte for byte.
+  survive byte for byte, line endings included.
 
 ## Three states
 

@@ -233,7 +233,7 @@ with `lstat`; a symlink is refused before any move or permission change.
 ## Reporting a vulnerability
 
 Do not open a public issue containing secrets or exploit details. Use GitHub's
-[private vulnerability reporting form](https://github.com/nicholasgerard/transmogrify/security/advisories/new)
+[private vulnerability reporting form](https://github.com/<org>/transmogrify/security/advisories/new)
 with the affected Transmogrify version, provider/runtime tuple, sanitized
 reproduction, impact, and any suggested mitigation. Never include provider
 credentials, private transcripts, session identifiers, or unrelated paths.

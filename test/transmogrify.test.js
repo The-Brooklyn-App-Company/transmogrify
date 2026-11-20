@@ -44,5 +44,5 @@ test('umbrella forwards arguments and propagates the tool exit status', async ()
   assert.equal(JSON.parse(usage.stderr).code, 'USAGE_ERROR');
   const version = await runNodeScript('scripts/transmogrify.js', ['--version']);
   assert.equal(version.code, 0);
-  assert.match(version.stdout.trim(), /^\d+\.\d+\.\d+$/);
+  assert.match(version.stdout.trim(), /^\d+\.\d+\.\d+(?:-rc\.\d+)?$/);
 });

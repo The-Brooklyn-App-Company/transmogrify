@@ -73,7 +73,9 @@ Overlays hold deltas only: a parameter, an added rule, or
   observed on an existing macOS account/machine (versions and limits below);
   resume is not guaranteed. `doorbell_codex=queue` is a separate opt-in,
   still fakes only; live unrun.
-- **No AI attribution** in commits or messages unless you turn it on.
+- **No AI attribution** in commits or messages unless you turn it on; a
+  worker lane's commit still carries its provider's `Co-Authored-By`
+  trailer ([Dispatch](../DISPATCH.md)).
 
 ## Quick start
 
@@ -154,7 +156,7 @@ Highest stage reached for each piece, with the client, version and date.
 | `install.sh host`, `check.sh host` | Test suite with a fake `defaults`; `check.sh host` read-only on a real macOS host | 2026-11-19 |
 | `recover-context.sh` digest under 8 KB, current-state block, Codex sources | Test suite; Claude Code hook registration used; Codex hook registration **unverified** | 2026-11-19; the 10 KB hook-output limit it works around was observed, not documented |
 | `bootstrap.sh`, `operator.sh` (create, archive, model, session, recover) | Test suite with fakes; no live first run on a clean account yet | 2026-11-19 |
-| **Experimental:** mailroom (ladders, tier telemetry, supervisor, fingerprint and canaries, both tier-1 watchers, unknown-send reconciliation, thread recovery), `switch.sh`, `hygiene.sh`, `install.sh host --apply` | Test suite with fakes; the pattern ran in one private deployment, not this code; live restart recovery and Claude tier 1 against a real client **unverified** | [Mailroom](mailroom.md#what-is-proven), 2026-11-19 |
+| **Experimental:** mailroom (ladders, tier telemetry, supervisor, fingerprint and canaries, both tier-1 watchers, unknown-send reconciliation, thread recovery), `switch.sh`, `hygiene.sh`, `install.sh host --apply` | Test suite with fakes; live restart recovery and Claude tier 1 against a real client **unverified** | [Mailroom](mailroom.md#what-is-proven), 2026-11-19 |
 | systemd units, Linux hosts | **Untested** | |
 | Codex relay delivery | Live isolated kit relay → existing native app thread → recipient acknowledgement, macOS; negative cases use fakes | codex-cli 0.169.0-alpha.11.1, 2026-11-18; queue/resume warning observed before a later recipient turn; not a fresh account/machine |
 | **Experimental:** lease, standby redirect, forward, cold takeover, asks ledger ([handoff](handoff.md)) | Test suite; sandboxed end-to-end with both real CLIs, headless, `file-only` registry (validation table in [handoff](handoff.md#per-client-validation)) | Claude Code 2.1.322, codex-cli 0.169.0-alpha.11, 2026-11-17. **Not yet** the live test on a real operator ([docs/operations/testing.md](testing.md)) |

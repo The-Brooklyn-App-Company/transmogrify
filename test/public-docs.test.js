@@ -135,20 +135,27 @@ function compareVersions(left, right) {
 // A release turns `## <version> (in progress)` into `## <version>` in the same
 // commit that sets the version everywhere else; the top heading is the only
 // one allowed to carry the suffix, and only for a version newer than the
-// package.
+// package. A release candidate (`2.0.0-rc.1`) is not a release: its notes stay under
+// `## 2.0.0 (in progress)` until 2.0.0 itself ships.
 test('the changelog headings follow the package version', () => {
-  const version = JSON.parse(read('package.json')).version;
+  const [version, candidate] = JSON.parse(read('package.json')).version.split('-');
   const headings = [...read('CHANGELOG.md').matchAll(/^## (\d+\.\d+\.\d+)(.*)$/gm)]
     .map((match) => ({ version: match[1], suffix: match[2].trim() }));
   assert.ok(headings.length > 0, 'CHANGELOG.md has no version headings');
-  assert.ok(headings.some((entry) => entry.version === version && entry.suffix === ''),
-    `CHANGELOG.md has no released heading for ${version}`);
   const [top, ...rest] = headings;
-  if (top.version === version) {
-    assert.equal(top.suffix, '', 'the released heading carries no suffix');
+  if (candidate) {
+    assert.match(candidate, /^rc\.\d+$/, 'only release candidates carry a suffix');
+    assert.equal(top.version, version, 'a release candidate\'s notes sit under its release heading');
+    assert.equal(top.suffix, '(in progress)', 'a release candidate\'s heading still reads "(in progress)"');
   } else {
-    assert.equal(top.suffix, '(in progress)', 'an unreleased top heading reads "(in progress)"');
-    assert.ok(compareVersions(top.version, version) > 0, 'the in-progress version must be newer than the package version');
+    assert.ok(headings.some((entry) => entry.version === version && entry.suffix === ''),
+      `CHANGELOG.md has no released heading for ${version}`);
+    if (top.version === version) {
+      assert.equal(top.suffix, '', 'the released heading carries no suffix');
+    } else {
+      assert.equal(top.suffix, '(in progress)', 'an unreleased top heading reads "(in progress)"');
+      assert.ok(compareVersions(top.version, version) > 0, 'the in-progress version must be newer than the package version');
+    }
   }
   for (const entry of rest) {
     assert.doesNotMatch(entry.suffix, /in progress|unreleased/i, `${entry.version} still reads as unreleased`);

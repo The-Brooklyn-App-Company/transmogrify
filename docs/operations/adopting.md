@@ -20,8 +20,7 @@ repository ([K-18](../../kit/KIT.md)). Nothing else crosses.
 
 Do not clone or copy the maintainer's homes, registry, grants or profile
 to save time: they name another person's sessions, approvals and paths, and
-the checks will flag them as drift at best. Start fresh; it takes about an
-hour.
+the checks will flag them as drift at best. Start fresh.
 
 ## Before you start
 
@@ -111,7 +110,7 @@ every approval comes to your Oracle as an ask.
 Done means the whole thing works end to end ([K-11](../../kit/KIT.md)):
 
 - [ ] `bootstrap.sh status` lists nothing left.
-- [ ] `sh "$SKILL_ROOT/ops/check.sh" host` and `ops/status.sh` are clean.
+- [ ] `sh "$SKILL_ROOT/ops/check.sh" host` and `sh "$SKILL_ROOT/ops/status.sh"` are clean.
 - [ ] A note written with `ops/inbox-put.sh` to your operator arrives in
       its app, and `ops/mailroom.sh metrics` shows the tier it took.
 - [ ] A note to your operator in the *other* app arrives through that

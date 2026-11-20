@@ -13,7 +13,7 @@ state. Never copy a real instance inventory into the public kit (K-31).
 
 | Item | Suggested location | Custody |
 | --- | --- | --- |
-| Pinned kit checkout | `~/src/agent-operations` | Released rules and scripts |
+| Pinned Transmogrify install | `~/.agents/skills/transmogrify` (from a release tag) | Released rules and scripts |
 | Oracle home | `~/ops/oracle` | Backlog, journal, grants and registry |
 | Embedded operator home | `~/ops/oracle/operators/web` | One outcome, mandate and notes |
 | Canonical work repository | `~/src/app-web` | Integration checkout and retained Git history |
@@ -37,10 +37,11 @@ that require JSON validation. Linux units exist but remain untested. Existing
 account setup is an owner action; installation never initiates sign-in.
 
 ```sh
-git clone <kit-url> ~/src/agent-operations
-cd ~/src/agent-operations
+git clone https://github.com/<org>/transmogrify.git ~/src/transmogrify
+cd ~/src/transmogrify
 git checkout <reviewed-release-tag>
-ops/bootstrap.sh     # guided: this section and section 5 in one run
+npm ci --ignore-scripts && ./install.sh      # or the start prompt
+sh ~/.agents/skills/transmogrify/ops/bootstrap.sh   # guided: this section and section 5 in one run
 ```
 
 [`bootstrap.sh`](hosts-and-ci.md#first-run) runs the steps below for

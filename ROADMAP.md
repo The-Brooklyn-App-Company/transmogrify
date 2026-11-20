@@ -1,5 +1,33 @@
 # Roadmap
 
+## 2.0: one operating system for a small agent team
+
+2.0 joins the operations layer (the former Agent Operations kit) and the
+worker-lane skill into one install. Scope: Claude Code and Codex, macOS
+first, Linux best effort for the `sh` layer.
+
+Before `2.0.0` ships (`2.0.0-rc.1` is local only, 2026-11-20):
+
+- The fresh-machine acceptance pass below, for both layers, on a machine
+  that has never run either.
+- The operations layer's live tests ([testing](docs/operations/testing.md)):
+  mailroom delivery and restart recovery against the real apps, a switch,
+  thread recovery.
+- Grants rendered and probed against real Claude Code and Codex configs.
+- Worker completions through the mailroom proven live, then made the
+  default and the separate wake path removed (K-36).
+- `/start` generated for 2.0 from the new repository, offering the
+  operations first run.
+
+Next:
+
+- **Antigravity** as a third client, through the client-capabilities
+  contract ([client capabilities](docs/operations/client-capabilities.md)),
+  only once its mechanisms are measured.
+- 2.1 removes the deprecated `ops/lane.sh` alias.
+- Linux hosts for the operations layer (systemd units) move from best effort
+  to supported only after a live run.
+
 ## Direction
 
 The destination is one operator skill that can be loaded by either Codex or

@@ -1,6 +1,6 @@
 {
-  "name": "@nicholasgerard/transmogrify",
-  "version": "0.6.2",
+  "name": "transmogrify",
+  "version": "2.0.0-rc.1",
   "private": true,
   "description": "Operate exact-owned Codex and Claude Code lanes with receipt-gated native app visibility, provider-specific steering, recovery, retirement, and worktree cleanup.",
   "license": "MIT",
@@ -10,10 +10,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nicholasgerard/transmogrify.git"
+    "url": "git+https://github.com/<org>/transmogrify.git"
   },
   "bugs": {
-    "url": "https://github.com/nicholasgerard/transmogrify/issues"
+    "url": "https://github.com/<org>/transmogrify/issues"
   },
   "homepage": "https://transmogrify.sh",
   "keywords": [

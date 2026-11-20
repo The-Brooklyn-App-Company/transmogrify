@@ -2,19 +2,109 @@
 
 ## 2.0.0 (in progress)
 
-- **One project for both layers.** The Agent Operations kit joins
-  Transmogrify as its operations layer, history included (imported under
-  `ops/` with `git subtree`): the rules in `kit/KIT.md` keep their IDs, the
-  kit's docs move to `docs/operations/`, its POSIX sh tools to `ops/`, its
-  skills beside `SKILL.md` in `skills/`, and its sh and dash suite to
-  `test/ops/`, which CI runs as its own job with `shellcheck` and
-  `check.sh kit`. The worker-lane tools under `scripts/` are unchanged.
-  The rules file's byte budget is now 11100 bytes, for the longer v2 paths.
+Release candidate `2.0.0-rc.1` (2026-11-20), local only: not tagged,
+published or installed by `/start`.
+
+Transmogrify is now an operating system for a small team of long-running AI
+agents on your own always-on Mac, across Claude Code and Codex: the Agent
+Operations kit (0.3.1) joins the worker-lane skill (0.6.2) as one project,
+one install and one first run. Scope: Claude Code and Codex, macOS first,
+Linux best effort for the `sh` layer; Antigravity is on the roadmap.
+
+- **One project for both layers.** The kit is imported with its history
+  (`git subtree` under `ops/`, no squash): the rules in `kit/KIT.md` keep
+  their IDs, the kit's docs move to `docs/operations/`, its POSIX sh tools
+  to `ops/`, its skills beside `SKILL.md` in `skills/`, and its sh and dash
+  suite to `test/ops/`, which CI runs as its own job with `shellcheck` and
+  `check.sh kit`. The rules file's byte budget is 11100 bytes.
+- **One install, pinned.** `./install.sh` (and the start prompt) copies
+  `ops/`, `kit/` and `skills/` with the worker tools, from a release tag or
+  the pinned release commit; one version for both layers (`package.json`).
+- **One first run.** `doctor.js --operations` adds the operations layer's
+  read-only host checks as non-blocking owner actions; `setup.js
+  --apply-host` applies them on consent; `bootstrap.sh` stays the sh entry
+  point and now also offers to write the grants (below).
+- **Approvals that follow an operator** (`ops/grants.sh`, new). One
+  client-neutral grants file in the Oracle home, rendered into Claude
+  Code's `autoMode.allow` (tagged entries only, every other byte kept) and a
+  managed `[auto_review]` block in each home's own `.codex/config.toml`
+  (the Oracle home's too, for grants marked for Codex), read back through
+  `codex app-server` and rolled back on failure; a three-state check
+  (rendered, resolved, accepted) run nightly, by the first run and by
+  `switch.sh`, which refuses a switch until the target side matches. The
+  first run writes client settings only after a consent step: a yes at the
+  terminal, or an explicit `--yes`. Never run against a real client config
+  yet.
+- **Worker completions through the mailroom**, behind
+  `TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`: a child's wake becomes a note in
+  its parent's inbox. The default is unchanged until a live proof.
+- **`lane.sh` is now `switch.sh`.** Moving an operator between apps is a
+  switch; "lane" means only a worker lane. `ops/lane.sh` stays for 2.0.x as
+  a deprecated alias (same arguments, one warning) and is removed in 2.1.
+  The switch's inbox notes are named `switch-out`, `switch-in` and
+  `switched`.
+- **K-11: done is end to end.** Done means the whole user-visible behavior
+  works in a staging or real environment, shown by a walk with screenshots;
+  every build is scoped by the user surfaces it touches. The operator home
+  template gains a build checklist and the delegation packet's acceptance
+  criteria start and end with those two steps.
+- **The operations layer speaks as Transmogrify:** new homes cite the
+  "Transmogrify operations kit"; `status.sh --drift` still reads homes that
+  cite the "Agent Operations kit".
 - **No Apple Events on read paths.** The doctor finds the ChatGPT desktop
   app from its standard locations and then Spotlight (`mdfind`), never
-  through `osascript`, so a check can no longer raise a macOS Automation
-  prompt on an unattended host. The consented relaunch quit is the only
-  Apple Events call left, and a test keeps it that way.
+  through `osascript`; the consented relaunch quit is the only Apple Events
+  call left, and a test keeps it that way.
+- **Byte-exact renders and safer host apply** (review fixes): the grants
+  renderers keep every byte outside what they manage (formatting, escapes,
+  CRLF line endings); host backups of the two bridges' duty files no longer
+  share a name; routine commits take only their own paths and leave other
+  staged work alone.
+- A new README, one skill index (`skills/README.md`), site copy for the
+  existing site (`site/site-content.md`), and a guide for a second person
+  adopting on their own machine (`docs/operations/adopting.md`).
+
+### Migrating from Agent Operations 0.3.x (kit users)
+
+- **Paths.** Scripts moved from `scripts/` to `ops/` (same names and
+  layout inside), templates, profiles, adapters and examples to `ops/`,
+  docs to `docs/operations/`, rules stay in `kit/KIT.md`. Update any hook,
+  timer or note that names a kit path; `install.sh host --apply` re-renders
+  both launchd units and the bridge duty files with the new paths.
+- **Unchanged:** profile keys, the profile path
+  (`~/.config/agent-operations/profile`), the state directory
+  (`~/.local/state/agent-operations`), launchd labels
+  (`local.agent-operations.*`), registry and home formats, rule IDs.
+- **`lane.sh` → `switch.sh`.** Same subcommands and exit codes. Existing
+  homes' `AGENTS.md` parked-side guard still calls `lane.sh side`, which
+  keeps working through the alias in 2.0.x; change that line to
+  `switch.sh side` (as in `ops/templates/home/AGENTS.md`) before 2.1.
+  `install.sh sync` adds only missing files and never rewrites it.
+- **Grants.** `MANDATE.md` grants keep working; to have them follow an
+  operator across apps, write `operators/GRANTS.md` from the template and
+  run `bootstrap.sh` (or `grants.sh render-claude` and `render-codex --all`).
+- **`bootstrap.sh status`** no longer sends the first-run test note; only
+  `bootstrap.sh` itself does.
+- **Install.** Replace the pinned kit checkout with a Transmogrify release
+  tag (or the start prompt). Each home's `AGENTS.md` names the kit folder
+  and version it was created from; update that line (and `KIT.local.md`'s
+  pin) to the new location by hand; `status.sh --drift` flags a version
+  that differs.
+
+### Migrating from Transmogrify 0.6.x (worker-lane users)
+
+- **Nothing to change for lanes.** `scripts/lane.js` and every other Node
+  tool keep their commands, options, exit codes, output contract and
+  records; the skill installs to the same folders.
+- The install now also carries `ops/`, `kit/` and `skills/`. They do
+  nothing until you run `bootstrap.sh`.
+- The doctor adds host checks only with `--operations`; without it, its
+  output is unchanged.
+- The package version now allows a release-candidate suffix
+  (`2.0.0-rc.1`); provider `clientInfo` reports it as is.
+- The project moves to a new repository, `<org>/transmogrify`; the old
+  one is archived with a pointer. Re-clone from the new one; tags restart
+  there at `v2.0.0`.
 
 ## 0.6.2
 

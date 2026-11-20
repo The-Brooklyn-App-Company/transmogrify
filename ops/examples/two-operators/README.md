@@ -12,8 +12,8 @@ here is fictional.
 ## Setup
 
 ```sh
-git clone <kit-url> ~/src/agent-operations && cd ~/src/agent-operations
-git checkout v0.2.0
+git clone https://github.com/<org>/transmogrify.git ~/src/transmogrify && cd ~/src/transmogrify
+git checkout v2.0.0
 ops/install.sh --dry-run oracle ~/ops/oracle
 ops/install.sh oracle ~/ops/oracle
 $EDITOR ~/.config/agent-operations/profile      # from ops/profiles/both.profile

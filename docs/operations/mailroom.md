@@ -230,6 +230,5 @@ without a session id always do.
 | Piece | Status |
 | --- | --- |
 | Relay rings, ladders, telemetry rows, metrics, supervisor (re-arm per app process, relaunch, deep-link wake and return, fingerprint, canary, degradation alarm, tier 4, unknown-send reconciliation, thread recovery), both watchers, installer, first run | Test suite (`test/ops/t_mailroom.sh`, `t_operator.sh`, `t_switch.sh`, `t_install.sh`, `t_bootstrap.sh`) against fakes: a fake peer socket, a fake app tool server, fake rollouts, `lsappinfo`, `open`, `launchctl`; macOS, 2026-11-19 |
-| The pattern (relay, ring, bridge with a kqueue watcher, `SendMessage` by session id; a Codex watcher sending natively and steering mid-turn; a model-free socket send to a warm Claude session) | Observed in one private deployment, 2026-11-19; not yet this kit's code |
 | Live restart recovery, `SendMessage` to a cold session, deep-link wake, Codex queue on a real turn-complete event, thread recovery on a real thread | **Unverified**: the live acceptance tests in [docs/operations/testing.md](testing.md#mailroom-live-acceptance) |
 | Linux | No push watch (kqueue is macOS); the relay timer runs every minute. **Untested** |

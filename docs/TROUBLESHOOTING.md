@@ -677,13 +677,13 @@ reconciliation cannot acknowledge a manual removal.
 
 ## Getting help
 
-Use [GitHub Discussions](https://github.com/nicholasgerard/transmogrify/discussions)
-for setup questions and [GitHub Issues](https://github.com/nicholasgerard/transmogrify/issues)
+Use [GitHub Discussions](https://github.com/<org>/transmogrify/discussions)
+for setup questions and [GitHub Issues](https://github.com/<org>/transmogrify/issues)
 for reproducible defects. For private support, privacy, or conduct matters,
 email [support@thebkapp.co](mailto:support@thebkapp.co), but do not send
 credentials, private transcripts, or session identifiers in ordinary email.
 Report sensitive security findings through the
-[private vulnerability form](https://github.com/nicholasgerard/transmogrify/security/advisories/new),
+[private vulnerability form](https://github.com/<org>/transmogrify/security/advisories/new),
 not a public issue.
 
 ## Clone harvest or identity refusal

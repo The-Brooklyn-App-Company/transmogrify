@@ -1,6 +1,6 @@
 # shellcheck shell=sh disable=SC2034
 # (SC2034: the AO_* globals set here are read by the sourcing scripts.)
-# core.sh - shared foundation for the agent-operations scripts.
+# core.sh - shared foundation for the operations layer's scripts.
 #
 # Sourced, never executed. Provides: messages and exit codes, profile loading,
 # path resolution, one-shot clock, file helpers, temp-file cleanup, locking,

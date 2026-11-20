@@ -131,10 +131,10 @@ The takeover, settle and unlock tests drive a pseudo-terminal with
 Pick an operator whose work is low-risk (no deploys, no external writes
 during the test) and which has a session on each client. Below its key is
 `demo` and its home `~/ops/demo`; replace both. Keep a terminal open in the
-home. `K` is your kit checkout:
+home. `K` is your installed Transmogrify:
 
 ```sh
-K=~/src/agent-operations; H=~/ops/demo; cd "$H"
+K=~/.agents/skills/transmogrify; H=~/ops/demo; cd "$H"
 ```
 
 ### Prepare (once)

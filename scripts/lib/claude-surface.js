@@ -214,8 +214,11 @@ function appendExecutionArgs(args, options = {}) {
       throw new ClaudeSurfaceError('USAGE_ERROR', 'Claude settings file must be an absolute path');
     }
     args.push('--settings', options.settingsFile);
-  } else if (options.fastMode !== undefined) {
-    args.push('--settings', JSON.stringify({ fastMode: options.fastMode }));
+  } else if (options.fastMode !== undefined || options.extraSettings) {
+    args.push('--settings', JSON.stringify({
+      ...(options.fastMode !== undefined ? { fastMode: options.fastMode } : {}),
+      ...(options.extraSettings || {}),
+    }));
   }
   return args;
 }

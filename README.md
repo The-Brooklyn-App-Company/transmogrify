@@ -219,7 +219,9 @@ applies the same host steps from the Node side.
 - **Agents act as you** (K-30): where you have authorized an agent to act
   for you (commits, pull requests, comments, messages on GitHub, a tracker or
   chat), the result carries no agent or model tag, trailer or signature.
-  Worker lanes follow the same rule. Set `attribution=disclose` in the
+  Worker lanes follow the same rule, and the first run switches off Claude
+  Code's own commit and pull-request attribution on your yes (Codex has no
+  such setting as of codex-cli 0.169.1). Set `attribution=disclose` in the
   profile to opt in.
 
 ## Support matrix

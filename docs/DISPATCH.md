@@ -337,7 +337,10 @@ is exactly that HEAD. It never pushes. A clone with uncommitted changes needs
 tracked and untracked seat changes except the recorded provisions and
 `.transmogrify/`, then commits with the operator's Git identity (and the
 provider's `Co-Authored-By` trailer only with `attribution=disclose`), then
-fetches the new commit. The fallback
+fetches the new commit. The commit message's digest is journaled when the harvest starts and
+recomputed on resume, so change the attribution setting only with no
+`harvest --commit` pending: a resumed harvest whose message differs stops
+with `HARVEST_MISMATCH`. The fallback
 accepts a title and body without a SHA. A SHA line containing anything other
 than one full 40-hex SHA is treated as absent. The result's `childReportedCommit`
 records whether the child supplied a valid commit SHA, even when the operator

@@ -239,6 +239,29 @@ test_codex_hook_is_written_on_consent_trusted_by_the_owner_then_checked() {
   assert_has "$T/out" "Your Codex hooks live in $CODEX_HOME/config.toml"
 }
 
+test_claude_attribution_is_switched_off_on_consent() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  mkdir -p "$CLAUDE_CONFIG_DIR"
+  printf '{\n  "model": "x"\n}\n' >"$CLAUDE_CONFIG_DIR/settings.json"
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  assert_has "$T/out" "8. No agent tags in Claude Code"
+  assert_lacks "$CLAUDE_CONFIG_DIR/settings.json" "attribution"
+  assert_has "$T/out" "TODO  attribution"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$CLAUDE_CONFIG_DIR/settings.json" '"attribution": {"commit": "", "pr": ""}'
+  assert_has "$CLAUDE_CONFIG_DIR/settings.json" '"includeCoAuthoredBy": false'
+  assert_has "$CLAUDE_CONFIG_DIR/settings.json" '"model": "x"'
+  assert_has "$T/out" "PASS  attribution   Claude Code adds no commit or pull-request attribution"
+  # attribution=disclose in the profile: nothing to switch off.
+  printf '{}\n' >"$CLAUDE_CONFIG_DIR/settings.json"
+  printf 'attribution=disclose\n' >>"$AO_PROFILE"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_eq "$(cat "$CLAUDE_CONFIG_DIR/settings.json")" '{}'
+  assert_has "$T/out" "PASS  attribution   the profile discloses agent attribution"
+}
+
 test_claude_hook_and_sign_in_are_parsed_not_matched() {
   [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
   fresh

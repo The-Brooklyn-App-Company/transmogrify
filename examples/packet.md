@@ -20,8 +20,8 @@ Replace this paragraph with the exact files and behavior this lane owns.
 - Reproduce the target behavior and implement only the authorized change.
 - Replace `<acceptance-command>` with an exact safe command, then run it.
 - Commit the authorized changes in the assigned clone on its current branch.
-  Use a clear imperative title, a body, and the provider attribution trailer
-  supplied by the exchange preamble.
+  Use a clear imperative title and a body, with no agent or model
+  attribution unless the exchange preamble asks for a trailer.
 - Write the handback using `examples/handback.md` as the format: title, body,
   full commit SHA, changes, checks, unverified work, and operator decisions.
 - If the seat cannot commit, omit the SHA and explain the failure in

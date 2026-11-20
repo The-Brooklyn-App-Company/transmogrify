@@ -165,7 +165,10 @@ surface disables archival until reverified.
 
 New managed seats are ordinary clones whose Git metadata lives in their own `.git`. Children
 can commit their assigned work with the operator's configured Git identity.
-The injected provider trailer supplies attribution. Children must stay on the
+They add no agent or model attribution unless the operations profile sets
+`attribution=disclose` (then the preamble asks for the provider trailer, and
+Claude children launch with Claude Code's own attribution left on). Children
+must stay on the
 assigned branch and never push. Every Codex turn started for a managed clone,
 including a recovery turn, receives a `workspaceWrite` policy whose only extra
 writable root is that clone's `.git`. Network access stays disabled, temporary

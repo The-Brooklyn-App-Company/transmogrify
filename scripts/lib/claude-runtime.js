@@ -19,6 +19,7 @@ const { childHooksPath, failDispatch, watcherPaths } = require('./dispatch');
 const { AdapterError, deadlineFor } = require('./adapter-kit');
 const { sleep } = require('./async');
 const { verifyLaneSeat } = require('./worktree');
+const { claudeAttributionSettings } = require('./attribution');
 
 // A child launched for a parent carries session hooks (through the CLI's
 // --settings) whose only action is to touch the parent's watcher nudge file
@@ -47,6 +48,7 @@ function writeChildHooksSettings(laneId, parentRef, execution, env) {
   const hook = [{ hooks: [{ type: 'command', command, timeout: 5 }] }];
   const settings = {
     ...(execution?.fastMode !== undefined ? { fastMode: execution.fastMode } : {}),
+    ...claudeAttributionSettings(env),
     hooks: { Stop: hook, SessionEnd: hook, Notification: hook },
   };
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });

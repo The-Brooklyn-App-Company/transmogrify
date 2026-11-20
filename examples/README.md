@@ -126,7 +126,8 @@ Harvest parses the bounded handback, verifies its SHA against the seat HEAD,
 fetches the clone commit into the operator repository under a fast-forward
 check, and preserves an immutable durable handback. If the child could not
 commit, it omits the SHA and explains why; the operator can run the same command
-with `--commit` to commit the reviewed changes with provider attribution.
+with `--commit` to commit the reviewed changes (provider attribution only
+under `attribution=disclose`).
 
 Harvest removes only matching recorded provisions and returns `retireCommand`
 with its `handbackSha256`. Run that exact command. For Claude, add

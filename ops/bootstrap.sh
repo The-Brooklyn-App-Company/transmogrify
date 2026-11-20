@@ -36,6 +36,9 @@
 #      Codex's own hooks/list read back (enabled, trusted at the current
 #      hash), then one isolated read-only `codex exec` check that the
 #      digest arrives
+#   8. Claude Code's own commit and pull-request attribution switched off
+#      in its settings (K-30: agents act as the user), on consent, unless
+#      the profile says attribution=disclose
 # Then the checklist: each in-app step with what to do and the check that
 # proves it (a registry id, the Codex watcher's heartbeat, a test note's
 # delivery); steps no script can see are confirmed with `bootstrap.sh mark`.
@@ -200,7 +203,49 @@ bs_run() {
   fi
   bs_grants
   bs_hooks
+  bs_attribution
   bs_checklist_loop
+}
+
+# ---------------------------------------------------------------- attribution
+# K-30: agents act as the authorized user. Claude Code adds its own commit
+# trailer and pull-request footer unless its settings switch them off
+# (`attribution`: {"commit": "", "pr": ""}; `includeCoAuthoredBy`: false for
+# older clients). Step 8 sets both in the Claude settings file on consent,
+# unless the profile says attribution=disclose; the checklist reads them.
+
+bs_attr_disclosed() { [ "$(ao_cfg attribution none)" = disclose ]; }
+
+bs_attribution() {
+  bs_uses claude || return 0
+  bs_attr_disclosed && return 0
+  _at_s=$(bs_claude_settings)
+  [ "$(bs_fr claude-attribution "$_at_s" | cut -f 1)" = ok ] && return 0
+  ao_explain "8. No agent tags in Claude Code" \
+    "Agents act as you (K-30): commits and pull requests made for you carry no agent" \
+    "or model tag. Claude Code adds one unless its settings switch it off, so this sets" \
+    "\"attribution\": {\"commit\": \"\", \"pr\": \"\"} and \"includeCoAuthoredBy\": false in $_at_s," \
+    "keeping every other byte, after a backup. It asks first. (attribution=disclose in the" \
+    "profile keeps the tags instead.)"
+  if [ -n "${_yes-}" ] || ao_consent "Switch off Claude Code's commit and pull-request attribution in $_at_s?"; then
+    _at_r=$(bs_fr claude-attribution-write "$_at_s")
+    case $_at_r in
+      written*) echo "   written: $_at_s (backup: ${_at_r#*"$AO_TAB"})" ;;
+      unchanged) echo "   already set: $_at_s" ;;
+      *) echo "   not written: ${_at_r#*"$AO_TAB"}" ;;
+    esac
+  else
+    echo "   Not written (no consent): run bootstrap.sh at a terminal or with --yes."
+  fi
+}
+
+bs_attribution_row() {
+  bs_uses claude || return 0
+  if bs_attr_disclosed; then ao_step PASS attribution "the profile discloses agent attribution (attribution=disclose)"; return; fi
+  _ar_s=$(bs_claude_settings)
+  _ar_v=$(bs_fr claude-attribution "$_ar_s")
+  if [ "${_ar_v%%"$AO_TAB"*}" = ok ]; then ao_step PASS attribution "Claude Code adds no commit or pull-request attribution ($_ar_s)"
+  else ao_step TODO attribution "${_ar_v#*"$AO_TAB"}: bootstrap.sh sets \"attribution\": {\"commit\": \"\", \"pr\": \"\"} and \"includeCoAuthoredBy\": false in $_ar_s on your yes (or add them yourself); the checklist then reads them"; fi
 }
 
 # ---------------------------------------------------------------- recovery hooks
@@ -301,6 +346,7 @@ bs_hooks() {
   BS_HOOK_STATUS=''
   case $(bs_codex_hook_status "$_hk_cli") in
     trusted*) echo "   Codex reports the hook as trusted."; return 0 ;;
+    disabled) printf '   The hook is disabled in Codex: run "%s" -C "%s", type /hooks, enable SessionStart, then /exit.\n' "$_hk_cli" "$AO_HOME"; return 0 ;;
     error*) echo "   Codex did not answer hooks/list ($(bs_codex_hook_status "$_hk_cli" | cut -f 2)); run bootstrap.sh again later."; return 0 ;;
     none)
       if [ -f "$_hk_d/hooks.json" ]; then
@@ -536,6 +582,7 @@ bs_checklist() {
   elif _gc=$(sh "$AO_SCRIPTS/grants.sh" check --findings 2>&1); then ao_step PASS grants "rendered and resolved on both clients"
   else ao_step TODO grants "$(printf '%s\n' "$_gc" | sed -n 's/^- grants: //p' | head -n 1) (review, then grants.sh render-claude / render-codex --all)"; fi
   bs_hook_rows
+  bs_attribution_row
   bs_signin_rows
   bs_restart_row
   bs_pin_rows

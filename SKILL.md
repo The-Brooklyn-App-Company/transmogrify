@@ -432,8 +432,9 @@ bound lane keeps its state. Retirements are never abandoned.
 Every spawned child receives `.transmogrify/packet.md` in its seat and must
 write `.transmogrify/handback.md`. A child may edit only its seat and `/tmp`.
 New managed seats are clones with their own Git metadata. The child commits
-on its current branch with the provider trailer injected by spawn, never
-pushes or changes branches, and ends the handback's Commit section with
+on its current branch with no agent or model attribution (the provider
+trailer only under `attribution=disclose`, K-30), never pushes or changes
+branches, and ends the handback's Commit section with
 `SHA: <full commit SHA>`. It must not write operator state. After the child is
 idle, fetch and verify its work from the operator process:
 

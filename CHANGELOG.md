@@ -69,7 +69,12 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   `attribution=disclose`. Worker lanes now follow it: the exchange preamble
   tells a child to add no attribution, and `harvest --commit` adds no
   `Co-Authored-By` trailer, unless `attribution=disclose` (or
-  `TRANSMOGRIFY_ATTRIBUTION=disclose`) is set.
+  `TRANSMOGRIFY_ATTRIBUTION=disclose`) is set. Claude children launch with
+  Claude Code's own `attribution` and `includeCoAuthoredBy` switches off,
+  and the first run sets the same in the Claude settings file on consent
+  (checklist row `attribution`). Finish any pending `harvest --commit`
+  before changing the setting: a resumed harvest recomputes its commit
+  message and refuses a mismatch.
 - **Worker completions through the mailroom**, behind
   `TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`: a child's wake becomes a note in
   its parent's inbox. The default is unchanged until a live proof.

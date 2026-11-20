@@ -628,6 +628,25 @@ test('attribution follows the operations profile, later lines winning, the envir
   assert.equal(attributionDisclosed({ AO_PROFILE: profile }), true);
   assert.equal(attributionDisclosed({ AO_PROFILE: profile, TRANSMOGRIFY_ATTRIBUTION: 'off' }), false);
   assert.equal(attributionDisclosed({ AO_PROFILE: path.join(dir, 'missing') }), false);
+  fs.writeFileSync(profile, 'attribution="disclose"\n');
+  assert.equal(attributionDisclosed({ AO_PROFILE: profile }), true, 'one pair of quotes is removed, as in the sh profile parser');
   assert.equal(attributionDisclosed({ HOME: dir }), false);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('harvest --commit adds the provider trailer only under attribution=disclose', async (t) => {
+  const fixture = managedLane(t, { dependencies: true });
+  fs.writeFileSync(path.join(fixture.seat.path, 'feature.txt'), 'implemented\n');
+  fs.writeFileSync(exchangePaths(fixture.seat.path).handback, handback({ sha: gitHead(fixture.seat.path) }));
+  await harvestLane({ repoRoot: fixture.repoRoot, laneId: fixture.lane.laneId, commit: true },
+    { ...fixture.env, TRANSMOGRIFY_ATTRIBUTION: 'disclose' }, { observe: async () => phaseFields('codex', 'idle') });
+  const message = execFileSync('git', ['-C', fixture.seat.path, 'show', '-s', '--format=%B'], { encoding: 'utf8' });
+  assert.match(message, /Co-Authored-By: Codex <noreply@openai\.com>/);
+});
+
+test('the Claude attribution switches follow the same setting', () => {
+  const { claudeAttributionSettings } = require('../scripts/lib/attribution');
+  assert.deepEqual(claudeAttributionSettings({ TRANSMOGRIFY_ATTRIBUTION: '' }),
+    { attribution: { commit: '', pr: '' }, includeCoAuthoredBy: false });
+  assert.deepEqual(claudeAttributionSettings({ TRANSMOGRIFY_ATTRIBUTION: '"disclose"' }), {});
 });

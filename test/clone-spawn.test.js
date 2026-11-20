@@ -78,7 +78,7 @@ test('Codex clone spawn keeps provenance, the unattributed preamble, and packet 
   assert.equal(lane.seat.kind, 'clone');
   assert.equal(verifyRecordedSeat(fixture.repoRoot, lane.seat).path, cwd);
   assert.match(input, /^╭─ Transmogrify/);
-  assert.ok(input.includes(`\n\n${exchangePreamble(cwd, 'codex')}\n\nImplement the clone packet.`));
+  assert.ok(input.includes(`\n\n${exchangePreamble(cwd, 'codex', fixture.env)}\n\nImplement the clone packet.`));
   assert.doesNotMatch(input, /Co-Authored-By:/);
   assert.match(input, /Add no Co-Authored-By trailer and no AI, agent or model attribution/);
   assert.equal(fs.readFileSync(result.exchange.packet, 'utf8'), 'Implement the clone packet.');

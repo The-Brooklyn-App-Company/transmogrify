@@ -20,6 +20,16 @@ settings file next to the project). Fill in the paths and commands.
 }
 ```
 
+### No agent tags (K-30)
+
+Agents act as the user: Claude Code's own commit trailer and pull-request
+footer stay off unless the profile sets `attribution=disclose`.
+`bootstrap.sh` sets this on your yes; by hand, add to the settings file:
+
+```json
+{ "attribution": { "commit": "", "pr": "" }, "includeCoAuthoredBy": false }
+```
+
 ### Compaction recovery hook
 
 Claude Code cuts SessionStart hook output over about 10 KB to a short

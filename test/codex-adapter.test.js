@@ -354,7 +354,7 @@ test('Codex dispatched profiles use live capabilities, render provenance, and re
         // Provenance first, then the exchange preamble, then the packet.
         assert.match(request.params.input[0].text, /^╭─ Transmogrify ─+\n/);
         assert.ok(request.params.input[0].text.includes(
-          `\n\n${exchangePreamble(fs.realpathSync(fixture.seat))}\n\n`,
+          `\n\n${exchangePreamble(fs.realpathSync(fixture.seat), 'codex', fixture.env)}\n\n`,
         ));
         assert.match(request.params.input[0].text, /^│ From {6}Claude Code on Claude Desktop$/m);
         assert.match(request.params.input[0].text, /^│ Task {6}"Cross-provider operator"$/m);

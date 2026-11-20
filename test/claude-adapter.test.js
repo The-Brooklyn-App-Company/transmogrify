@@ -314,8 +314,12 @@ test('Claude spawn journals intent, uses exact argv, binds three identifiers, an
   assert.deepEqual(launch.args.slice(0, 5), [
     '--bg', '--name', '::: native Claude lane', '--remote-control', '::: native Claude lane',
   ]);
-  assert.ok(launch.args[5].startsWith(`${exchangePreamble(fs.realpathSync(fixture.seat), 'claude')}\n\n`));
-  assert.match(launch.args[5], /Return CLAUDE_READY\.\n\n\[transmogrify spawn [0-9a-f-]{36}\]$/);
+  // Without a parent there is no hooks file: the inline settings carry Claude
+  // Code's own attribution switches off (K-30), then the prompt.
+  assert.equal(launch.args[5], '--settings');
+  assert.deepEqual(JSON.parse(launch.args[6]), { attribution: { commit: '', pr: '' }, includeCoAuthoredBy: false });
+  assert.ok(launch.args[7].startsWith(`${exchangePreamble(fs.realpathSync(fixture.seat), 'claude', fixture.env)}\n\n`));
+  assert.match(launch.args[7], /Return CLAUDE_READY\.\n\n\[transmogrify spawn [0-9a-f-]{36}\]$/);
   assert.equal(launch.options.cwd, fs.realpathSync(fixture.seat));
   assert.equal(listOperations(fixture.repoRoot, fixture.env)[0].state, 'complete');
   assert.equal(fs.existsSync(lane.ownership.spawnIntent.stdoutPath), false);
@@ -358,8 +362,9 @@ test('Claude spawn records and forwards an explicit model selection', async (t) 
     '--model', 'claude-opus-5',
   ]);
   // No parent dispatched this lane, so the exchange preamble leads.
-  assert.ok(launch.args[7].startsWith(`${exchangePreamble(fs.realpathSync(fixture.seat), 'claude')}\n\n`));
-  assert.match(launch.args[7], /Return CLAUDE_READY\./);
+  assert.equal(launch.args[7], '--settings');
+  assert.ok(launch.args[9].startsWith(`${exchangePreamble(fs.realpathSync(fixture.seat), 'claude', fixture.env)}\n\n`));
+  assert.match(launch.args[9], /Return CLAUDE_READY\./);
   assert.equal(lane.ownership.spawnIntent.modelSelector, 'claude-opus-5');
   assert.equal(listOperations(fixture.repoRoot, fixture.env)[0].details.modelSelector, 'claude-opus-5');
   assert.equal(result.receipt.requestedModelSelector, 'claude-opus-5');
@@ -390,7 +395,7 @@ test('Claude dispatched profiles render provenance and survive exact-session rec
   assert.equal(JSON.parse(fs.readFileSync(childHooksPath(lane.laneId, fixture.env), 'utf8')).fastMode, false, 'the hooks file carries the fast-mode pin');
   // A parent dispatched this lane: provenance first, then the exchange preamble.
   assert.match(launch.args[11], /^╭─ Transmogrify ─+\n/);
-  assert.ok(launch.args[11].includes(`\n\n${exchangePreamble(fs.realpathSync(fixture.seat), 'claude')}\n\n`));
+  assert.ok(launch.args[11].includes(`\n\n${exchangePreamble(fs.realpathSync(fixture.seat), 'claude', fixture.env)}\n\n`));
   assert.match(launch.args[11], /╭─ Transmogrify ─+\n/);
   assert.match(launch.args[11], /^│ From {6}Codex Desktop$/m);
   assert.match(launch.args[11], /^│ Task {6}"Release operator"$/m);

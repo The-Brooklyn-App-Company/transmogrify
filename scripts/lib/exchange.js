@@ -7,11 +7,11 @@
 
 const crypto = require('node:crypto');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { TextDecoder } = require('node:util');
 const { sanitizedGitEnv, safeGitConfigArgs } = require('./git-env');
+const { attributionDisclosed } = require('./attribution');
 const {
   beginLaneOperation,
   completeLaneOperation,
@@ -50,27 +50,6 @@ function exchangePaths(seatPath) {
     packet: path.join(directory, 'packet.md'),
     handback: path.join(directory, 'handback.md'),
   };
-}
-
-// Agents act as the authorized user: a child's commit carries no agent or
-// model attribution unless the operations profile opts in with
-// `attribution=disclose` (kit rule K-30; TRANSMOGRIFY_ATTRIBUTION overrides
-// the profile). The profile is parsed literally, later lines winning, as
-// the sh tools parse it.
-function attributionDisclosed(env = process.env) {
-  if (env.TRANSMOGRIFY_ATTRIBUTION !== undefined) return env.TRANSMOGRIFY_ATTRIBUTION === 'disclose';
-  const file = env.AO_PROFILE || path.join(env.XDG_CONFIG_HOME || path.join(env.HOME || os.homedir(), '.config'),
-    'agent-operations', 'profile');
-  let value;
-  try {
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      const match = /^\s*attribution\s*=\s*(.*?)\s*$/.exec(line);
-      if (match) value = match[1];
-    }
-  } catch {
-    return false;
-  }
-  return value === 'disclose';
 }
 
 function trailerLine(provider, disclose) {

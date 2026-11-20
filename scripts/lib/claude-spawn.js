@@ -29,6 +29,7 @@ const {
   materializeManagedSeat, planManagedSeat, plannedProvisionedEntries, verifySeat,
 } = require('./worktree');
 const { prependExchangePreamble, writePacket } = require('./exchange');
+const { claudeAttributionSettings } = require('./attribution');
 const {
   BACKEND, ClaudeTransmogrifyError, RETRYABLE_SPAWN_RECEIPT_CODES, SPAWN_ABSENCE_GRACE_MS,
   SPAWN_VERIFY_DELAY_MS, SPAWN_VERIFY_TIMEOUT_MS, capabilities, childHooksEnabled, claudeCatalogSource,
@@ -297,9 +298,11 @@ async function reserveClaudeSpawn(ctx) {
   ctx.stderrPath = path.join(paths.operations, `${operationId}.spawn.stderr`);
   const { seatIntent, externalSeat } = ctx;
   const prompt = `${options.input}\n\n${marker}`;
+  const noAttribution = claudeAttributionSettings(env);
   ctx.argv = claudeSpawnArgs(options.name, prompt, {
     ...execution,
-    ...(settingsFile ? { fastMode: undefined, settingsFile } : {}),
+    ...(settingsFile ? { fastMode: undefined, settingsFile }
+      : Object.keys(noAttribution).length ? { extraSettings: noAttribution } : {}),
   });
   const modelSelector = options.executionProfile?.resolved.model.selector ?? options.model;
   const spawnIntent = {

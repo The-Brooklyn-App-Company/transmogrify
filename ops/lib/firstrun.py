@@ -9,6 +9,8 @@ Usage: firstrun.py claude-auth                      (stdin: `claude auth status 
        firstrun.py codex-hook CODEX HOME SCRIPT [TIMEOUT]
        firstrun.py codex-hook-write FILE COMMAND
        firstrun.py codex-pins STATE                 (stdin: name TAB session TAB client, one row per operator)
+       firstrun.py claude-attribution SETTINGS          (ok | missing REASON | unreadable)
+       firstrun.py claude-attribution-write SETTINGS    (written BACKUP | unchanged | refused REASON)
        firstrun.py shell-quote WORD...
 
 Output: one line, its first word the verdict.
@@ -192,6 +194,153 @@ def codex_pins(state):
     return out("missing", ", ".join(missing)) if missing else out("ok", len(want))
 
 
+# ---- Claude Code attribution (K-30) ----------------------------------------------------------------------------------
+# Claude Code adds its own commit trailer and pull-request footer unless its settings say otherwise: `attribution`
+# ({"commit": "", "pr": ""}, current clients) and `includeCoAuthoredBy` (false, older ones). The write keeps every
+# other byte of the settings file: the two keys are spliced into its text, never re-serialized.
+ATTR = {"attribution": '{"commit": "", "pr": ""}', "includeCoAuthoredBy": "false"}
+
+
+def _ws(t, i):
+    while i < len(t) and t[i] in " \t\r\n":
+        i += 1
+    return i
+
+
+def _value_end(t, i):
+    if t[i] == '"':
+        i += 1
+        while t[i] != '"':
+            i += 2 if t[i] == "\\" else 1
+        return i + 1
+    if t[i] in "[{":
+        depth = 0
+        while True:
+            c = t[i]
+            if c == '"':
+                i = _value_end(t, i)
+                continue
+            if c in "[{":
+                depth += 1
+            elif c in "]}":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+            i += 1
+    j = i
+    while j < len(t) and t[j] not in ",]} \t\r\n":
+        j += 1
+    return j
+
+
+def _members(t, i):
+    out = []
+    i = _ws(t, i + 1)
+    while t[i] != "}":
+        ks, ke = i, _value_end(t, i)
+        vs = _ws(t, _ws(t, ke) + 1)
+        ve = _value_end(t, vs)
+        out.append((json.loads(t[ks:ke]), ks, vs, ve))
+        i = _ws(t, ve)
+        if t[i] == ",":
+            i = _ws(t, i + 1)
+    return out, i
+
+
+def _indent(t, pos):
+    start = t.rfind("\n", 0, pos) + 1
+    return re.match(r"[ \t]*", t[start:]).group(0)
+
+
+def attribution_ok(data):
+    a = data.get("attribution") if isinstance(data, dict) else None
+    return (isinstance(a, dict) and a.get("commit") == "" and a.get("pr") == ""
+            and data.get("includeCoAuthoredBy") is not True)
+
+
+def claude_attribution(settings):
+    try:
+        with open(settings, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return out("missing", "no settings file")
+    except (OSError, ValueError):
+        return out("unreadable", "the settings file does not parse")
+    if attribution_ok(data):
+        return out("ok")
+    return out("missing", "attribution is not {\"commit\": \"\", \"pr\": \"\"}")
+
+
+def splice_top(raw, key, value):
+    top = _ws(raw, 0)
+    members, close = _members(raw, top)
+    nl = "\r\n" if "\r\n" in raw else "\n"
+    hit = [m for m in members if m[0] == key]
+    if hit:
+        _, ks, vs, ve = hit[-1]
+        return raw[:vs] + value + raw[ve:]
+    if members:
+        last, lv = members[-1][3], _indent(raw, members[0][1])
+        return raw[:last] + "," + nl + lv + json.dumps(key) + ": " + value + raw[last:]
+    return raw[:top] + "{" + nl + "  " + json.dumps(key) + ": " + value + nl + "}" + raw[close + 1:]
+
+
+def claude_attribution_write(settings):
+    try:
+        with open(settings, encoding="utf-8", newline="") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        raw = None
+    except OSError:
+        return out("refused", "cannot read the settings file")
+    if raw is None:
+        new = "{\n" + ",\n".join("  %s: %s" % (json.dumps(k), v) for k, v in ATTR.items()) + "\n}\n"
+        before = {}
+    else:
+        try:
+            before = json.loads(raw)
+        except ValueError:
+            return out("refused", "the settings file does not parse; fix it first")
+        if not isinstance(before, dict):
+            return out("refused", "the settings file is not a JSON object")
+        if attribution_ok(before):
+            return out("unchanged")
+        new = raw
+        for k, v in ATTR.items():
+            new = splice_top(new, k, v)
+    after = json.loads(new)
+    b = dict(before)
+    for k in ATTR:
+        b.pop(k, None)
+        after_v = after.pop(k, None)
+        if after_v != json.loads(ATTR[k]):
+            return out("refused", "internal check failed; nothing written")
+    if b != after:
+        return out("refused", "internal check failed (another key would change); nothing written")
+    os.makedirs(os.path.dirname(settings) or ".", exist_ok=True)
+    backup = ""
+    if raw is not None:
+        backup = "%s.bak-%s-attribution" % (settings, time.strftime("%Y%m%d-%H%M%S"))
+        with open(backup, "w", encoding="utf-8", newline="") as f:
+            f.write(raw)
+    tmp = settings + ".tmp-%d" % os.getpid()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+        f.write(new)
+    if raw is not None:
+        os.chmod(tmp, os.stat(settings).st_mode & 0o7777)
+        try:
+            with open(settings, encoding="utf-8", newline="") as f:
+                if f.read() != raw:
+                    os.unlink(tmp)
+                    return out("refused", "the settings file changed meanwhile; nothing written")
+        except OSError:
+            os.unlink(tmp)
+            return out("refused", "cannot re-read the settings file")
+    os.replace(tmp, settings)
+    return out("written", backup or "-")
+
+
 def shell_quote(words):
     print(" ".join("'" + w.replace("'", "'\\''") + "'" for w in words))
     return 0
@@ -211,6 +360,10 @@ def main(a):
         return codex_hook_write(a[1], a[2])
     if cmd == "codex-pins" and len(a) == 2:
         return codex_pins(a[1])
+    if cmd == "claude-attribution" and len(a) == 2:
+        return claude_attribution(a[1])
+    if cmd == "claude-attribution-write" and len(a) == 2:
+        return claude_attribution_write(a[1])
     if cmd == "shell-quote" and len(a) >= 2:
         return shell_quote(a[1:])
     print(__doc__.strip().split("\n\n")[1], file=sys.stderr)

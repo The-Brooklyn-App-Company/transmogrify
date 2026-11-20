@@ -286,6 +286,8 @@ def splice_top(raw, key, value):
 
 
 def claude_attribution_write(settings):
+    # A linked settings file (a dotfiles setup) is written through to its target, never replaced by a copy.
+    settings = os.path.realpath(settings)
     try:
         with open(settings, encoding="utf-8", newline="") as f:
             raw = f.read()
@@ -321,8 +323,10 @@ def claude_attribution_write(settings):
     backup = ""
     if raw is not None:
         backup = "%s.bak-%s-attribution" % (settings, time.strftime("%Y%m%d-%H%M%S"))
-        with open(backup, "w", encoding="utf-8", newline="") as f:
+        fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, os.stat(settings).st_mode & 0o7777)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
             f.write(raw)
+        os.chmod(backup, os.stat(settings).st_mode & 0o7777)
     tmp = settings + ".tmp-%d" % os.getpid()
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:

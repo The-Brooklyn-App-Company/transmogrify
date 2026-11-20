@@ -399,6 +399,10 @@ test_check_leaks_more_forms() {
     printf 'gitlab %s\n' "glpat""-abcdefghijklmnopqrst"
     printf 'mail %s\n' "12345+alice@users.""noreply.github.com"
     printf 'fine %s and example C0 tokens CHANGELOG2\n' "git@""github.com"
+    printf 'link https://acme.slack.com/archives/%s/p1700000000000000\n' "C0""6ABCDEF12"
+    printf 'thread https://app.slack.com/client/%s/%s/thread/%s-1700000000.000100\n' "T0""6ABCDEF12" "C0""6ABCDEF12" "C0""6ABCDEF12"
+    printf 'path docs/operations/slack/channels/exports/%s/notes\n' "C0""6ABCDEF12"
+    printf 'hash "integrity": "sha1-%sabcdefghijklmnop="\n' "C0""6ABCDEF12"
   } >"$T/repo/more.md"
   (cd "$T/repo" && git add -A)
   (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
@@ -409,6 +413,8 @@ test_check_leaks_more_forms() {
   for l in 9 10 11 12; do assert_has "$T/out" "more.md:$l: L04"; done
   assert_has "$T/out" "more.md:13: L02"
   assert_lacks "$T/out" "more.md:14:"
+  for l in 15 16 17; do assert_has "$T/out" "more.md:$l: L03"; done
+  assert_lacks "$T/out" "more.md:18:"
   assert_has "$T/err" "leaks: no denylist: generic rules only"
   # A tracked symlink is scanned as its target path, not followed.
   rm "$T/repo/more.md"
@@ -467,6 +473,15 @@ test_precommit_hook_carries_this_checkouts_denylist() {
   [ "$rc" -ne 0 ] || _fail "the hook let a denylisted word through"
   assert_has "$T/out" "staged:w.md:1: D1"
   assert_lacks "$T/out" "walrus"
+  # A rerun without options keeps the hook's denylist and requirement; --no-denylist drops them on purpose.
+  run install.sh precommit "$T/repo"
+  assert_rc 0
+  assert_has "$T/repo/.git/hooks/pre-commit" "TRANSMOGRIFY_LEAK_DENYLIST='$T/private/deny'"
+  assert_has "$T/repo/.git/hooks/pre-commit" "leaks --staged --require-denylist"
+  run install.sh precommit --no-denylist "$T/repo"
+  assert_rc 0
+  assert_lacks "$T/repo/.git/hooks/pre-commit" "TRANSMOGRIFY_LEAK_DENYLIST="
+  assert_lacks "$T/repo/.git/hooks/pre-commit" "--require-denylist"
   # A denylist inside the repository is refused.
   rm "$T/repo/.git/hooks/pre-commit"
   cp "$T/private/deny" "$T/repo/deny.txt"

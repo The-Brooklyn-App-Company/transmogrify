@@ -562,6 +562,8 @@ def read_json(path):
 
 
 def render_claude(src, path, dry=False, prune=False):
+    # A linked settings file (a dotfiles setup) is written through to its target, never replaced by a copy.
+    path = os.path.realpath(path)
     raw, data = read_json(path)
     new, changes, problems = claude_plan(src, data, prune)
     if problems:

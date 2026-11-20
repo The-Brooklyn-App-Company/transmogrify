@@ -12,7 +12,7 @@
 #        install.sh [--dry-run] timers [--launchd | --systemd]
 #        install.sh [--dry-run] bridge claude|codex [--home DIR] [--name NAME]
 #        install.sh [--dry-run] host [--apply]
-#        install.sh [--dry-run] precommit [--denylist FILE] [--require-denylist] [REPO]
+#        install.sh [--dry-run] precommit [--denylist FILE] [--require-denylist | --no-denylist] [REPO]
 #
 # --dry-run lists every directory, file, link, worktree and timer the
 # command would create, and changes nothing. Without it the same list is
@@ -586,23 +586,38 @@ inst_skills() {
 # runs `check.sh leaks --staged`, so nothing owner- or company-specific is
 # committed by accident. --denylist names the private denylist for this
 # checkout's hook only (it must live outside REPO; nothing else changes);
-# --require-denylist makes the hook refuse to commit without one. An
-# existing hook this kit did not write is left alone and reported.
+# --require-denylist makes the hook refuse to commit without one. Run again
+# without them, it keeps what the existing hook carries (never a silent
+# downgrade); --no-denylist drops both on purpose. An existing hook this kit
+# did not write is left alone and reported.
 INST_HOOK_MARK='transmogrify-leak-guard'
 inst_shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 inst_precommit() {
-  _pd='' _preq=''
+  _pd='' _preq='' _pdrop=''
   while [ $# -gt 0 ]; do
     case $1 in
       --denylist) [ $# -ge 2 ] || ao_die "$AO_E_USAGE" "--denylist needs a file"; _pd=$(inst_abs "$2"); shift ;;
       --require-denylist) _preq=1 ;;
-      -*) ao_die "$AO_E_USAGE" "usage: install.sh precommit [--denylist FILE] [--require-denylist] [REPO]" ;;
+      --no-denylist) _pdrop=1 ;;
+      -*) ao_die "$AO_E_USAGE" "usage: install.sh precommit [--denylist FILE] [--require-denylist | --no-denylist] [REPO]" ;;
       *) break ;;
     esac
     shift
   done
   [ $# -le 1 ] || ao_die "$AO_E_USAGE" "usage: install.sh precommit [--denylist FILE] [--require-denylist] [REPO]"
   _pr=$(inst_abs "${1:-$KIT}")
+  [ -z "$_pdrop" ] || [ -z "$_pd$_preq" ] || ao_die "$AO_E_USAGE" "--no-denylist excludes --denylist and --require-denylist"
+  git -C "$_pr" rev-parse --git-dir >/dev/null 2>&1 || ao_die "$AO_E_USAGE" "not a git checkout: $_pr"
+  _hk0=$(git -C "$_pr" rev-parse --git-path hooks/pre-commit) || ao_die "$AO_E_FAIL" "cannot find the hooks folder of $_pr"
+  case $_hk0 in /*) ;; *) _hk0=$_pr/$_hk0 ;; esac
+  # Rerun without options: keep what this kit's existing hook carries.
+  if [ -z "$_pdrop" ] && [ -f "$_hk0" ] && grep -q "$INST_HOOK_MARK" "$_hk0" 2>/dev/null; then
+    if [ -z "$_pd" ]; then
+      _pd=$(sed -n "s/^TRANSMOGRIFY_LEAK_DENYLIST='\(.*\)'\$/\1/p" "$_hk0" | sed "s/'\\\\''/'/g" | head -n 1)
+      [ -z "$_pd" ] || printf 'keep    the denylist the existing hook names\n'
+    fi
+    if [ -z "$_preq" ] && grep -q -- '--require-denylist' "$_hk0"; then _preq=1; fi
+  fi
   if [ -n "$_pd" ]; then
     [ -f "$_pd" ] && [ -r "$_pd" ] || ao_die "$AO_E_USAGE" "the denylist is not a readable file: $_pd"
     case $(inst_physical "$(dirname -- "$_pd")")/ in "$(inst_physical "$_pr")"/*) ao_die "$AO_E_USAGE" "the denylist must live outside $_pr" ;; esac

@@ -60,7 +60,8 @@
 #                contact (package.json's author email)
 #            L03 a Slack channel, user or team id (C, D, G, T, U or W, a
 #                digit, then uppercase letters and digits; 9 to 12 long;
-#                not inside a long base64 run)
+#                in URLs and paths too; not inside base64: a run with "+"
+#                or ending in "=", or an integrity-hash line)
 #            L04 an API key or token shape (sk-, sk_live_, gh?_,
 #                github_pat_, glpat-, npm_, lin_api_, xox?-, xapp-, AKIA,
 #                ASIA, AIza, a JWT, a Slack webhook URL) or a PEM private key
@@ -551,12 +552,16 @@ check_leak_scan() {
       print n ":" FNR ": " rule; seen[rule] = 1
     }
     function home(name) { if (!(tolower(name) in homes)) hit("L01") }
-    # b64run(line, start, len): the length of the run of base64 characters
-    # around a token; a long run is a hash or a blob, not an id.
-    function b64run(line, st, len,   i, j) {
+    # inb64(line, start, len): the token sits in base64 (a hash or a blob), by
+    # evidence a URL or a path never has: the run of base64 characters
+    # around it holds a "+" or ends in "=", or the line carries an
+    # integrity hash (sha1-, sha256-, sha384-, sha512-).
+    function inb64(line, st, len,   i, j, run) {
+      if (line ~ /sha(1|256|384|512)-/) return 1
       i = st; while (i > 1 && substr(line, i - 1, 1) ~ /[A-Za-z0-9+\/=]/) i--
       j = st + len; while (j <= length(line) && substr(line, j, 1) ~ /[A-Za-z0-9+\/=]/) j++
-      return j - i
+      run = substr(line, i, j - i)
+      return length(run) >= 24 && (index(run, "+") > 0 || substr(run, length(run), 1) == "=")
     }
     # jwt(line): three dot-separated base64url parts after "eyJ".
     function jwt(line,   t, k, parts, np, x) {
@@ -650,12 +655,13 @@ check_leak_scan() {
         hit("L02"); break
       }
       # L03: Slack ids, on alphanumeric tokens (SLACK_CHANNEL=..., /archives/...,
-      # slack-...), unless the token sits in a long base64 run (a hash).
+      # message, client and thread links, slack-...), unless the token sits in
+      # base64.
       rest = $0; off = 0
       while (match(rest, /[A-Za-z0-9]+/)) {
         st = off + RSTART; t = substr(rest, RSTART, RLENGTH); l = RLENGTH
         off += RSTART + RLENGTH - 1; rest = substr(rest, RSTART + RLENGTH)
-        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && b64run($0, st, l) < 40) hit("L03")
+        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && !inb64($0, st, l)) hit("L03")
       }
       # L04: API keys and tokens by shape.
       rest = $0

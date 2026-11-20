@@ -458,4 +458,15 @@ test_codex_render_keeps_crlf_line_endings() {
   head -c "$(wc -c <"$T/before")" "$T/proj/alpha/.codex/config.toml" | cmp -s - "$T/before" || _fail "CRLF text changed"
 }
 
+test_claude_render_writes_through_a_linked_settings_file() {
+  gsetup
+  mkdir -p "$T/dotfiles"
+  mv "$T/claude/settings.json" "$T/dotfiles/settings.json"
+  ln -s "$T/dotfiles/settings.json" "$T/claude/settings.json"
+  run grants.sh render-claude
+  assert_rc 0
+  [ -L "$T/claude/settings.json" ] || _fail "the settings link was replaced by a file"
+  assert_has "$T/dotfiles/settings.json" "[grant:own-merges]"
+}
+
 ao_test_main "$0"

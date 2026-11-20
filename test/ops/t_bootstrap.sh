@@ -254,6 +254,18 @@ test_claude_attribution_is_switched_off_on_consent() {
   assert_has "$CLAUDE_CONFIG_DIR/settings.json" '"includeCoAuthoredBy": false'
   assert_has "$CLAUDE_CONFIG_DIR/settings.json" '"model": "x"'
   assert_has "$T/out" "PASS  attribution   Claude Code adds no commit or pull-request attribution"
+  # A linked settings file (dotfiles) is written through; the backup keeps the file's mode.
+  mkdir -p "$T/dotfiles"
+  printf '{\n  "model": "y"\n}\n' >"$T/dotfiles/settings.json"
+  chmod 600 "$T/dotfiles/settings.json"
+  rm -f "$CLAUDE_CONFIG_DIR/settings.json"
+  ln -s "$T/dotfiles/settings.json" "$CLAUDE_CONFIG_DIR/settings.json"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  [ -L "$CLAUDE_CONFIG_DIR/settings.json" ] || _fail "the settings link was replaced by a file"
+  assert_has "$T/dotfiles/settings.json" '"includeCoAuthoredBy": false'
+  [ -n "$(find "$T/dotfiles" -name 'settings.json.bak-*-attribution' -perm 600)" ] || _fail "the backup is not owner-only"
+  [ -z "$(find "$T/dotfiles" -name 'settings.json.bak-*-attribution' ! -perm 600)" ] || _fail "a backup is not owner-only"
+  rm -f "$CLAUDE_CONFIG_DIR/settings.json"
   # attribution=disclose in the profile: nothing to switch off.
   printf '{}\n' >"$CLAUDE_CONFIG_DIR/settings.json"
   printf 'attribution=disclose\n' >>"$AO_PROFILE"

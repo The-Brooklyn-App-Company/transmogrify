@@ -54,6 +54,18 @@ ao_confirm() {
   return 0
 }
 
+# ao_consent TEXT  Guided only: a strict yes for a step that writes
+# something the person owns outside the kit (a client's settings). Only "y"
+# or "yes" counts; Enter, EOF and anything else is no. Unguided it returns 1:
+# the caller decides whether an explicit flag (--yes) stands in for it.
+ao_consent() {
+  [ -n "$AO_GUIDED" ] || return 1
+  printf '   %s [y/N]: ' "$1" >&2
+  IFS= read -r _g_in || return 1
+  case $_g_in in [Yy] | [Yy][Ee][Ss]) return 0 ;; esac
+  return 1
+}
+
 # ao_pause TEXT  Guided only: wait for Enter (q stops). Returns 1 on q.
 ao_pause() {
   [ -n "$AO_GUIDED" ] || return 1

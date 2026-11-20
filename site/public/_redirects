@@ -1,13 +1,13 @@
 # Short links to the canonical repository documents.
 # Cloudflare Workers Static Assets applies these before serving a static asset.
-/github    https://github.com/nicholasgerard/transmogrify           302
-/source    https://github.com/nicholasgerard/transmogrify           302
-/skill     https://github.com/nicholasgerard/transmogrify/blob/main/SKILL.md            302
-/protocol  https://github.com/nicholasgerard/transmogrify/blob/main/docs/PROTOCOL.md    302
-/security  https://github.com/nicholasgerard/transmogrify/blob/main/SECURITY.md         302
-/roadmap   https://github.com/nicholasgerard/transmogrify/blob/main/ROADMAP.md          302
-/license   https://github.com/nicholasgerard/transmogrify/blob/main/LICENSE             302
-/issues    https://github.com/nicholasgerard/transmogrify/issues    302
+/github    https://github.com/<org>/transmogrify           302
+/source    https://github.com/<org>/transmogrify           302
+/skill     https://github.com/<org>/transmogrify/blob/main/SKILL.md            302
+/protocol  https://github.com/<org>/transmogrify/blob/main/docs/PROTOCOL.md    302
+/security  https://github.com/<org>/transmogrify/blob/main/SECURITY.md         302
+/roadmap   https://github.com/<org>/transmogrify/blob/main/ROADMAP.md          302
+/license   https://github.com/<org>/transmogrify/blob/main/LICENSE             302
+/issues    https://github.com/<org>/transmogrify/issues    302
 
 # In-site conveniences.
 /docs      /#docs     301

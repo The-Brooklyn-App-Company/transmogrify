@@ -440,6 +440,12 @@ test_claude_render_keeps_every_other_byte() {
   assert_has "$T/claude/settings.json" '"model":"x",   "esc": "\u00e9\/",'
   assert_has "$T/claude/settings.json" '"deny": [ "a" ]'
   assert_has "$T/claude/settings.json" '[grant:own-merges]'
+  # An unrelated entry already in autoMode.allow keeps its own bytes too.
+  printf '{\n  "autoMode": {\n    "allow": [\n      "Keep \\u00e9\\/ as written"\n    ]\n  }\n}\n' >"$T/claude/settings.json"
+  run grants.sh render-claude
+  assert_rc 0
+  assert_has "$T/claude/settings.json" '"Keep \u00e9\/ as written"'
+  assert_has "$T/claude/settings.json" '[grant:own-merges]'
 }
 
 test_codex_render_keeps_crlf_line_endings() {

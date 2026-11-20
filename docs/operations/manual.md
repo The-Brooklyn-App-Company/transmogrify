@@ -6,6 +6,11 @@ paused jobs, or publish software. Start with one low-risk operator, prove its
 real delivery path, then repeat the same setup. Product versions and transport
 availability must be verified on the machine being installed.
 
+Sections 1 to 7 are the setup. Sections 8 to 10 also record design notes
+and dated observations from the 0.3 line; items marked design or unshipped
+are not part of Transmogrify 2.0 and live on the [roadmap](../../ROADMAP.md)
+until they ship.
+
 ## 1. Choose the homes, owners and delivery paths
 
 Keep three layers: public kit, optional private team overlay, private personal

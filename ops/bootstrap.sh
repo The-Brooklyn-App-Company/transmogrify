@@ -206,7 +206,7 @@ bs_grants() {
     "managed block change, after a backup. This writes client settings, so it asks first."
   sh "$AO_SCRIPTS/grants.sh" render-claude --dry-run </dev/null 2>&1 | sed 's/^/   /'
   sh "$AO_SCRIPTS/grants.sh" render-codex --all --dry-run </dev/null 2>&1 | sed 's/^/   /'
-  if { [ -n "$AO_GUIDED" ] || [ -n "${_yes-}" ]; } && ao_confirm "Write these approvals into the client settings listed above?"; then
+  if [ -n "${_yes-}" ] || ao_consent "Write these approvals into the client settings listed above?"; then
     sh "$AO_SCRIPTS/grants.sh" render-claude </dev/null 2>&1 | sed 's/^/   /'
     sh "$AO_SCRIPTS/grants.sh" render-codex --all </dev/null 2>&1 | sed 's/^/   /'
   else

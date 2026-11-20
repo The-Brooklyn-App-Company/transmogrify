@@ -124,6 +124,11 @@ drift_row() {
     -e 's/.*Agent Operations kit (`[^`]*`, version \([^)]*\)).*/\1/p' "$_h/AGENTS.md" 2>/dev/null | head -n 1)
   [ -z "$_av" ] || [ -z "$kit_version" ] || [ "$_av" = "$kit_version" ] ||
     drift pin "AGENTS.md cites kit version $_av, this checkout is $kit_version" "read CHANGELOG.md for the difference, then update the version in $_h/AGENTS.md"
+  # The parked-side guard of a home written before 2.0 runs lane.sh, whose
+  # 0.3 path (scripts/lane.sh) no longer exists in a 2.0 install.
+  if grep -q 'lane\.sh side' "$_h/AGENTS.md" 2>/dev/null; then
+    drift guard "AGENTS.md's parked-side guard runs lane.sh (switch.sh since 2.0)" "change that line to: sh $AO_SCRIPTS/switch.sh side $OP_KEY"
+  fi
 }
 
 # drift_main  The --drift report.

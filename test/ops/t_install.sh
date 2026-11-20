@@ -279,6 +279,12 @@ test_drift_names_renames_pins_and_stale_ids() {
   sed -i.bak 's/Transmogrify operations kit (/Agent Operations kit (/; s/, version [^)]*)/, version 0.0.9)/' "$w/AGENTS.md"
   run status.sh --drift
   assert_has "$T/out" "web: pin: AGENTS.md cites kit version 0.0.9"
+  assert_lacks "$T/out" "web: guard:"
+  # Its 0.3 parked-side guard (scripts/lane.sh) is flagged with the new line.
+  sed -i.bak 's|/ops/switch.sh side web|/scripts/lane.sh side web|' "$w/AGENTS.md"
+  run status.sh --drift
+  assert_has "$T/out" "web: guard: AGENTS.md's parked-side guard runs lane.sh"
+  assert_has "$T/out" "switch.sh side web"
 }
 
 test_sync_leaves_a_dirty_operator_conf_alone() {

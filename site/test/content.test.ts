@@ -25,12 +25,12 @@ describe('the start prompt', () => {
   });
 
   test('the remote Markdown names the canonical repository and no alternate source', () => {
-    assert.match(remotePrompt, /https:\/\/github\.com\/nicholasgerard\/transmogrify/);
+    assert.match(remotePrompt, /https:\/\/github\.com\/<org>\/transmogrify/);
     const repositoryUrls = remotePrompt.match(/https:\/\/github\.com\/[^\s`)]+/g) ?? [];
     assert.ok(repositoryUrls.length >= 1);
     assert.ok(
       repositoryUrls.every((url) =>
-        url.startsWith('https://github.com/nicholasgerard/transmogrify'),
+        url.startsWith('https://github.com/<org>/transmogrify'),
       ),
     );
   });
@@ -172,7 +172,7 @@ describe('legal documents', () => {
     });
 
     test(`${file} links the MIT license or the repository`, () => {
-      assert.match(source, /github\.com\/nicholasgerard\/transmogrify/);
+      assert.match(source, /github\.com\/<org>\/transmogrify/);
     });
 
     test(`${file} invents no postal address or company entity`, () => {

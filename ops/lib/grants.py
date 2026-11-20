@@ -424,6 +424,19 @@ def _members(t, i):
     return out, i
 
 
+def _elements(t, i):
+    """t[i] is '[': the raw text of each element, in order."""
+    out = []
+    i = _ws(t, i + 1)
+    while t[i] != "]":
+        ve = _value_end(t, i)
+        out.append(t[i:ve])
+        i = _ws(t, ve)
+        if t[i] == ",":
+            i = _ws(t, i + 1)
+    return out
+
+
 def _line_indent(t, pos):
     start = t.rfind("\n", 0, pos) + 1
     return re.match(r"[ \t]*", t[start:]).group(0)
@@ -444,11 +457,20 @@ def splice_allow(raw, data, new):
         unit = first if first and raw.rfind("\n", 0, members[0][1]) >= 0 else "  "
     nl = "\r\n" if "\r\n" in raw else "\n"
 
+    kept = []  # (decoded, raw) of the entries already in the file: an entry kept as is keeps its own bytes
+
+    def text(e):
+        for k, (dec, rawe) in enumerate(kept):
+            if dec == e:
+                del kept[k]
+                return rawe
+        return json.dumps(e, ensure_ascii=ea)
+
     def arr(level):
         if not new:
             return "[]"
         inner = level + unit
-        return "[" + nl + ("," + nl).join(inner + json.dumps(e, ensure_ascii=ea) for e in new) + nl + level + "]"
+        return "[" + nl + ("," + nl).join(inner + text(e) for e in new) + nl + level + "]"
 
     def obj(level):
         return "{" + nl + level + unit + '"allow": ' + arr(level + unit) + nl + level + "}"
@@ -463,6 +485,8 @@ def splice_allow(raw, data, new):
         allow = [m for m in sub if m[0] == "allow"]
         if allow:
             _, aks, avs, ave = allow[-1]
+            if raw[avs] == "[":
+                kept.extend((json.loads(x), x) for x in _elements(raw, avs))
             return raw[:avs] + arr(_line_indent(raw, aks)) + raw[ave:]
         if sub:
             lv = _line_indent(raw, sub[0][1])

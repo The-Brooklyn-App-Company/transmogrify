@@ -75,11 +75,16 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   (`~/.config/agent-operations/profile`), the state directory
   (`~/.local/state/agent-operations`), launchd labels
   (`local.agent-operations.*`), registry and home formats, rule IDs.
-- **`lane.sh` → `switch.sh`.** Same subcommands and exit codes. Existing
-  homes' `AGENTS.md` parked-side guard still calls `lane.sh side`, which
-  keeps working through the alias in 2.0.x; change that line to
-  `switch.sh side` (as in `ops/templates/home/AGENTS.md`) before 2.1.
-  `install.sh sync` adds only missing files and never rewrites it.
+- **`lane.sh` → `switch.sh`: required step.** Same subcommands and exit
+  codes. Every existing home's `AGENTS.md` starts its recovery with a
+  parked-side guard that runs `<kit>/scripts/lane.sh side KEY`; that path
+  does not exist in a 2.0 install, so change the line to
+  `sh <install>/ops/switch.sh side KEY` (as in
+  `ops/templates/home/AGENTS.md`) when you switch installs. `status.sh
+  --drift` flags every home that still runs `lane.sh side`, with the exact
+  line; `install.sh sync` adds only missing files and never rewrites it.
+  `ops/lane.sh` remains as a deprecated alias through 2.0.x for scripts and
+  habits, not for that guard.
 - **Grants.** `MANDATE.md` grants keep working; to have them follow an
   operator across apps, write `operators/GRANTS.md` from the template and
   run `bootstrap.sh` (or `grants.sh render-claude` and `render-codex --all`).

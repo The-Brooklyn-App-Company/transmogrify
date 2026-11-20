@@ -100,7 +100,7 @@ ${PREREQUISITE_BLOCK.split('\n').map((line) => `   ${line}`).join('\n')}
    }
    trap cleanup_transmogrify_scratch EXIT HUP INT TERM
    git -C "$TRANSMOGRIFY_SCRATCH" init
-   git -C "$TRANSMOGRIFY_SCRATCH" remote add origin https://github.com/nicholasgerard/transmogrify.git
+   git -C "$TRANSMOGRIFY_SCRATCH" remote add origin https://github.com/<org>/transmogrify.git
    git -C "$TRANSMOGRIFY_SCRATCH" fetch --depth 1 origin "$TRANSMOGRIFY_RELEASE_COMMIT"
    git -C "$TRANSMOGRIFY_SCRATCH" checkout --detach FETCH_HEAD
    test "$(git -C "$TRANSMOGRIFY_SCRATCH" rev-parse HEAD)" = "$TRANSMOGRIFY_RELEASE_COMMIT"

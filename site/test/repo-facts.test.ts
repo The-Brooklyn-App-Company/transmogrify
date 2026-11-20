@@ -91,7 +91,7 @@ describe('the real repository', () => {
   });
 
   test('resolves the canonical repository and issue URLs', () => {
-    assert.equal(facts.repositoryUrl, 'https://github.com/nicholasgerard/transmogrify');
+    assert.equal(facts.repositoryUrl, 'https://github.com/<org>/transmogrify');
     assert.ok(facts.issuesUrl.startsWith(facts.repositoryUrl));
   });
 });

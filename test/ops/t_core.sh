@@ -302,4 +302,21 @@ test_git_commit_takes_only_its_paths() {
   assert_eq "$(git -C "$r" diff --cached --name-only)" draft.md "the unrelated draft stays staged"
 }
 
+test_consent_needs_an_explicit_yes() {
+  for a in '' n x EOF; do
+    if [ "$a" = EOF ]; then
+      lib ". \"\$AO_SCRIPTS/lib/guide.sh\"; AO_GUIDED=1; ao_consent 'Write?' </dev/null"
+    else
+      lib ". \"\$AO_SCRIPTS/lib/guide.sh\"; AO_GUIDED=1; printf '%s\\n' '$a' | ao_consent 'Write?'"
+    fi
+    assert_rc 1
+  done
+  for a in y yes YES; do
+    lib ". \"\$AO_SCRIPTS/lib/guide.sh\"; AO_GUIDED=1; printf '%s\\n' '$a' | ao_consent 'Write?'"
+    assert_rc 0
+  done
+  lib ". \"\$AO_SCRIPTS/lib/guide.sh\"; AO_GUIDED=; printf 'y\\n' | ao_consent 'Write?'"
+  assert_rc 1
+}
+
 ao_test_main "$0"

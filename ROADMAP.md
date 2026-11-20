@@ -6,7 +6,8 @@
 worker-lane skill into one install. Scope: Claude Code and Codex, macOS
 first, Linux best effort for the `sh` layer.
 
-Before `2.0.0` ships (`2.0.0-rc.1` is local only, 2026-11-20):
+`2.0.0` shipped on 2026-11-20 under a dated exception (below, "Release gate
+and recorded exceptions"). Still owed from the 2.0 gate:
 
 - The fresh-machine acceptance pass below, for both layers, on a machine
   that has never run either.
@@ -16,8 +17,8 @@ Before `2.0.0` ships (`2.0.0-rc.1` is local only, 2026-11-20):
 - Grants rendered and probed against real Claude Code and Codex configs.
 - Worker completions through the mailroom proven live, then made the
   default and the separate wake path removed (K-36).
-- `/start` generated for 2.0 from the new repository, offering the
-  operations first run.
+- `/start` deployed for 2.0 from the new repository (the generator now
+  offers the operations first run).
 
 Next:
 
@@ -406,6 +407,23 @@ above) and without the pass on a machine that has never seen Transmogrify.
 
 2026-09-09 exception: 0.6.2 shipped on the owner's decision under the same
 terms; the 0.6.2 record above lists what ran on the maintainer host.
+
+2026-11-20 exception: 2.0.0 shipped on the owner's decision without the
+fresh-machine acceptance pass, the operations layer's live tests, grants
+probed against real client configs, or worker completions through the
+mailroom proven live (the 2.0 list at the top). What ran on the maintainer
+host, at d6be563 and again on the release tree: `npm test` (817 pass, 1 skipped), the
+kit suite under sh and dash (792 pass), the leak guard with the private
+denylist (no finding), and one live guided first run in a scratch home with
+the real Claude Code (2.1.322) and Codex (codex-cli 0.169.1) CLIs: install,
+doctor, `bootstrap.sh` with Claude and with Codex as the starting client,
+the Codex hook written and read back through Codex's own `hooks/list`, and
+the sign-in and pins readers checked read-only against the real installs.
+The host apply (App Nap, launchd units) was declined there, since it writes
+the real user's app and launchd state; it stays covered by the test suite.
+That run found the profile `path` gap (the example profiles left out
+`~/.local/bin`, so the CLIs were not found); it was fixed before release.
+No compatibility pin's surface changed, so no pin was re-measured.
 
 The gate is retained. The next release requires the onboarding acceptance
 matrix on the maintainer host and on a machine that has never seen

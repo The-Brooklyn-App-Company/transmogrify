@@ -30,7 +30,7 @@ small, accountable team on hardware they control.
 daemon you trust with credentials. It never signs in for you, never stores a
 secret, and needs no server or account of its own.
 
-> **Status: 2.0.0-rc.1, a release candidate.** The workers layer carries
+> **Status: 2.0.0.** The workers layer carries
 > forward the 0.6 line's measured receipts. Much of the operations layer is
 > proven only against the test suite's fakes; each piece's highest proven
 > stage is in [What is proven](docs/operations/README.md#what-is-proven).
@@ -238,7 +238,7 @@ Dated receipts; anything not listed is unverified.
 | Relay to an existing Codex thread | One live isolated round trip, macOS | codex-cli 0.169, 2026-11-18 |
 | Mailroom ladders, supervisor, restart recovery | Test suite with fakes; live restart recovery **unverified** | 2026-11-19 |
 | Grants renderers (Claude Code, Codex) | Test suite with fixtures and a fake Codex CLI; never run against a real client config | 2026-11-20 |
-| First run (`bootstrap.sh`), operator routines, switches | Test suite with fakes; no live first run on a clean account yet | 2026-11-20 |
+| First run (`bootstrap.sh`), operator routines, switches | Test suite with fakes; one live guided run on the maintainer host in a scratch home with the real CLIs (host apply declined, in-app steps not walked); no clean account yet | 2026-11-20 |
 | macOS host setup (`install.sh host`) | Test suite; read-only check on a real macOS host | 2026-11-19 |
 | Linux, the `sh` layer | Best effort: CI suite only; systemd units untested | |
 | Antigravity | Not supported; on the [roadmap](ROADMAP.md) | |

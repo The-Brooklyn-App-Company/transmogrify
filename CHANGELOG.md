@@ -1,9 +1,9 @@
 # Changelog
 
-## 2.0.0 (in progress)
+## 2.0.0
 
-Release candidate `2.0.0-rc.1` (2026-11-20), local only: not tagged,
-published or installed by `/start`.
+Released 2026-11-20, on the owner's decision under the dated exception in
+ROADMAP.md (no pass yet on a machine that has never run either layer).
 
 Transmogrify is now an operating system for a small team of long-running AI
 agents on your own always-on Mac, across Claude Code and Codex: the Agent
@@ -52,6 +52,13 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   Codex pins from the app's own pinned list (an undocumented state file,
   read only). Marks remain only where a check cannot run, and for the
   Claude sidebar, which nothing on disk shows.
+- **The profile's `path` finds the CLIs.** It replaces `PATH` for every kit
+  script, and the example profiles left out `~/.local/bin`, where Claude
+  Code's native installer puts `claude`, so the checklist said "no Claude
+  CLI answered" and kit jobs could not start it. `bootstrap.sh` step 2 now
+  appends the folders of `claude` and `codex` (and `~/.local/bin` when
+  `claude` is there but not on `PATH`) to the profile's `path` when missing.
+  Found in the live first run.
 - **Leak guard** (`ops/check.sh leaks`). Nothing owner- or
   company-specific reaches the public tree: generic rules (home folders,
   e-mail addresses other than the project contact, Slack ids, API-key
@@ -100,9 +107,27 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   CRLF line endings); host backups of the two bridges' duty files no longer
   share a name; routine commits take only their own paths and leave other
   staged work alone.
-- A new README, one skill index (`skills/README.md`), site copy for the
-  existing site (`site/site-content.md`), and a guide for a second person
-  adopting on their own machine (`docs/operations/adopting.md`).
+- A new README, one skill index (`skills/README.md`), and a guide for a
+  second person adopting on their own machine
+  (`docs/operations/adopting.md`).
+- **The website, rebuilt for 2.0** from `site/site-content.md`, hero kept:
+  what it is (the Oracle, operators, workers, approvals, mail, nothing
+  hosted), your first hour, one system diagram with a plain-text
+  alternative, the support matrix, and a new set of six document cards.
+  `/start` now runs the doctor with `--operations` and offers the
+  operations layer's guided first run (`bootstrap.sh`, at a terminal).
+  The landing page's size budget was rebased for the new sections.
+
+### Known issues
+
+- **Leak guard edge cases** (`ops/check.sh leaks`, rule L03): a line that
+  also carries a `sha1-`/`sha256-`/`sha384-`/`sha512-` word is exempt as a
+  whole, so a Slack link on such a line is missed; an id inside a run of 24
+  or more characters that holds a `+` or ends in `=` is skipped.
+- **Test harness under dash:** the hang guard in
+  `test/ops/t_tools.sh` (`test_check_leaks_stops_a_scan_that_hangs`) cannot
+  stop a hung scan under dash, which has no job control without a terminal;
+  the test passes because the scan's own per-file budget works.
 
 ### Migrating from Agent Operations 0.3.x (kit users)
 

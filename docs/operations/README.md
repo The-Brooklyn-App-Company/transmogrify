@@ -155,7 +155,7 @@ Highest stage reached for each piece, with the client, version and date.
 | launchd units (tick, relay) | Rendered by `install.sh`; loading them is your step | |
 | `install.sh host`, `check.sh host` | Test suite with a fake `defaults`; `check.sh host` read-only on a real macOS host | 2026-11-19 |
 | `recover-context.sh` digest under 8 KB, current-state block, Codex sources | Test suite; Claude Code hook registration used; Codex hook registration **unverified** | 2026-11-19; the 10 KB hook-output limit it works around was observed, not documented |
-| `bootstrap.sh`, `operator.sh` (create, archive, model, session, recover) | Test suite with fakes; no live first run on a clean account yet | 2026-11-19 |
+| `bootstrap.sh`, `operator.sh` (create, archive, model, session, recover) | Test suite with fakes; `bootstrap.sh` run live once, guided, in a scratch home on the maintainer host with the real CLIs (host apply declined, in-app steps not walked); no clean account yet | 2026-11-20 |
 | **Experimental:** mailroom (ladders, tier telemetry, supervisor, fingerprint and canaries, both tier-1 watchers, unknown-send reconciliation, thread recovery), `switch.sh`, `hygiene.sh`, `install.sh host --apply` | Test suite with fakes; live restart recovery and Claude tier 1 against a real client **unverified** | [Mailroom](mailroom.md#what-is-proven), 2026-11-19 |
 | systemd units, Linux hosts | **Untested** | |
 | Codex relay delivery | Live isolated kit relay → existing native app thread → recipient acknowledgement, macOS; negative cases use fakes | codex-cli 0.169.0-alpha.11.1, 2026-11-18; queue/resume warning observed before a later recipient turn; not a fresh account/machine |

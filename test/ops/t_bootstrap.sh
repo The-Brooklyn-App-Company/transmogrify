@@ -239,6 +239,42 @@ test_codex_hook_is_written_on_consent_trusted_by_the_owner_then_checked() {
   assert_has "$T/out" "Your Codex hooks live in $CODEX_HOME/config.toml"
 }
 
+test_profile_path_gains_the_cli_folders() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  # claude where Claude Code's native installer puts it (~/.local/bin, not on
+  # the caller's PATH), codex in a folder the caller's PATH has but the
+  # profile's path lacks.
+  mkdir -p "$T/clis" "$HOME/.local/bin"
+  mv "$T/bin/claude" "$T/fake-claude"
+  printf '#!/bin/sh\nif [ "$1 $2" = "auth status" ]; then echo %s; exit 0; fi\nexec "%s" "$@"\n' \
+    "'{\"loggedIn\": true}'" "$T/fake-claude" >"$HOME/.local/bin/claude"
+  chmod +x "$HOME/.local/bin/claude"
+  mv "$T/bin/codex" "$T/clis/codex"
+  _tp_path=$PATH
+  PATH=$T/bin:$T/clis:/usr/bin:/bin
+  export PATH
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --yes --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  assert_has "$AO_PROFILE" "path=$T/bin:/usr/bin:/bin:$HOME/.local/bin:$T/clis"
+  assert_eq "$(grep -c '^path=' "$AO_PROFILE")" 1 "path lines"
+  assert_has "$T/out" "path: added the folder of claude ($HOME/.local/bin) codex ($T/clis)"
+  # The checklist now finds both CLIs through the profile's path.
+  assert_has "$T/out" "PASS  sign-in-claude the Claude CLI reports signed in"
+  assert_has "$T/out" "PASS  sign-in-codex the Codex CLI reports signed in"
+  # A rerun adds nothing: the folders are already there.
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_has "$AO_PROFILE" "path=$T/bin:/usr/bin:/bin:$HOME/.local/bin:$T/clis"
+  assert_eq "$(grep -c '^path=' "$AO_PROFILE")" 1 "path lines"
+  assert_lacks "$T/out" "path: added"
+  # No path in the profile: PATH is used as it is, so nothing is added.
+  sed '/^path=/d' "$AO_PROFILE" >"$T/p" && cat "$T/p" >"$AO_PROFILE"
+  run bootstrap.sh --yes --home "$T/ops/oracle"
+  assert_eq "$(grep -c '^path=' "$AO_PROFILE")" 0 "path lines"
+  PATH=$_tp_path
+  export PATH
+}
+
 test_claude_attribution_is_switched_off_on_consent() {
   [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
   fresh

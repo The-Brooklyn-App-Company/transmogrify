@@ -15,9 +15,10 @@
 # making this client the one active Oracle. Everything else it does itself,
 # by the kit's own scripts, re-runnable at any time:
 #   1. install.sh oracle      the Oracle home, registry and profile
-#   2. the profile            owner_tz, your answers for CHANGE-ME keys, and
-#                             the Codex app's bundled node and tool server,
-#                             found inside the app bundle
+#   2. the profile            owner_tz, your answers for CHANGE-ME keys, the
+#                             folders of the claude and codex CLIs added to
+#                             its path, and the Codex app's bundled node and
+#                             tool server, found inside the app bundle
 #   3. install.sh host --apply  App Nap off per desktop app, the ProcessType
 #                             check, both launchd units with watch paths
 #                             generated from the registry, both bridge homes
@@ -52,6 +53,8 @@
 #
 # Exit codes: 0 every step done; 1 steps left; 2 usage error; 5 refused.
 set -u
+# The caller's PATH, before the profile's `path` replaces it (ao_load).
+BS_CALLER_PATH=$PATH
 AO_SCRIPTS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 . "$AO_SCRIPTS/lib/core.sh"
 . "$AO_SCRIPTS/lib/registry.sh"
@@ -75,6 +78,34 @@ bs_profile_set() {
   _pf=$(ao_profile_path)
   _v=$(printf '%s' "$2" | tr -d '\n')
   { grep -v "^$1=" "$_pf"; printf '%s=%s\n' "$1" "$_v"; } | ao_write_atomic "$_pf" && chmod 600 "$_pf"
+}
+
+# bs_path_add_clis  The profile's `path` replaces PATH for every kit script,
+# so the directories holding the claude and codex CLIs must be on it: each
+# one the caller's PATH finds (and ~/.local/bin, where Claude Code's native
+# installer puts claude, when claude is there but not on PATH) is appended
+# when missing. Appended, never prepended, so the profile's order wins.
+# Nothing changes when the profile has no `path` (PATH then stays as is).
+bs_path_add_clis() {
+  _pa_cur=$(sed -n 's/^path=//p' "$(ao_profile_path)" | tail -n 1)
+  [ -n "$_pa_cur" ] || return 0
+  _pa_new=$_pa_cur _pa_added=''
+  for _pa_cli in claude codex; do
+    _pa_bin=$(PATH=$BS_CALLER_PATH; command -v "$_pa_cli" 2>/dev/null) || _pa_bin=''
+    case $_pa_bin in /*) ;; *) _pa_bin='' ;; esac
+    if [ -z "$_pa_bin" ] && [ "$_pa_cli" = claude ] && [ -x "$HOME/.local/bin/claude" ]; then
+      _pa_bin=$HOME/.local/bin/claude
+    fi
+    [ -n "$_pa_bin" ] || continue
+    _pa_dir=${_pa_bin%/*}
+    case $_pa_dir in '' | *:*) continue ;; esac
+    case ":$_pa_new:" in *":$_pa_dir:"*) continue ;; esac
+    _pa_new=$_pa_new:$_pa_dir
+    _pa_added="$_pa_added $_pa_cli ($_pa_dir)"
+  done
+  [ -n "$_pa_added" ] || return 0
+  bs_profile_set path "$_pa_new" || return 1
+  echo "   path: added the folder of$_pa_added, so kit scripts find the CLI"
 }
 
 bs_tz() {
@@ -146,11 +177,12 @@ bs_run() {
     grep -E '^(create|keep) ' | sed 's/^/   /'
   [ -r "$_pf" ] || ao_die "$AO_E_FAIL" "no profile at $_pf after install.sh oracle"
 
-  ao_explain "2. Your profile" "Your timezone, the models (CHANGE-ME values), and the Codex app's paths."
+  ao_explain "2. Your profile" "Your timezone, the models (CHANGE-ME values), the CLIs' folders on its path, and the Codex app's paths."
   bs_profile_set owner_tz "$_tz" || ao_die "$AO_E_FAIL" "cannot write $_pf"
   while IFS= read -r _kv; do
     bs_profile_set "${_kv%%=*}" "${_kv#*=}" || ao_die "$AO_E_FAIL" "cannot write $_pf"
   done <"$_sets"
+  bs_path_add_clis || ao_die "$AO_E_FAIL" "cannot write $_pf"
   # Keys are single words, and ao_ask reads the terminal, so not a read loop.
   # shellcheck disable=SC2013
   for _k in $(sed -n 's/^\([a-z_]*\)=CHANGE-ME.*/\1/p' "$_pf"); do

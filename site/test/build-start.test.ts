@@ -160,6 +160,14 @@ describe('renderStart', () => {
     assert.match(result.stderr, /repository root could not be resolved/);
   });
 
+  test('checks the operations layer and offers its guided first run at a terminal', () => {
+    const source = renderStart({ releaseCommit: '2'.repeat(40), version: '2.0.0' });
+    assert.match(source, /--explain \\\n\s+--operations/);
+    assert.match(source, /operations layer as not set up, offer its guided\s+first run once/);
+    assert.match(source, /sh "\$SKILL_ROOT\/ops\/bootstrap\.sh"/);
+    assert.match(source, /rather than running\s+it for them/);
+  });
+
   test('uses the explaining doctor and guided setup one consented step at a time', () => {
     const source = renderStart({ releaseCommit: '2'.repeat(40), version: '0.2.0' });
     assert.match(source, /before describing the\s+machine or asking the user/);

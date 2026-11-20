@@ -193,6 +193,31 @@ describe('legal documents', () => {
   });
 });
 
+describe('the landing sections', () => {
+  const dir = resolve(siteRoot, 'src/content/sections');
+  const sections = readdirSync(dir)
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => readFileSync(resolve(dir, name), 'utf8'));
+  const field = (source: string, key: string) => new RegExp(`^${key}:\\s*'?([^'\\n]+)'?$`, 'm').exec(source)?.[1];
+
+  test('are the 2.0 set, in order, numbered as they render', () => {
+    assert.deepEqual(sections.map((source) => field(source, 'anchor')), ['what', 'first-hour', 'how', 'support', 'docs']);
+    assert.deepEqual(sections.map((source) => field(source, 'number')), ['01', '02', '03', '04', '05']);
+    assert.deepEqual(sections.map((source) => Number(field(source, 'order'))), [1, 2, 3, 4, 5]);
+  });
+
+  test('the system diagram carries a plain-text alternative and the support section its tables', () => {
+    const how = sections[2];
+    assert.equal(field(how, 'module'), 'system');
+    assert.match(how, /^\s+description: >-\n/m);
+    const support = sections[3];
+    assert.equal(field(support, 'module'), 'matrix');
+    assert.match(support, /caption: What works in each app/);
+    assert.match(support, /caption: Platforms/);
+  });
+});
+
 /**
  * The release refresh has two manual parts, and a test fails when either is
  * forgotten: the site package version tracks the root package, and the Docs
@@ -220,11 +245,11 @@ describe('the release refresh', () => {
 
     test('the cards are the documents a first reader needs, in reading order', () => {
       assert.deepEqual(carded, [
+        'README.md',
+        'docs/operations/README.md',
+        'docs/operations/mailroom.md',
+        'docs/operations/grants.md',
         'SKILL.md',
-        'examples/README.md',
-        'docs/EXECUTION-PROFILES.md',
-        'docs/NOTIFICATIONS.md',
-        'SECURITY.md',
         'docs/TROUBLESHOOTING.md',
       ]);
     });

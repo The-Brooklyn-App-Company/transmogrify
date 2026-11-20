@@ -141,7 +141,8 @@ ${PREREQUISITE_BLOCK.split('\n').map((line) => `   ${line}`).join('\n')}
    node "$SKILL_ROOT/scripts/doctor.js" \\
      --repo-root "$REPO_ROOT" \\
      --target all \\
-     --explain
+     --explain \\
+     --operations
    \`\`\`
 
 7. Read the doctor's setup plan, but do not paste its JSON into the
@@ -183,6 +184,15 @@ ${PREREQUISITE_BLOCK.split('\n').map((line) => `   ${line}`).join('\n')}
    IDE agent, finish setup and send the user to one of the desktop apps; do not
    start lane work there. On an unsupported machine, offer Codex without live
    app streaming. Otherwise continue with the user's requested work.
+10. If the doctor lists the operations layer as not set up, offer its guided
+    first run once, in one sentence: it sets up the Oracle, the always-on host
+    and the mailroom, asking before each change. It asks its own questions at
+    a terminal, so give the user the command to run there rather than running
+    it for them:
+
+    \`\`\`bash
+    sh "$SKILL_ROOT/ops/bootstrap.sh"
+    \`\`\`
 
 Transmogrify does not use GUI automation as a lifecycle control channel.
 `;

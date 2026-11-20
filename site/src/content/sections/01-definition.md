@@ -3,62 +3,48 @@ order: 1
 anchor: what
 label: What it is
 number: '01'
-title: What it is
+title: A small, accountable team of agents
 lede: >-
-  One skill, installed once, that lets Claude and Codex hand work to each other
-  and watch it run.
+  One main session that holds your priorities and approvals, one long-running
+  session per outcome, and short-lived workers either app can hand to the
+  other, all on your own always-on Mac.
 module: features
 features:
-  - icon: arrows
-    title: Works in both directions
-    detail: >-
-      Claude Code can hand a job to Codex, and Codex can hand one to Claude
-      Code. The commands are the same either way.
-  - icon: route
-    title: Picks the right model
-    detail: >-
-      Say what the job needs and Transmogrify chooses the model, effort, and
-      speed for it, or name the model yourself.
-  - icon: branch
-    title: One clone per job
-    detail: >-
-      Every job works in its own clone of your repository, so agents never
-      edit the same files, and hands back a commit when it is done.
   - icon: eye
-    title: Live in the app
+    title: The Oracle
     detail: >-
-      Codex jobs show in the ChatGPT app once it is connected to the shared
-      runtime; Claude jobs show in the Claude app, on your Mac and your phone.
+      Your main session: priorities, approvals, follow-through. One per person,
+      active in one app at a time.
+  - icon: arrows
+    title: Operators
+    detail: >-
+      One long-running session per outcome, each with a home repository that
+      holds everything needed to pick it back up. Each runs in Claude Code or
+      Codex, and moves between them by a checked switch.
+  - icon: branch
+    title: Workers
+    detail: >-
+      Short jobs in either app, one clone each, that hand back a commit. The
+      session that started one can steer it, collect it and close it out.
+  - icon: shield
+    title: Approvals that follow
+    detail: >-
+      Your standing approvals live in one file and are written into each app's
+      own approval settings, only after you say yes. An operator cannot switch
+      apps until the other side matches.
   - icon: message
-    title: Steer while it runs
+    title: Mail that never stops
     detail: >-
-      Send a running job more instructions, stop it, or pick it up again
-      later. It keeps going after the agent that started it is gone.
-  - icon: archive
-    title: Cleans up after itself
+      Messages reach sessions in both apps without a model polling. When a path
+      breaks, delivery slows down instead of stopping, and you hear about it
+      once.
+  - icon: house
+    title: Nothing hosted
     detail: >-
-      When a job finishes, the agent that started it is woken, collects the
-      commit, and archives the job and its clone.
+      No server, account or telemetry of its own; your Claude and ChatGPT
+      accounts work as they already do.
 ---
 
-Install Transmogrify by pasting the prompt above into either Claude Code or
-the ChatGPT desktop app. Once installed, it works in both apps automatically.
-
-Use Transmogrify to easily hand off work between Claude and Codex. Invoke the
-skill to create a job and send it to the model you want. Transmogrify knows
-each model's strengths, effort levels, and sizes, so it can choose for you or
-take the one you name. Bring your own rules for when to use which model, or
-use the built-in guidance that routes each kind of work to the model best
-suited for it.
-
-Every job runs in its own clone of your repository and shows up in its app:
-Codex jobs show up in the ChatGPT app once it is connected to Transmogrify's
-runtime, and Claude jobs show up in the Claude app, on your Mac and your phone.
-Watch a job work in real time, send it more instructions, and pick up the
-commit it hands back. When it finishes, the agent that started it is woken,
-collects the result, and archives the job and its clone.
-
-A good way to work: make one agent the orchestrator and let it fan jobs out
-across Codex and Claude as the work calls for it. Transmogrify needs no server,
-account, or telemetry of its own; your Claude and ChatGPT accounts work as they
-already do.
+**Who it is for:** solo builders and small teams who already use Claude Code
+or Codex. **What it is not:** a framework, a hosted service, or a daemon you
+trust with credentials.

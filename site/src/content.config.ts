@@ -6,7 +6,7 @@ import { glob } from 'astro/loaders';
  * Landing-page sections.
  *
  * Prose lives in the Markdown body. Anything the page renders as structure —
- * the feature grid, the two provider diagrams, document cards — lives in typed
+ * the feature grid, the system diagram, the support tables, document cards — lives in typed
  * frontmatter so a content edit cannot silently break the layout.
  *
  * Facts with a canonical home in the repository root are NOT stored here. The
@@ -27,30 +27,36 @@ const sections = defineCollection({
     title: z.string().min(4),
     lede: z.string().optional(),
     /** Which structural module renders after the prose body. */
-    module: z.enum(['prose', 'features', 'providers', 'docs']).default('prose'),
+    module: z.enum(['prose', 'features', 'system', 'matrix', 'docs']).default('prose'),
     /** Key features, each with one of the icons drawn in FeaturesModule. */
     features: z
       .array(
         z.object({
-          icon: z.enum(['arrows', 'route', 'branch', 'eye', 'message', 'archive']),
+          icon: z.enum(['arrows', 'branch', 'eye', 'message', 'shield', 'house']),
           title: z.string(),
           detail: z.string(),
         }),
       )
       .optional(),
-    /** One block per provider, each with the diagram drawn in ProvidersModule. */
-    providers: z
+    /** The system diagram (drawn in SystemModule): its caption and its plain-text alternative. */
+    diagram: z
+      .object({
+        caption: z.string().min(20),
+        description: z.string().min(40),
+      })
+      .optional(),
+    /** Support tables (MatrixModule): a caption, a header row, and rows of the same width. */
+    tables: z
       .array(
-        z.object({
-          id: z.enum(['claude', 'codex']),
-          title: z.string(),
-          body: z.string(),
-          doc: z.object({
-            label: z.string(),
-            /** Repository-relative path; the canonical URL is built at render time. */
-            path: z.string(),
+        z
+          .object({
+            caption: z.string(),
+            head: z.array(z.string()).min(2),
+            rows: z.array(z.array(z.string())).min(1),
+          })
+          .refine((table) => table.rows.every((row) => row.length === table.head.length), {
+            message: 'every row has as many cells as the header',
           }),
-        }),
       )
       .optional(),
     docs: z

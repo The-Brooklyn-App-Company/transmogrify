@@ -4,7 +4,8 @@ import { getCollection, render } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import StartPrompt from '../components/StartPrompt.astro';
 import FeaturesModule from '../components/FeaturesModule.astro';
-import ProvidersModule from '../components/ProvidersModule.astro';
+import SystemModule from '../components/SystemModule.astro';
+import MatrixModule from '../components/MatrixModule.astro';
 import DocsModule from '../components/DocsModule.astro';
 import Inline from '../components/Inline.astro';
 import { getRepoFacts } from '../lib/repo-facts.node.ts';
@@ -74,6 +75,10 @@ const rendered = await Promise.all(
             </header>
 
             <div class="section-body">
+              {entry.data.module === 'system' && entry.data.diagram && (
+                <SystemModule caption={entry.data.diagram.caption} description={entry.data.diagram.description} />
+              )}
+
               <div class="prose">
                 <Content />
               </div>
@@ -81,8 +86,8 @@ const rendered = await Promise.all(
               {entry.data.module === 'features' && entry.data.features && (
                 <FeaturesModule features={entry.data.features} />
               )}
-              {entry.data.module === 'providers' && entry.data.providers && (
-                <ProvidersModule providers={entry.data.providers} />
+              {entry.data.module === 'matrix' && entry.data.tables && (
+                <MatrixModule tables={entry.data.tables} />
               )}
               {entry.data.module === 'docs' && entry.data.docs && (
                 <DocsModule docs={entry.data.docs} />

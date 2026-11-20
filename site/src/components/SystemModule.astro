@@ -1,0 +1,237 @@
+---
+import Inline from './Inline.astro';
+
+interface Props {
+  caption: string;
+  description: string;
+}
+const { caption, description } = Astro.props;
+
+/**
+ * One diagram of the whole system, top to bottom: you, the Oracle and the
+ * approvals it writes into both apps, three operators (one per app and one
+ * either), worker lanes in their own clones, the delivery strip, and the
+ * fallback ladder. Every box is a part of the real mechanism; nothing is
+ * decorative. SVG text does not wrap, so labels stay short.
+ */
+type Box = { x: number; y: number; w: number; h: number; label?: string; note?: string; lines?: string[]; kind?: 'accent' | 'soft' | 'clone' };
+
+const you: Box = { x: 270, y: 8, w: 180, h: 44, label: 'You', note: 'at a desk or on a phone' };
+const oracle: Box = { x: 270, y: 86, w: 180, h: 52, label: 'The Oracle', note: 'priorities, approvals', kind: 'accent' };
+const settings: Box[] = [
+  { x: 548, y: 66, w: 164, h: 32, lines: ['Claude Code settings'], kind: 'soft' },
+  { x: 548, y: 118, w: 164, h: 32, lines: ['Codex settings'], kind: 'soft' },
+];
+const operators: Box[] = [
+  { x: 30, y: 196, w: 180, h: 52, label: 'Operator', note: 'Claude Code' },
+  { x: 270, y: 196, w: 180, h: 52, label: 'Operator', note: 'Codex' },
+  { x: 510, y: 196, w: 180, h: 52, label: 'Operator', note: 'either app' },
+];
+// Worker lanes under the first two operators: stacked cards, each its own clone.
+const workers = [operators[0], operators[1]].map((op) => ({ x: op.x + 20, y: 290, w: 140, h: 34 }));
+
+const strip: Box[] = [
+  { x: 8, y: 382, w: 178, h: 48, lines: ['hooks, timers, CI,', 'other sessions'], kind: 'soft' },
+  { x: 214, y: 388, w: 84, h: 36, lines: ['inbox'] },
+  { x: 326, y: 388, w: 84, h: 36, lines: ['relay'] },
+];
+const bridges: Box[] = [
+  { x: 448, y: 362, w: 180, h: 36, label: 'Mailroom (Claude)', kind: 'accent' },
+  { x: 448, y: 414, w: 180, h: 36, label: 'Mailroom (Codex)', kind: 'accent' },
+];
+const ladder: Box[] = [
+  { x: 8, y: 504, w: 158, h: 34, lines: ['model-free'] },
+  { x: 192, y: 518, w: 158, h: 34, lines: ['bridge turn'] },
+  { x: 376, y: 532, w: 158, h: 34, lines: ['headless or CLI'] },
+  { x: 560, y: 546, w: 152, h: 34, lines: ['alarm to you'], kind: 'soft' },
+];
+
+const cx = (b: Box | { x: number; w: number }) => b.x + b.w / 2;
+const cy = (b: Box) => b.y + b.h / 2;
+const bottom = (b: { y: number; h: number }) => b.y + b.h;
+---
+
+<figure class="system">
+  <div class="diagram-wrap">
+    <svg class="diagram" viewBox="0 0 720 604" role="img" aria-labelledby="system-diagram-title">
+      <title id="system-diagram-title">{description}</title>
+      <defs>
+        <marker id="system-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="head" d="M0 0 8 4 0 8Z" />
+        </marker>
+      </defs>
+
+      {[you, oracle, ...operators, ...bridges].map((b) => (
+        <g>
+          <rect class:list={['box', b.kind]} x={b.x} y={b.y} width={b.w} height={b.h} rx="7" />
+          <text class="label" x={cx(b)} y={b.note ? cy(b) - 5 : cy(b) + 5} text-anchor="middle">{b.label}</text>
+          {b.note && <text class="note" x={cx(b)} y={cy(b) + 13} text-anchor="middle">{b.note}</text>}
+        </g>
+      ))}
+
+      {[...settings, ...strip, ...ladder].map((b) => (
+        <g>
+          <rect class:list={['box', b.kind]} x={b.x} y={b.y} width={b.w} height={b.h} rx="7" />
+          {(b.lines ?? []).map((line, i, all) => (
+            <text class="note strong" x={cx(b)} y={cy(b) + 4 + (i - (all.length - 1) / 2) * 15} text-anchor="middle">{line}</text>
+          ))}
+        </g>
+      ))}
+
+      {/* You talk to the Oracle. */}
+      <path class="edge" d={`M${cx(you)} ${bottom(you) + 2}V${oracle.y - 3}`} marker-end="url(#system-arrow)" />
+
+      {/* Approvals: one file, written into both apps' settings. */}
+      <text class="note" x={cx(settings[0])} y={settings[0].y - 12} text-anchor="middle">approvals (one file)</text>
+      {settings.map((s) => (
+        <path class="edge dotted" d={`M${oracle.x + oracle.w + 2} ${cy(oracle)}L${s.x - 3} ${cy(s)}`} marker-end="url(#system-arrow)" />
+      ))}
+
+      {/* The Oracle coordinates the operators. */}
+      {operators.map((op) => (
+        <path class="edge" d={`M${cx(oracle)} ${bottom(oracle) + 2}L${cx(op)} ${op.y - 3}`} marker-end="url(#system-arrow)" />
+      ))}
+
+      {/* An operator moves between apps by a checked switch. */}
+      <path class="edge" d={`M${operators[0].x + operators[0].w + 4} ${cy(operators[0]) + 8}H${operators[1].x - 4}`} marker-start="url(#system-arrow)" marker-end="url(#system-arrow)" />
+      <text class="note" x={(operators[0].x + operators[0].w + operators[1].x) / 2} y={cy(operators[0]) - 2} text-anchor="middle">switch</text>
+
+      {/* Worker lanes: stacked cards, each in its own clone, each handing back a commit. */}
+      {workers.map((w) => (
+        <g>
+          <rect class="box clone" x={w.x + 8} y={w.y - 6} width={w.w} height={w.h} rx="7" />
+          <rect class="box clone front" x={w.x} y={w.y} width={w.w} height={w.h} rx="7" />
+          <text class="note strong" x={cx(w)} y={w.y + 21} text-anchor="middle">own clone</text>
+          <path class="edge" d={`M${w.x + w.w - 18} ${w.y - 8}V${bottom(operators[0]) + 3}`} marker-end="url(#system-arrow)" />
+          <text class="note" x={w.x + w.w - 12} y={w.y - 22} text-anchor="start">commit</text>
+        </g>
+      ))}
+
+      {/* Delivery strip: sources, the inbox, the relay, then a Mailroom in each app. */}
+      <path class="edge" d={`M${strip[0].x + strip[0].w + 2} ${cy(strip[1])}H${strip[1].x - 3}`} marker-end="url(#system-arrow)" />
+      <path class="edge" d={`M${strip[1].x + strip[1].w + 2} ${cy(strip[1])}H${strip[2].x - 3}`} marker-end="url(#system-arrow)" />
+      {bridges.map((b) => (
+        <path class="edge" d={`M${strip[2].x + strip[2].w + 2} ${cy(strip[2])}L${b.x - 3} ${cy(b)}`} marker-end="url(#system-arrow)" />
+      ))}
+      <path class="edge" d={`M${bridges[0].x + bridges[0].w - 30} ${bridges[0].y - 2}V${bottom(operators[2]) + 3}`} marker-end="url(#system-arrow)" />
+      <path class="edge" d={`M${bridges[1].x + bridges[1].w + 2} ${cy(bridges[1])}H704V${cy(operators[2]) + 10}H${operators[2].x + operators[2].w + 3}`} marker-end="url(#system-arrow)" />
+      <text class="note" x={bridges[0].x + bridges[0].w - 36} y={bridges[0].y - 30} text-anchor="end">to the sessions</text>
+
+      {/* The ladder: a broken step adds latency, never stops delivery. */}
+      <text class="note" x="8" y="490" text-anchor="start">when a step fails, delivery falls to the next:</text>
+      {ladder.slice(0, -1).map((b, i) => (
+        <path class="edge" d={`M${b.x + b.w + 2} ${cy(b)}L${ladder[i + 1].x - 3} ${cy(ladder[i + 1])}`} marker-end="url(#system-arrow)" />
+      ))}
+      <text class="note" x="712" y="598" text-anchor="end">a broken step adds latency, never stops delivery</text>
+    </svg>
+  </div>
+  <figcaption><Inline text={caption} /></figcaption>
+</figure>
+
+<style>
+  .system {
+    display: grid;
+    gap: var(--s-4);
+    padding: var(--s-5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+  }
+
+  /* The diagram keeps a legible minimum width and scrolls inside its own
+     wrapper on narrow screens rather than shrinking its text. */
+  .diagram-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-block-end: var(--s-2);
+  }
+
+  .diagram {
+    display: block;
+    inline-size: 100%;
+    min-inline-size: 38rem;
+    max-inline-size: 48rem;
+    block-size: auto;
+    overflow: visible;
+  }
+
+  .box {
+    fill: var(--bg-inset);
+    stroke: var(--line-strong);
+    stroke-width: 1;
+  }
+
+  .box.accent {
+    fill: var(--accent-wash);
+    stroke: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .box.soft {
+    fill: var(--bg-sunken);
+    stroke: var(--line);
+  }
+
+  .box.clone {
+    fill: var(--bg-raised);
+    stroke: var(--line);
+    stroke-dasharray: 3 3;
+  }
+
+  .box.clone.front {
+    fill: var(--bg-inset);
+  }
+
+  .label {
+    fill: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .note {
+    fill: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .note.strong {
+    fill: var(--text);
+  }
+
+  .edge {
+    fill: none;
+    stroke: var(--faint);
+    stroke-width: 1.5;
+  }
+
+  .edge.dotted {
+    stroke-dasharray: 2 4;
+    stroke-linecap: round;
+  }
+
+  .head {
+    fill: var(--faint);
+  }
+
+  figcaption {
+    color: var(--muted);
+    font-size: var(--step--1);
+    line-height: 1.65;
+    max-inline-size: 66ch;
+  }
+
+  figcaption :global(code) {
+    font-size: 0.92em;
+    color: var(--text);
+    background: var(--bg-inset);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.05em 0.32em;
+  }
+
+  @media (max-width: 44rem) {
+    .system {
+      padding: var(--s-4);
+    }
+  }
+</style>

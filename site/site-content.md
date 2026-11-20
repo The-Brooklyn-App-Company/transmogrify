@@ -1,10 +1,9 @@
 # Site content for Transmogrify 2.0
 
-Copy for the existing site to render later. Source of truth for every claim
-is the root [README](../README.md); when they disagree, the README wins and
-this file is updated. Nothing here changes the site's build, layout or
-checks. Repository links point to `The-Brooklyn-App-Company/transmogrify`,
-the 2.0 home (not created yet).
+The copy the 2.0 site renders (`src/content/sections/`). Source of truth
+for every claim is the root [README](../README.md); when they disagree, the
+README wins and both this file and the sections are updated. Repository
+links point to `The-Brooklyn-App-Company/transmogrify`, the 2.0 home.
 
 ## Hero
 

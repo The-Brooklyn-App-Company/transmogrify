@@ -59,13 +59,14 @@ Other commands:
 Substantive copy lives in Markdown under `src/content/`, validated by the typed
 schemas in `src/content.config.ts`.
 
-- **`sections/*.md`** — the landing page: what it is, how it works, and the
-  docs. Prose is the Markdown body; anything the page renders as *structure*
-  (the feature grid, the two provider diagrams, the six document cards) is
-  typed frontmatter, so a copy edit cannot silently break a layout. `order` controls
-  sequence; `module` selects which structural component renders after the
-  prose. The only call to action on the page is the start prompt in the hero;
-  the page explains, it does not walk through an install.
+- **`sections/*.md`** — the landing page: what it is, your first hour, how
+  it works, the support matrix, and the docs. Prose is the Markdown body;
+  anything the page renders as *structure* (the feature grid, the system
+  diagram, the support tables, the six document cards) is typed frontmatter,
+  so a copy edit cannot silently break a layout. `order` controls sequence;
+  `module` selects which structural component renders with the prose (after
+  it, except the system diagram, which comes first). The only call to action
+  on the page is the start prompt in the hero.
 - **`legal/*.md`** — the Terms of Service and Privacy Policy, rendered by
   `src/pages/[slug].astro`. Both must declare the same `effectiveDate` as
   `LEGAL_EFFECTIVE_DATE` in `src/lib/site.ts`; the page throws at build time if

@@ -119,7 +119,9 @@ drift_row() {
     drift session "registered session id $OP_SID has no $OP_CLIENT transcript (stale or from another machine)" "put the current session id, or pending, in the registry row"
   fi
   # shellcheck disable=SC2016 # the backticks are literal Markdown
-  _av=$(sed -n 's/.*Agent Operations kit (`[^`]*`, version \([^)]*\)).*/\1/p' "$_h/AGENTS.md" 2>/dev/null | head -n 1)
+  # Homes from 2.0 cite the "Transmogrify operations kit"; older ones the "Agent Operations kit".
+  _av=$(sed -n -e 's/.*Transmogrify operations kit (`[^`]*`, version \([^)]*\)).*/\1/p' \
+    -e 's/.*Agent Operations kit (`[^`]*`, version \([^)]*\)).*/\1/p' "$_h/AGENTS.md" 2>/dev/null | head -n 1)
   [ -z "$_av" ] || [ -z "$kit_version" ] || [ "$_av" = "$kit_version" ] ||
     drift pin "AGENTS.md cites kit version $_av, this checkout is $kit_version" "read CHANGELOG.md for the difference, then update the version in $_h/AGENTS.md"
 }

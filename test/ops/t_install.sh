@@ -275,6 +275,10 @@ test_drift_names_renames_pins_and_stale_ids() {
   assert_has "$T/out" "web: pin: AGENTS.md cites kit version 0.1.0, this checkout is $(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$KIT_DIR/package.json")"
   assert_has "$T/out" "oracle: pin: KIT.local.md pins kit 0.1.0"
   assert_has "$T/out" "oracle: pin: KIT.local.md pins commit abc1234"
+  # A home written before 2.0 cites the "Agent Operations kit": still read.
+  sed -i.bak 's/Transmogrify operations kit (/Agent Operations kit (/; s/, version [^)]*)/, version 0.0.9)/' "$w/AGENTS.md"
+  run status.sh --drift
+  assert_has "$T/out" "web: pin: AGENTS.md cites kit version 0.0.9"
 }
 
 test_sync_leaves_a_dirty_operator_conf_alone() {

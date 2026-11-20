@@ -293,7 +293,7 @@ inst_oracle() {
       failures=$((failures + 1))
     fi
   fi
-  inst_commit "$home" "Create the Oracle home from Agent Operations $kit_version"
+  inst_commit "$home" "Create the Oracle home from Transmogrify $kit_version"
   cat <<EOF
 
 Next, by hand:
@@ -442,7 +442,7 @@ inst_operator() {
       git -C "$work_root/$_r" worktree add -q -b "$v_key/main" "$_wt"
     fi || { ao_warn "cannot create worktree $_wt"; failures=$((failures + 1)); }
   done <"$contribs"
-  [ -n "$embedded" ] || inst_commit "$home" "Create operator home $v_key from Agent Operations $kit_version"
+  [ -n "$embedded" ] || inst_commit "$home" "Create operator home $v_key from Transmogrify $kit_version"
   inst_commit "$AO_HOME" "Add operator $v_key"
   [ -z "$clones" ] || printf '\nClone these yourself (the installer uses no network):%s\n' "$clones"
   cat <<EOF
@@ -510,7 +510,7 @@ inst_sync_row() {
   # other home in its own repository.
   _top=$(git -C "$_rh" rev-parse --show-toplevel 2>/dev/null) && _top=$(CDPATH='' cd -- "$_top" && pwd -P) || _top=
   if [ -z "$_top" ] || [ "$_top" != "$oracle_top" ]; then
-    inst_commit "$_rh" "Sync operator home $v_key for $v_sync (Agent Operations $kit_version)"
+    inst_commit "$_rh" "Sync operator home $v_key for $v_sync (Transmogrify $kit_version)"
   fi
   printf '%s\t%s\t%s\t%s\n' "$v_key" "$_rh" "$_sname" "$OP_LEASE" >>"$sync_steps"
 }
@@ -668,7 +668,7 @@ inst_bridge() {
   inst_render "$TPL/mailroom/$v_client-AGENTS.md" "$home/AGENTS.md"
   [ "$v_client" != claude ] || inst_render "$TPL/home/CLAUDE.md" "$home/CLAUDE.md"
   [ -n "$row" ] || inst_append "$AO_REGISTRY" "$v_key$AO_TAB$v_name$AO_TAB$(inst_tilde "$home")${AO_TAB}pending$AO_TAB$v_client"
-  inst_commit "$home" "Create the $v_client mailroom bridge home from Agent Operations $kit_version"
+  inst_commit "$home" "Create the $v_client mailroom bridge home from Transmogrify $kit_version"
   inst_commit "$AO_HOME" "Add the $v_client mailroom bridge"
   cat <<EOT
 

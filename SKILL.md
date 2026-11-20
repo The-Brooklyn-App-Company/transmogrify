@@ -31,6 +31,14 @@ mutation is journaled before dispatch and confirmed by an exact receipt. Never
 trade exact ownership for convenience, and never replay a mutation whose
 outcome is unknown.
 
+## Skill index
+
+This is the workers skill. Transmogrify 2.0 also ships the operations
+layer's skills (operator setup, review handoff, release closeout, return to
+desk, model bake-off) under `$SKILL_ROOT/skills/`; the one index of all of
+them, with when to load each, is `$SKILL_ROOT/skills/README.md`. Operator
+sessions follow the rules in `$SKILL_ROOT/kit/KIT.md` by ID.
+
 ## The happy path
 
 1. Run `doctor.js --repo-root "$REPO_ROOT" --target all --explain` quietly,

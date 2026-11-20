@@ -1,6 +1,6 @@
 ---
 name: operator-setup
-description: Use when setting up Agent Operations (an Oracle home or a new operator) or re-checking an existing setup. Not for routine repository work.
+description: Use when setting up the Transmogrify operations layer (an Oracle home or a new operator) or re-checking an existing setup. Not for routine repository work.
 ---
 
 # Operator setup

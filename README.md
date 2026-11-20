@@ -1,258 +1,359 @@
 # Transmogrify
 
-Transmogrify is an open-source skill for Claude Code and Codex. Install it once
-and either app can hand coding work to the other and watch it run: every job
-gets its own clone of your repository and a name you can find in the app, and
-the agent that started it can steer it, collect the commit it hands back, and
-close it out. The commands are the same in both directions.
+An operating system for a small team of long-running AI agents on your own
+always-on Mac, across Claude Code and Codex.
 
-Under the hood each provider keeps its native channel. Codex jobs are threads
-on a shared local `codex app-server` runtime; Claude jobs are named Claude
-Code Remote Control sessions. Every lifecycle mutation is ownership-gated: the
-installation keeps an exact lane registry and durable operation records
-outside your repository, never adopts a session by name, and never touches a
-session or worktree it does not own. Read [Security](SECURITY.md) before using
-it on sensitive work.
+Transmogrify gives one person, or a small team, a main session that holds
+your priorities and approvals (the **Oracle**), one long-running session per
+outcome (an **operator**, each with a home repository that holds everything
+needed to resume it), and short-lived **worker lanes** that either app can
+hand to the other: every job gets its own clone of your repository, and the
+session that started it can steer it, collect the commit it hands back, and
+close it out. Messages reach sessions in both desktop apps without a model
+polling, approvals follow an operator when it moves between the apps, and a
+broken delivery path slows things down instead of stopping them.
 
-The name: to transmogrify is to change something completely while keeping it
-recognizable. Transmogrify turns two different native agent mechanisms into
-one lifecycle without flattening them into a fake common transport.
+It is two layers in one install:
 
-## Support matrix
+- **Operations** (`ops/`, `kit/`, `docs/operations/`): rules with stable IDs,
+  homes, the mailroom, the operator routines and switches, approvals, and
+  scheduled checks. POSIX `sh`, `jq` and the system Python; no daemon.
+- **Workers** (`scripts/`, `SKILL.md`): exact-owned worker lanes in Codex
+  or Claude Code, with durable operation records and "never replay an
+  unknown outcome". Node.js.
 
-| Host app | Codex jobs | Claude Code jobs |
+**Who it is for:** solo builders and small teams (up to about five people)
+who already use Claude Code or Codex and want their agents to behave like a
+small, accountable team on hardware they control.
+
+**What it is not:** a framework, a hosted service, an agent runtime, or a
+daemon you trust with credentials. It never signs in for you, never stores a
+secret, and needs no server or account of its own.
+
+> **Status: 2.0.0-rc.1, a release candidate.** The workers layer carries
+> forward the 0.6 line's measured receipts. Much of the operations layer is
+> proven only against the test suite's fakes; each piece's highest proven
+> stage is in [What is proven](docs/operations/README.md#what-is-proven).
+
+## The picture
+
+```text
+ you, at a desk or on a phone
+        |
+        v
+   the Oracle ............ approvals (one grants file) ...> each app's own
+   (one per person,                                         approval layer
+    one active app)
+        |
+   +----+-------------+------------------+
+   |                  |                  |
+ operator           operator          operator      one home each; runs in
+ (Claude Code)      (Codex)           (either)      exactly one app at a time
+   |                  |
+ worker lanes       worker lanes                     one clone per job;
+ (Codex or Claude)  (Codex or Claude)                hands back a commit
+
+ delivery: sources (hooks, timers, CI, trackers, other sessions)
+             -> inbox (one note file per message)
+             -> relay (model-free, on a timer and on change)
+             -> bridge ("Mailroom", one per desktop app)
+             -> the recipient session
+```
+
+Same-app messages go directly, with the app's own tool. Everything else is a
+note in the recipient's inbox; the relay rings the receiving app's bridge,
+and every ring walks that app's **degradation ladder**:
+
+| Tier | Claude Code | Codex |
 | --- | --- | --- |
-| Codex | Yes. They run on the shared Codex server and show live in the ChatGPT app once the app is connected to that server. | Yes. They run as named Remote Control sessions and show in the Claude app. |
-| Claude Code | Yes. They run on the shared Codex server and show live in the ChatGPT app once the app is connected to that server. | Yes. They run as named Remote Control sessions and show in the Claude app. |
+| 1, model-free | A warm session's local socket (opt-in, undocumented interface) | The app's native send, from a watcher the bridge owns |
+| 2, a bridge model turn | The bridge session sends it; this also reaches cold sessions | The bridge re-arms its watcher, which catches up |
+| 3, headless or CLI | One confined headless run | One CLI queue straight to the thread |
+| 4, alarm | A note to the Oracle, then one push to you per outage | Same |
 
-Live streaming in the ChatGPT app is conditional and measured, never assumed:
-`scripts/desktop-attach.js` reports whether the app holds a connection to the
-selected runtime, and only on a verified app build. Without that receipt a
-Codex lane runs protocol-only, which `spawn` accepts only with
-`--allow-protocol-only`. Claude lanes carry their Remote Control receipt and
-were live-verified on Desktop and iPhone. Verified builds and receipts are in
-the [protocol contract](docs/PROTOCOL.md) and
-[Claude Code integration](docs/CLAUDE-CODE.md).
-
-## Requirements
-
-- [Node.js](https://nodejs.org/en/download) 20 or newer with npm, plus Git,
-  Bash, `ps`, and `lsof`. macOS and Linux are CI-tested; Windows is not
-  supported.
-- Codex CLI/app-server `0.151.0` or newer, signed in
-  ([Codex CLI guide](https://learn.chatgpt.com/docs/codex/cli)). Live
-  streaming in the ChatGPT app additionally needs an app build verified for
-  relay attachment and thread resume; no current build passes (26.901.51231
-  and 26.903.61454 both fail to resume threads on the relay path), and an
-  owner records one that does with
-  `desktop-attach.js persist --authorize --verified-build <version> <build>`.
-  Mobile visibility was measured with ChatGPT for iOS `1.2026.230`
-  (`32543289983`).
-- For Claude jobs: Apple Silicon macOS and Claude Code CLI `2.1.258` or newer,
-  signed in to a `claude.ai` account. Compatibility is a measured minimum plus
-  probes, with no maximum version; a failed measurement blocks mutations. The
-  private archive step separately pins the exact CLI hash and Claude Desktop
-  `1.49585.0`. Mobile behavior was verified with Claude for iOS `1.260828.1`
-  (`33349478298`). Details in
-  [Claude compatibility](docs/CLAUDE-CODE.md#compatibility-receipts).
-- One runtime dependency, `ws`. The website under `site/` is a separate
-  package that is not installed with the skill.
-- The target repository must be a Git worktree root with at least one commit.
+A broken tier adds latency, is logged on the delivery's row and is flagged
+once per cause. Details: [Mailroom](docs/operations/mailroom.md).
 
 ## Install
 
-Paste one line into Claude Code or the ChatGPT desktop app:
+Paste one line into Claude Code or Codex (the ChatGPT desktop app):
 
 ```text
 Fetch https://transmogrify.sh/start and follow its instructions.
 ```
 
-CI generates `/start` from one exact published release commit; it refuses to
-install without that pin and never falls back to a branch. To install from a
-source checkout instead:
+The same line works in either app. CI generates `/start` from one exact
+published release commit; it refuses to install without that pin and never
+falls back to a branch. It installs both layers, then runs the read-only
+doctor.
+
+From a source checkout instead, pinned to a release tag:
 
 ```bash
-git clone https://github.com/nicholasgerard/transmogrify.git
+git clone https://github.com/<org>/transmogrify.git
 cd transmogrify
+git checkout v2.0.0          # a release tag, never a branch
 npm ci --ignore-scripts
 ./install.sh --dry-run
 ./install.sh
 ```
 
-The installer copies the skill to `~/.claude/skills/transmogrify` and
-`~/.agents/skills/transmogrify` (Codex's personal skill location), backs up
-existing installations, and refuses an occupied target it did not write or an
-unsafe parent directory. `--target codex|claude` installs one host;
-`./install.sh --help` lists the rest. The package is not published to npm.
+The installer copies the whole package, both layers, to
+`~/.claude/skills/transmogrify` and `~/.agents/skills/transmogrify` (Codex's
+personal skill location), backs up existing installations, and refuses an
+occupied target it did not write or an unsafe parent directory.
+`--target codex|claude` installs one host; `./install.sh --help` lists the
+rest. The package is not published to npm. Upgrades, rollback and removal
+are in [Troubleshooting](docs/TROUBLESHOOTING.md#installation-and-upgrades).
 
-Then, in a new session, run the doctor and let guided setup handle whatever it
-finds, one consent at a time:
+### Requirements
+
+- macOS for the operations layer (launchd units, the desktop apps). Linux is
+  best effort for the `sh` layer: CI runs its suite on Ubuntu, but no Linux
+  host has run it live. Windows is not supported.
+- Git, `jq`, the system Python (`/usr/bin/python3`), and Claude Code or Codex
+  (or both), signed in by you.
+- For worker lanes: [Node.js](https://nodejs.org/en/download) 20 or newer
+  with npm, plus Bash, `ps` and `lsof`; Codex CLI/app-server `0.151.0` or
+  newer; for Claude jobs, Apple Silicon and Claude Code CLI `2.1.258` or
+  newer. Compatibility is a measured minimum plus probes, with no maximum
+  version; the optional private archive step separately pins the exact CLI
+  hash and Claude Desktop build
+  ([Claude compatibility](docs/CLAUDE-CODE.md#compatibility-receipts)).
+  Live streaming in the ChatGPT app also needs an app build verified for
+  relay attachment and thread resume (none passes yet; see the support
+  matrix).
+
+### The first run
+
+One guided first run sets up both layers, one consent at a time:
 
 ```bash
 export SKILL_ROOT="$HOME/.agents/skills/transmogrify"   # Claude-only: $HOME/.claude/skills/transmogrify
-export REPO_ROOT=/absolute/path/to/repository
-node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$REPO_ROOT" --target all --explain
-node "$SKILL_ROOT/scripts/setup.js" --repo-root "$REPO_ROOT"
+node "$SKILL_ROOT/scripts/doctor.js" --repo-root "$PWD" --target all --operations --explain
+sh "$SKILL_ROOT/ops/bootstrap.sh"
 ```
 
-The doctor reads provider state, measures compatibility, and writes only
-local receipts; it never starts, stops, steers, or archives a real session.
-Its `setup.ownerActions` names every step only the owner can take, with a
-`blocking` flag: a logged-out or unmeasured Claude CLI blocks Claude lanes, a
-runtime that needs authorization blocks Codex lanes, and an unattached Codex
-app only withholds live streaming. In a non-interactive host, authorize one
-step at a time with the matching `setup.js` flag
-(`--install-claude-cli`, `--install-codex-cli`, `--sign-in`,
-`--start-runtime`, `--relaunch-desktop`, `--persist-attach`). Invoke the skill
-with `$transmogrify operate this repository` in Codex or
-`/transmogrify operate this repository` in Claude Code. Upgrades, rollback,
-and removal are in [Troubleshooting](docs/TROUBLESHOOTING.md#installation-and-upgrades).
+The doctor only reads: provider state, compatibility, and the host steps the
+operations layer would take (`ops/install.sh --dry-run host`). Its
+`setup.ownerActions` lists every step only you can take. `bootstrap.sh` then
+asks for the choices that are yours (the app you start the Oracle on, the
+Oracle home, your timezone, models, the Oracle lock), creates the Oracle
+home and profile, applies the host settings on your yes (App Nap off, both
+launchd units, both bridge homes), and, if you already have a grants file,
+shows the approvals it would write into each app's settings and writes them
+only on your yes. It ends with the short list of in-app steps no script can
+do (sign in, pin, title the two "Mailroom" sessions), each with the check
+that proves it. `node "$SKILL_ROOT/scripts/setup.js" --apply-host` applies
+the same host steps from the Node side.
 
-## The Codex runtime and the ChatGPT app
+## Your first hour
 
-Codex lanes need a shared `codex app-server` runtime. If a verified one is
-listening, Transmogrify reuses it; otherwise `scripts/runtime-up.sh` ensures
-Codex's installer-managed daemon and a private loopback relay, falling back to
-a standalone loopback runtime on port 8843. It never replaces or reconfigures
-a runtime owned by another program. Runtime selection is the same everywhere:
-`--url`, then `TRANSMOGRIFY_URL`, then the live relay record, then
-`TRANSMOGRIFY_PORT`, then port 8843.
+1. **The Oracle comes up.** Start a session in the Oracle home in the app
+   you chose, title it "Oracle", pin it, and give `bootstrap.sh` its id.
+   The checklist confirms the mailroom with a test note.
+2. **Add an operator.** `sh "$SKILL_ROOT/ops/operator.sh" create web` asks
+   for its name, its app, and the model and effort for both apps: decided
+   once, now, with you. It creates the home and walks the in-app steps
+   (session, title, pin, mandate) with a check for each.
+3. **Send a note across apps.** From a hook, a timer or the other app:
+   `printf 'Release notes are ready.\n' | sh "$SKILL_ROOT/ops/inbox-put.sh" web notes`.
+   The relay rings the operator's app through its bridge.
+4. **See the tier it took.** `sh "$SKILL_ROOT/ops/mailroom.sh" metrics`
+   prints, per app, the rings, the tier each took, and latency.
+5. **Run a worker lane.** From the operator's session, invoke the skill
+   (`$transmogrify` in Codex, `/transmogrify` in Claude Code), or by hand:
 
-The ChatGPT app shows lanes live when it is a client of that runtime, which
-happens when it is launched with `CODEX_APP_SERVER_WS_URL` pointing at the
-relay. `desktop-attach.js ensure` does that on a verified build (relaunching a
-running app only with `--relaunch-desktop` or
-`TRANSMOGRIFY_DESKTOP_RELAUNCH=auto`), `persist --authorize` keeps it across
-logins with a LaunchAgent, and `unpersist --authorize` restores the previous
-setting. An app update pauses persisted attachment until the new build is
-verified again; lanes keep working protocol-only. After any Desktop restart or
-update, rerun the doctor so attachment is measured again. The mechanism, its
-limits, and the builds recorded as broken are in the
-[protocol contract](docs/PROTOCOL.md#native-app-visibility).
+   ```bash
+   node "$SKILL_ROOT/scripts/lane.js" parent-init --repo-root "$REPO_ROOT" \
+     --host-provider claude --host-app claude-code --name 'Web operator'
+   printf '%s\n' 'Fix the failing date test and commit.' |
+     node "$SKILL_ROOT/scripts/lane.js" spawn --repo-root "$REPO_ROOT" \
+       --worktrees "$WORKTREES" --target codex --name 'tests: date fix' \
+       --parent-context-file "$PARENT_CONTEXT" --intent balanced --input-file -
+   ```
 
-## Quick start
+   The lane runs in its own clone and hands back a commit; `lane.js harvest`
+   fetches it into your repository and prints the exact `lane.js retire`
+   command. The full walkthrough is in [Examples](examples/README.md) and
+   [SKILL.md](SKILL.md).
 
-Create a durable parent context, then spawn a child with the packet on stdin:
+## Guarantees and defaults
 
-```bash
-export WORKTREES="$HOME/.local/share/transmogrify/worktrees/example-repository"
-install -d -m 700 "$WORKTREES"
+- **Claim only what is proven** (K-10): requested, received, working,
+  returned, merged, deployed, accepted. Done means the whole user-visible
+  behavior was walked end to end (K-11).
+- **Approvals go through the Oracle** (K-08) and **follow an operator across
+  apps**: one grants file, rendered into Claude Code's `autoMode.allow` and a
+  managed Codex `[auto_review]` block, checked nightly; a switch is refused
+  until the target app's approvals match ([Grants](docs/operations/grants.md)).
+  Money, trades, sending as you, deletes and force-pushes are never relayed
+  (K-03).
+- **Degrade, never stop** (K-37): every delivery path falls back to a slower
+  one; the last tier reaches you.
+- **One active side** (K-13): each operator runs in exactly one app, and one
+  app holds the Oracle; the other side stays parked and redirects.
+- **Models are set at creation** with you, for both apps, and never changed
+  by an operator itself (K-26).
+- **Secrets stay in the secret store** (K-05): a credential moves store to
+  store; nothing here prints, copies or types one.
+- **Exact ownership for workers:** every lane mutation is journaled before
+  dispatch and confirmed by an exact receipt; nothing adopts a session by
+  name or replays an unknown outcome.
+- **No AI attribution** in commits or messages unless you turn it on (K-30).
 
-node "$SKILL_ROOT/scripts/lane.js" parent-init \
-  --repo-root "$REPO_ROOT" --host-provider codex --host-app codex-desktop \
-  --name 'Repository operator'
-# Copy contextFile from the result.
-export PARENT_CONTEXT=/absolute/path/to/parent-context.json
+## Support matrix
 
-printf '%s\n' 'Inspect the failing tests and report the smallest safe fix.' |
-  node "$SKILL_ROOT/scripts/lane.js" spawn \
-    --repo-root "$REPO_ROOT" --worktrees "$WORKTREES" \
-    --target codex --name 'tests: diagnose failure' \
-    --parent-context-file "$PARENT_CONTEXT" --intent balanced --input-file -
-```
+Dated receipts; anything not listed is unverified.
 
-`--target claude` spawns a Claude Code lane instead. Both take a
-provider-neutral `--intent` or explicit `--model`, `--effort`, and `--speed`
-([Execution profiles](docs/EXECUTION-PROFILES.md)). The child gets a managed
-clone under `WORKTREES`, or an existing worktree with `--cwd`. Its first
-message is prefixed with dispatch provenance and its native title starts with
-`::: `. Keep the parent listening until its children return:
+| Piece | Status | Evidence |
+| --- | --- | --- |
+| Codex worker lanes, from Codex or Claude Code | Supported | App-server `0.151.0` or newer, measured by the doctor; CI on macOS and Linux |
+| Claude Code worker lanes, from Codex or Claude Code | Supported, Apple Silicon macOS | CLI `2.1.258` or newer; live-verified on Desktop and on Claude for iOS `1.260828.1`, 2026-09-09 |
+| Codex lanes live in the ChatGPT desktop app | Conditional: no verified build | `26.901.51231` and `26.903.61454` fail to resume threads on the relay path; an owner records a passing build with `desktop-attach.js persist --authorize --verified-build <version> <build>` ([Protocol](docs/PROTOCOL.md#native-app-visibility)) |
+| Codex lanes on mobile | Measured | ChatGPT for iOS `1.2026.230`, 2026-09-09 |
+| Relay to a named Claude Code desktop session | Proven, macOS | Claude Code 2.1.322, 2026-11-17 |
+| Relay to an existing Codex thread | One live isolated round trip, macOS | codex-cli 0.169, 2026-11-18 |
+| Mailroom ladders, supervisor, restart recovery | Test suite with fakes; live restart recovery **unverified** | 2026-11-19 |
+| Grants renderers (Claude Code, Codex) | Test suite with fixtures and a fake Codex CLI; never run against a real client config | 2026-11-20 |
+| First run (`bootstrap.sh`), operator routines, switches | Test suite with fakes; no live first run on a clean account yet | 2026-11-20 |
+| macOS host setup (`install.sh host`) | Test suite; read-only check on a real macOS host | 2026-11-19 |
+| Linux, the `sh` layer | Best effort: CI suite only; systemd units untested | |
+| Antigravity | Not supported; on the [roadmap](ROADMAP.md) | |
 
-```bash
-node "$SKILL_ROOT/scripts/lane.js" wait --parent-context-file "$PARENT_CONTEXT" \
-  --repo-root "$REPO_ROOT" --timeout-ms 60000
-node "$SKILL_ROOT/scripts/lane.js" ack --parent-context-file "$PARENT_CONTEXT" --event EVENT_ID
-```
+Full tables: [What is proven](docs/operations/README.md#what-is-proven)
+(operations), the [protocol contract](docs/PROTOCOL.md) and
+[Claude Code integration](docs/CLAUDE-CODE.md) (workers).
 
-Events persist across restarts and redeliver until acknowledged. A completion
-wake tells the parent a child finished its turn; it never means the task
-succeeded and never triggers automatic archival. Steer and inspect a lane by
-its `laneId`:
+## Concepts
 
-```bash
-printf '%s\n' 'Prioritize the regression test before refactoring.' |
-  node "$SKILL_ROOT/scripts/lane.js" steer --repo-root "$REPO_ROOT" --lane LANE_ID --input-file -
-node "$SKILL_ROOT/scripts/lane.js" status --repo-root "$REPO_ROOT" --lane LANE_ID
-```
-
-Every child receives `.transmogrify/packet.md` and writes
-`.transmogrify/handback.md` in its seat. In a managed clone it commits on its
-assigned branch and reports the full SHA; it never pushes or changes branches.
-Once the child is idle, harvest and retire:
-
-```bash
-node "$SKILL_ROOT/scripts/lane.js" harvest --repo-root "$REPO_ROOT" --lane LANE_ID
-node "$SKILL_ROOT/scripts/lane.js" retire --repo-root "$REPO_ROOT" --lane LANE_ID \
-  --harvested-output-sha256 LOWERCASE_SHA256      # Claude lanes add --private-archive
-```
-
-Harvest verifies the handback and seat HEAD, fetches the commit into your
-repository, saves the handback durably, and prints the retirement command;
-`harvest --commit` is the fallback when a child could not commit. Retirement
-needs that harvest digest, requires the seat clean and unchanged, and removes
-only what it provisioned; anything else blocks cleanup and preserves the seat.
-The full ordering is in [SKILL.md](SKILL.md#7-harvest-and-retire), and a
-complete walkthrough with every file is in [Examples](examples/README.md).
+- **Rules** ([kit/KIT.md](kit/KIT.md)): 37 short rules with stable IDs
+  (`K-01`...), cited, never restated. A team or a person adds rules and
+  overrides in their own layer; a few are fixed.
+- **Homes:** each operator, and the Oracle, is one git repository holding
+  its mandate, notes, backlog and journal, so a session resumes from files,
+  not chat history
+  ([Operators and repositories](docs/operations/operators-and-repos.md)).
+- **The mailroom:** inbox, relay, the two bridges, the supervisor and the
+  ladders above ([Mailroom](docs/operations/mailroom.md)).
+- **Routines and switches:** creating, archiving, recovering or re-modelling
+  an operator (`operator.sh`) and moving it between apps (`switch.sh`) run as
+  scripted checklists with a verifier per step
+  ([Conventions](docs/operations/conventions.md)).
+- **Workers and execution profiles:** lanes spawned with a provider-neutral
+  intent (`fast-loop`, `balanced`, `deep`, ...) or an explicit model, effort
+  and speed ([Execution profiles](docs/EXECUTION-PROFILES.md)). A worker's
+  completion can reach its parent as a mailroom note
+  (`TRANSMOGRIFY_COMPLETION_ROUTE=mailroom`;
+  [Notifications](docs/NOTIFICATIONS.md)).
+- **Grants:** the owner's standing approvals, verbatim and dated, in one file
+  that renders into both apps ([Grants](docs/operations/grants.md)).
+- **Review:** independent review by the other model family, bounded rounds,
+  and a weekly cross-model review of each operator
+  ([Review and release](docs/operations/review-and-release.md)).
 
 ## Tools
 
+Operations layer, `ops/` (POSIX `sh`; each takes `--help`):
+
 | Tool | Purpose |
 | --- | --- |
-| `scripts/transmogrify.js` | One entry point that forwards to the tools below |
-| `scripts/doctor.js` | Read-only discovery, compatibility measurement, and the setup plan |
-| `scripts/setup.js` | Guided setup, one consented step at a time |
-| `scripts/lane.js` | `parent-init`, `parent-list`, `capabilities`, `spawn`, `children`, `wait`, `ack`, `steer`, `status`, `interrupt`, `stop`, `recover`, `harvest`, `retire`, `reconcile`, `abandon`, `schema` |
-| `scripts/maintain.js` | The doctor plus each provider's exact-owned reconcile; `--retention` trashes aged journals and old install backups recoverably |
-| `scripts/runtime-up.sh` | Ensure the managed Codex daemon and relay, or report the standalone fallback |
-| `scripts/desktop-attach.js` | Measure, ensure, persist, or remove the ChatGPT app's attachment to the runtime |
-| `scripts/watch.js` | Per-parent watcher started by `spawn`; records child events and wakes the parent ([Notifications](docs/NOTIFICATIONS.md)) |
-| `scripts/lane-status-listen.js`, `scripts/rpc.js` | Read-only Codex listening and diagnostics |
+| `bootstrap.sh` | The guided first run |
+| `install.sh` | Homes, profiles, skill links, host setup (`host`, `host --apply`), sync between apps |
+| `operator.sh` | Create, archive, recover or re-model an operator; record a session |
+| `switch.sh` | Move an operator between apps; the parked-side guard; holds; the Oracle lock (`lane.sh` is a deprecated alias until 2.1) |
+| `grants.sh` | Validate, render and check the approvals that follow an operator |
+| `inbox-put.sh`, `relay.sh`, `mailroom.sh` | Write a note; route it; the bridges, supervisor and metrics |
+| `tick.sh`, `hygiene.sh`, `status.sh`, `check.sh` | The scheduled watchdog, the nightly hygiene list, status and drift, checks |
+| `worker-run.sh`, `review-run.sh`, `cross-review.sh` | Boxed headless runs, reviews, the weekly cross-model review |
+| `recover-context.sh` | The recovery digest a session reads at start |
 
-Every tool takes `--help`. Commands exit 0 for a confirmed result, 2 for a
-usage error or a safe refusal, 3 for a failure or an uncertain outcome, and 1
-only for an internal error; failures print one JSON envelope with a fixed
-message per code, and success output is an allowlist per operation
-([Output contract](docs/OUTPUT.md)).
+Full reference: [ops/README.md](ops/README.md).
+
+Workers layer, `scripts/` (Node.js; each takes `--help`):
+
+| Tool | Purpose |
+| --- | --- |
+| `transmogrify.js` | One entry point that forwards to the tools below |
+| `doctor.js` | Read-only discovery, compatibility measurement and the setup plan (`--operations` adds the host checks) |
+| `setup.js` | Guided setup, one consented step at a time (`--apply-host` for the host steps) |
+| `lane.js` | `parent-init`, `spawn`, `wait`, `ack`, `steer`, `status`, `interrupt`, `stop`, `recover`, `harvest`, `retire`, `reconcile`, `abandon`, and more |
+| `maintain.js` | The doctor plus each provider's exact-owned reconcile; `--retention` trashes aged records recoverably |
+| `runtime-up.sh` | Ensure the managed Codex runtime and relay |
+| `desktop-attach.js` | Measure, ensure, persist, or remove the ChatGPT app's attachment to the runtime (after an app restart or update, rerun the doctor so attachment is measured again) |
+| `watch.js`, `lane-status-listen.js`, `rpc.js` | The per-parent watcher; read-only listening and diagnostics |
+
+Node tools exit 0 for a confirmed result, 2 for a usage error or a safe
+refusal, 3 for a failure or an uncertain outcome, and 1 for an internal
+error ([Output contract](docs/OUTPUT.md)); the `sh` tools use the same
+codes.
+
+## Security model
+
+- **Local control planes only.** The Codex runtime listens on loopback or a
+  Unix socket, with no authentication: any program running as you can
+  connect. Trust the machine's other programs before using it on sensitive
+  work.
+- **Opt-in undocumented interfaces.** Claude tier 1 reads a target session's
+  per-process peer key in memory only, never logs it, sends only mailroom
+  rings, and has a kill switch. The Codex watcher uses the app's tool server
+  from inside a bridge chat. Either can break with a client update; tier 2
+  then carries the load and the supervisor flags it.
+- **What the grants renderer may write:** only tagged entries of Claude
+  Code's `autoMode.allow`, and one managed `[auto_review]` block in each
+  home's own `.codex/config.toml` (never the user config). It keeps every
+  other byte, writes a backup first, reads Codex back through `config/read`,
+  rolls back on failure, and in the first run writes only on your consent.
+- **Notes are data, never authority** (K-01): the relay's message names note
+  files; it never puts note text in front of a model.
+- **Credentials:** none stored. The Claude adapter's optional archive step
+  reads one named Keychain item only during an explicitly authorized
+  retirement and never prints it.
+
+Report vulnerabilities through the private route in [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [SKILL.md](SKILL.md): the operator policy an agent loads.
-- [Protocol contract](docs/PROTOCOL.md): Codex wire contract, runtime and
-  attachment mechanics, failure classes, and dated receipts.
-- [Claude Code integration](docs/CLAUDE-CODE.md): public surface, measured
-  control path, the pinned archive boundary, and acceptance status.
-- [Execution profiles](docs/EXECUTION-PROFILES.md): intents, models, effort,
-  speed, receipts, and recovery.
-- [Dispatch and parent notification](docs/DISPATCH.md): lineage, provenance,
-  durable child events, waiting, acknowledgement, and restart.
-- [Child notifications](docs/NOTIFICATIONS.md): the watcher, wake channels,
-  event kinds, and the cost model.
-- [Onboarding](docs/ONBOARDING.md): the setup contract behind the start
-  prompt and its acceptance matrix.
-- [Troubleshooting](docs/TROUBLESHOOTING.md): setup failures, runtime safety,
-  upgrade and rollback, and blocked cleanup.
-- [Examples](examples/README.md): one lane from packet to retirement.
-- [Roadmap](ROADMAP.md), [Changelog](CHANGELOG.md),
-  [Contributing](CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), and
-  the [website source](site/README.md).
+Operations: [overview](docs/operations/README.md),
+[architecture](docs/operations/architecture.md),
+[operators and repositories](docs/operations/operators-and-repos.md),
+[conventions](docs/operations/conventions.md),
+[mailroom](docs/operations/mailroom.md),
+[grants](docs/operations/grants.md),
+[hosts and CI](docs/operations/hosts-and-ci.md),
+[client capabilities](docs/operations/client-capabilities.md),
+[review and release](docs/operations/review-and-release.md),
+[continuity](docs/operations/continuity.md),
+[adopting on a second machine](docs/operations/adopting.md),
+[manual](docs/operations/manual.md), and
+[testing](docs/operations/testing.md).
 
-## Support and security
+Workers: [SKILL.md](SKILL.md) (the policy an agent loads),
+[protocol contract](docs/PROTOCOL.md),
+[Claude Code integration](docs/CLAUDE-CODE.md),
+[execution profiles](docs/EXECUTION-PROFILES.md),
+[dispatch and parent notification](docs/DISPATCH.md),
+[child notifications](docs/NOTIFICATIONS.md),
+[onboarding](docs/ONBOARDING.md), [output contract](docs/OUTPUT.md),
+[troubleshooting](docs/TROUBLESHOOTING.md), and
+[examples](examples/README.md).
 
-Ask setup and usage questions in
-[GitHub Discussions](https://github.com/nicholasgerard/transmogrify/discussions),
+Skills: [the skill index](skills/README.md).
+
+## Roadmap, contributing, support
+
+[Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) (with migration notes for
+kit 0.3 and worker 0.6 users) · [Contributing](CONTRIBUTING.md) ·
+[Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](site/README.md).
+
+Ask questions in
+[GitHub Discussions](https://github.com/<org>/transmogrify/discussions) and
 file reproducible defects in
-[GitHub Issues](https://github.com/nicholasgerard/transmogrify/issues), and
-email [support@thebkapp.co](mailto:support@thebkapp.co) for private matters.
-Report vulnerabilities through the private route in [SECURITY.md](SECURITY.md);
-never post credentials, transcripts, session identifiers, or exploit details
-publicly.
-
-The loopback runtime and Unix-socket endpoints have no authentication: treat
-them as a local control plane and trust the machine's other programs before
-connecting sensitive work. The Claude adapter pins the build it measured, and
-its optional archive step reads one named macOS Keychain item only during an
-explicitly authorized retirement and never prints it.
+[GitHub Issues](https://github.com/<org>/transmogrify/issues). Never post
+credentials, transcripts, session identifiers or exploit details publicly.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT. The workers layer is under [LICENSE](LICENSE); the operations layer,
+imported from Agent Operations, keeps its own notice in
+[LICENSE-agent-operations](LICENSE-agent-operations).

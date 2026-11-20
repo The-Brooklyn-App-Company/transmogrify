@@ -18,4 +18,4 @@ Kept current and short (the recovery hook reads only this block):
 
 ## @DATE@
 
-- Home created from the Agent Operations kit @KIT_VERSION@.
+- Home created from the Transmogrify operations kit @KIT_VERSION@.

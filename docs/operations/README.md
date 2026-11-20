@@ -1,8 +1,9 @@
-# Agent Operations
+# Transmogrify operations layer
 
-An operating kit for running coding agents across several repositories
-from your own always-on machine: rules with stable IDs, short docs,
-templates, thin skills, and POSIX sh scripts run by the OS scheduler. It
+The operations layer of Transmogrify is an operating kit for running coding
+agents across several repositories from your own always-on machine: rules
+with stable IDs, short docs, templates, thin skills, and POSIX sh scripts
+run by the OS scheduler. It
 works with Claude Code and Codex in any seat. It is not a framework, a
 daemon or an agent runtime.
 
@@ -26,7 +27,7 @@ want them to behave like a small, accountable team:
 
 | Layer | Holds |
 | --- | --- |
-| **Kit** (this repository, public) | [The rules](../../kit/KIT.md) (`K-01`...), [docs](./), [templates](../../ops/templates/), [scripts](../../ops/), [skills](../../skills/). No one's choices or identities |
+| **Kit** (Transmogrify, public) | [The rules](../../kit/KIT.md) (`K-01`...), [docs](./), [templates](../../ops/templates/), [scripts](../../ops/), [skills](../../skills/). No one's choices or identities |
 | **Team** (private repository) | The kit pin, `TEAM.md`, `PROJECTS.tsv`, team adapters ([templates](../../ops/templates/team/)) |
 | **Personal** (private) | The Oracle home, operator homes, the machine's profile |
 
@@ -76,34 +77,42 @@ Overlays hold deltas only: a parameter, an added rule, or
 
 ## Quick start
 
-Prerequisites: macOS (Linux is untested), git, `jq`, and Claude Code
-and/or Codex signed in.
+Prerequisites: macOS (Linux is best effort for the `sh` layer), git, `jq`,
+and Claude Code and/or Codex signed in. The operations layer installs with
+the rest of Transmogrify, pinned to a release tag (the start prompt, or
+`./install.sh` from a tagged checkout; see the [README](../../README.md#install)).
+`SKILL_ROOT` is the installed copy, for example
+`~/.agents/skills/transmogrify`.
 
 ```sh
-git clone <kit-url> ~/src/agent-operations
-cd ~/src/agent-operations && git checkout <reviewed-release-tag>
-ops/bootstrap.sh                                # guided first run, then a checklist
-ops/operator.sh create web                      # first operator; models decided now
+sh "$SKILL_ROOT/ops/bootstrap.sh"               # guided first run, then a checklist
+sh "$SKILL_ROOT/ops/operator.sh" create web     # first operator; models decided now
 ```
 
 `bootstrap.sh` explains each step, asks only for your choices (client,
-Oracle home, timezone, models, the Oracle lock) and does the rest; it ends
-with the few in-app steps a person must do, each with its check
+Oracle home, timezone, models, the Oracle lock, and writing your grants into
+the clients' settings) and does the rest; it ends with the few in-app steps
+a person must do, each with its check
 ([first run](hosts-and-ci.md#first-run)). The same by hand:
 
 ```sh
-ops/install.sh --dry-run oracle ~/ops/oracle    # lists every file
-ops/install.sh oracle ~/ops/oracle              # creates and commits
-$EDITOR ~/.config/agent-operations/profile          # replace every CHANGE-ME
-ops/install.sh operator web --owns git@git.example.com:me/app.git
-ops/check.sh home ~/ops/oracle ~/ops/web && ops/status.sh
-ops/install.sh host --apply                     # App Nap, units, bridges; then in-app steps
+K=$SKILL_ROOT
+sh "$K/ops/install.sh" --dry-run oracle ~/ops/oracle    # lists every file
+sh "$K/ops/install.sh" oracle ~/ops/oracle              # creates and commits
+$EDITOR ~/.config/agent-operations/profile              # replace every CHANGE-ME
+sh "$K/ops/install.sh" operator web --owns git@git.example.com:me/app.git
+sh "$K/ops/check.sh" home ~/ops/oracle ~/ops/web && sh "$K/ops/status.sh"
+sh "$K/ops/install.sh" host --apply                     # App Nap, units, bridges; then in-app steps
 ```
 
-Then start and name a session in each home, and apply each home's
-`settings/` pattern in your client yourself. The full walkthrough is
-[install and bootstrap](operators-and-repos.md#install-and-bootstrap);
-a worked example is [two operators](../../ops/examples/two-operators/README.md).
+The profile and state paths keep their 0.3 names
+(`~/.config/agent-operations/profile`, `~/.local/state/agent-operations`),
+so an existing setup keeps working. Then start and name a session in each
+home, and apply each home's `settings/` pattern in your client yourself. The
+full walkthrough is
+[install and bootstrap](operators-and-repos.md#install-and-bootstrap); a
+worked example is [two operators](../../ops/examples/two-operators/README.md);
+a second person on their own machine follows [adopting](adopting.md).
 
 Start-to-finish setup: [docs/operations/manual.md](manual.md).
 
@@ -120,6 +129,7 @@ Start-to-finish setup: [docs/operations/manual.md](manual.md).
    [conventions](conventions.md) (two apps, one active side),
    [mailroom](mailroom.md),
    [grants](grants.md) (approvals that follow an operator),
+   [adopting](adopting.md) (a second person, their own machine),
    [continuity](continuity.md), and the
    [scripts reference](../../ops/README.md).
 

@@ -2,7 +2,7 @@
 
 ## What the kit is
 
-Agent Operations is an operating kit for a person, or a team of up to about
+The operations layer of Transmogrify (formerly Agent Operations) is an operating kit for a person, or a team of up to about
 five, who run coding agents across several repositories from their own
 always-on machine. It is plain files: rules, docs, templates, thin skills
 and POSIX sh scripts run by the OS scheduler. It is not a framework, a

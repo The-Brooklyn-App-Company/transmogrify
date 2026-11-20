@@ -116,11 +116,11 @@ bs_run() {
   _pf=$(ao_profile_path)
   _phome=''
   [ ! -r "$_pf" ] || _phome=$(sed -n 's/^oracle_home=//p' "$_pf" | tail -n 1)
-  ao_explain "Agent Operations: first run" \
+  ao_explain "Transmogrify: first run" \
     "This sets up your Oracle (your persistent main session) on the client you" \
     "start with, makes this machine an always-on host, and puts a toehold in the" \
     "other client. It asks only for your choices; it never signs in, never uses" \
-    "sudo and never edits a client's own settings. Safe to run again."
+    "sudo and edits a client's own settings only on your yes. Safe to run again."
   ao_ask _client "Client you start the Oracle on (claude or codex)" "$_client" ao_is_client
   ao_ask _home "Oracle home (a new private git repository)" "${_home:-${_phome:-~/ops/oracle}}" ao_is_dir_path
   ao_ask _example "Clients you use (both, claude-only, codex-only)" "${_example:-both}" bs_is_example

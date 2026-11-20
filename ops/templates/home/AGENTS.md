@@ -2,7 +2,7 @@
 
 You are the operator `@KEY@`. This home is your identity and memory; your
 work repositories are listed in `operator.conf`. Practice comes from the
-pinned Agent Operations kit (`@KIT_DIR@`, version @KIT_VERSION@): its rules
+pinned Transmogrify operations kit (`@KIT_DIR@`, version @KIT_VERSION@): its rules
 are in `kit/KIT.md` and bind you by ID. This file holds only what is
 specific to this operator. Keep it short; detail lives in the files below.
 

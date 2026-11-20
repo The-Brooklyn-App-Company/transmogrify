@@ -35,6 +35,10 @@
     "docs/",
     "examples/",
     "scripts/",
+    "ops/",
+    "kit/",
+    "skills/",
+    "LICENSE-agent-operations",
     "install.sh"
   ],
   "engines": {

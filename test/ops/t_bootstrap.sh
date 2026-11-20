@@ -87,6 +87,12 @@ test_first_run_sets_up_everything_then_lists_the_human_steps() {
   live=$!
   mkdir -p "$T/ops/oracle/inbox/.mailroom/codex/.watcher"
   printf '2026-11-19T00:00:00Z %s\n' "$live" >"$T/ops/oracle/inbox/.mailroom/codex/.watcher/heartbeat"
+  # status only reads: no test note goes out from it
+  run bootstrap.sh status
+  assert_rc 1
+  assert_has "$T/out" "WAIT  round-trip    no test note sent yet (status only reads"
+  ! ls "$T/ops/oracle/inbox/oracle"/*bootstrap-check.md >/dev/null 2>&1 || _fail "status sent a test note"
+  run bootstrap.sh --yes --oracle-session sid-oracle --home "$T/ops/oracle"
   run bootstrap.sh status
   assert_rc 1
   assert_has "$T/out" "PASS  codex-watcher armed"

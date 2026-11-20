@@ -143,7 +143,7 @@ K=~/src/agent-operations; H=~/ops/demo; cd "$H"
 2. Apply the settings patterns from
    [handoff.md#settings-patterns-apply-them-yourself](handoff.md#settings-patterns-apply-them-yourself)
    to both clients (Claude Code deny rules; Codex rules file).
-3. `$K/scripts/lease.sh init` and `$K/scripts/lease.sh status` (expect
+3. `$K/ops/lease.sh init` and `$K/ops/lease.sh status` (expect
    `lease: none`).
 4. Add to the operator's `AGENTS.md`, for this test: "Start every turn with
    `lease.sh renew --instance <token> --epoch <n>`. If it is refused, you are
@@ -169,11 +169,11 @@ Record every step's result (pass, fail, surprise) in the operator's notes.
 | 6 | Ask Claude to file a dummy ask: `ask.sh new --action noop --target test --revision 1 --risk none --rollback none`. In the **Oracle** thread, approve it in words; the Oracle runs `ask.sh approve demo-1 --words "<your words>"` | Row in `ASKS.md` (open) and in the Oracle's `APPROVALS.tsv`, both committed |
 | 7 | Claude: `ask.sh reserve demo-1 --target test --revision 1 -- true` (the command stands in for the effect) | `reserved` then `used`, both committed; a second `reserve` is refused |
 | 8 | Ask Claude to run, in the background: `lease.sh dispatch-run --instance <token> --epoch 1 --what test -- sleep 600`. In your terminal, `lease.sh status` shows the marker and its pid; pause it: `kill -STOP <pid>` | `status` shows the marker `stopped` |
-| 9 | Close the Claude session. In **your terminal**: `$K/scripts/lease.sh takeover --expect-epoch 1 --holder-stopped --provider codex --session '<codex name>'` | Refused: dispatch marker exists (and, while the Claude process lives, its client process too) |
-| 10 | `kill -KILL <pid>`; `$K/scripts/lease.sh settle --marker <id> --outcome not-landed` (type the confirmation) | Settled; marker moved to `settled/` |
+| 9 | Close the Claude session. In **your terminal**: `$K/ops/lease.sh takeover --expect-epoch 1 --holder-stopped --provider codex --session '<codex name>'` | Refused: dispatch marker exists (and, while the Claude process lives, its client process too) |
+| 10 | `kill -KILL <pid>`; `$K/ops/lease.sh settle --marker <id> --outcome not-landed` (type the confirmation) | Settled; marker moved to `settled/` |
 | 11 | Run the takeover again; type the confirmation | Cold note committed (`git log -1`), lease `assigned` to codex, epoch 2 |
-| 12 | In Codex: "Acquire the lease: `lease.sh acquire --provider codex --session '<its name>'`" | Prints **REQUIRED FIRST STEP: switch-in audit**; `dispatch-begin` and `ask.sh new` refuse until `audit-done`; `$K/scripts/status.sh` shows `pending` in the AUDIT column |
-| 13 | With a `reviewer_codex_model` in the profile, in your terminal: `$K/scripts/cross-review.sh --key demo` (one headless model call) | `audits/switch-in-lease-<generation>-2.md` in the home, starting with the audit line; a note in the operator's inbox |
+| 12 | In Codex: "Acquire the lease: `lease.sh acquire --provider codex --session '<its name>'`" | Prints **REQUIRED FIRST STEP: switch-in audit**; `dispatch-begin` and `ask.sh new` refuse until `audit-done`; `$K/ops/status.sh` shows `pending` in the AUDIT column |
+| 13 | With a `reviewer_codex_model` in the profile, in your terminal: `$K/ops/cross-review.sh --key demo` (one headless model call) | `audits/switch-in-lease-<generation>-2.md` in the home, starting with the audit line; a note in the operator's inbox |
 | 14 | Ask Codex to run `lease.sh audit-brief` (it lists that report), triage every finding in it (or write its own report, starting with the brief's first line), commit it and run `audit-done` | `switch-in audit recorded (lease, claude -> codex)`; dispatch now allowed; `lease.sh status` shows the report path and commit; `status.sh` shows `done` |
 | 15 | Re-open the old Claude session and send any message | Its `renew` fails; it redirects to Codex and does no work |
 | 16 | Approval from step 6 (if unused, file a new one in epoch 1 first) | `reserve` in Codex is refused: approvals do not cross a takeover |
@@ -183,11 +183,11 @@ Record every step's result (pass, fail, surprise) in the operator's notes.
 - Warm handback (optional): Codex writes `HANDOFF.md` from `lease.sh note`,
   runs `release`; Claude acquires (another switch-in audit is required).
 - Registry switch without a lease (optional, on an operator with no
-  `.operator/lease`): run `$K/scripts/cross-review.sh --key <key>` once so
+  `.operator/lease`): run `$K/ops/cross-review.sh --key <key>` once so
   it records the operator's family, change its registry `client` column to
   the other family, run it again, and expect
   `status.sh` to show `pending` and a report in its `audits/`; after the
-  session commits it, `$K/scripts/lease.sh --home <home> audit-done --report
+  session commits it, `$K/ops/lease.sh --home <home> audit-done --report
   <path>` records it and `status.sh` shows `done`.
 - To stop testing: remove the `AGENTS.md` lines; `rm -rf $H/.operator`
   removes the lease, mailbox and markers (a later `acquire` starts a new
@@ -198,8 +198,8 @@ Record every step's result (pass, fail, surprise) in the operator's notes.
 
 ## 3. Second client and drift
 
-On your real setup, read-only first: `$K/scripts/status.sh --drift` lists
-what differs between the clients. Then `$K/scripts/install.sh --dry-run
+On your real setup, read-only first: `$K/ops/status.sh --drift` lists
+what differs between the clients. Then `$K/ops/install.sh --dry-run
 sync codex` (or `claude`) shows what would be added; run it without
 `--dry-run`, start and name each session as printed, apply
 `settings/handoff.md` yourself, and rerun `status.sh --drift` until it

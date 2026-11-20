@@ -59,7 +59,10 @@ is not a Codex identity). A worked, fictional example is
   different policy. An unmanaged `auto_review` setting, a symlinked
   `.codex` or a path into the Codex user folder is refused. After writing,
   `codex app-server` `config/read` must show the rendered policy coming
-  from that home's `.codex` layer; otherwise the previous file is restored.
+  from that home's `.codex` layer; otherwise, or when the render is
+  interrupted, the previous file is restored. Markers, keys and tables count
+  only outside TOML strings, and the text outside the managed block must
+  survive byte for byte.
 
 ## Three states
 
@@ -68,7 +71,7 @@ is not a Codex identity). A worked, fictional example is
 | State | Claude | Codex |
 | --- | --- | --- |
 | rendered | the tagged entries match the file | the home's managed block decodes to the current rendering |
-| resolved | the settings parse | `config/read` shows that policy from the home's own `.codex`, the layer is trusted, and no managed layer sets `auto_review` |
+| resolved | the settings parse | `config/read` shows that policy from the home's own `.codex`, the layer is trusted, no managed layer sets `auto_review`, and `configRequirements/read` answers with no managed requirement a person has not checked (profile key `grants_managed_requirements_ok`) |
 | accepted | a fresh session passed a harmless probe, recorded with `grants.sh accept` | the same, per home |
 
 A file check alone does not prove what a live reviewer loaded: Codex
@@ -84,6 +87,7 @@ the probe pending again.
 - **Nightly hygiene** reports `grants.sh check --findings`.
 - **First run:** `bootstrap.sh` lists the grants check among the steps.
 
+Read commands (`validate`, `check`, the gate) and dry runs create nothing.
 The renderers write only these two files, only when run, and only after a
 person adds a baseline they have read. Approval configuration changes are
 the owner's call; nothing in the kit runs a renderer on a schedule.

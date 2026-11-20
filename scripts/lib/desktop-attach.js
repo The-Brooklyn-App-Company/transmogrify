@@ -256,9 +256,10 @@ async function bundleAt(run, appPath, allowed, env) {
 // with its path, version, and build. Null when none is installed.
 //
 // The lookup never sends Apple Events (no osascript, no `path to application`):
-// those raise a macOS Automation consent prompt on an unattended host. It checks
-// the standard per-machine and per-user locations first, then asks Spotlight
-// (mdfind), and accepts a bundle only after its plist names an allowed id.
+// those raise a macOS Automation consent prompt on an unattended host. For each
+// accepted id in priority order it checks the standard per-machine and per-user
+// locations, then asks Spotlight (mdfind), and accepts a bundle only after its
+// plist names that id.
 async function resolveDesktopApp(run, env, dependencies = {}) {
   const allowed = bundleCandidates(env);
   const homes = env.HOME && path.isAbsolute(env.HOME) ? [env.HOME] : [];
@@ -271,12 +272,14 @@ async function resolveDesktopApp(run, env, dependencies = {}) {
     ]),
   ];
   const exists = dependencies.existsSync || fs.existsSync;
-  for (const appPath of candidates) {
-    if (!exists(path.join(appPath, 'Contents', 'Info.plist'))) continue;
-    const found = await bundleAt(run, appPath, allowed, env);
-    if (found) return found;
-  }
+  // Bundle-id priority first (the Codex app before the ChatGPT app), then
+  // the standard locations before Spotlight for each id.
   for (const bundleId of allowed) {
+    for (const appPath of candidates) {
+      if (!exists(path.join(appPath, 'Contents', 'Info.plist'))) continue;
+      const found = await bundleAt(run, appPath, [bundleId], env);
+      if (found) return found;
+    }
     const located = await requireTool(run, 'mdfind', [`kMDItemCFBundleIdentifier == "${bundleId}"`], env);
     if (located.code !== 0) continue;
     for (const line of located.stdout.split(/\r?\n/)) {
@@ -1303,6 +1306,7 @@ module.exports = {
   persistenceReceiptPath,
   resolveRuntimeTarget,
   resolveRuntimeUrl,
+  resolveDesktopApp,
   stableNodePath,
   unpersist,
 };

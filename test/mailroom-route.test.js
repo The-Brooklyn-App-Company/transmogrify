@@ -73,12 +73,16 @@ test('the mailroom route needs a registry key and an operations layer', (t) => {
   assert.ok(mailroomTarget({ TRANSMOGRIFY_OPS_KEY: 'alpha' }).script.endsWith(path.join('ops', 'inbox-put.sh')));
 });
 
-test('inbox-put outcomes map to written, retryable, and never-retried codes', async (t) => {
+test('inbox-put outcomes map to written and never-retried codes', async (t) => {
   const written = fakeOps(t, 0);
   const receipt = await deliverToMailroom('child done', { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: written });
   assert.deepEqual(receipt, { channel: 'mailroom', method: 'mailroom-inbox', certainty: 'written', note: 'stamp-transmogrify-child.md' });
   assert.equal(fs.readFileSync(path.join(written, 'note-alpha-transmogrify-child'), 'utf8'), 'child done');
-  await assert.rejects(() => deliverToMailroom('x', { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: fakeOps(t, 1) }), { code: 'WAKE_UNDELIVERED' });
+  await assert.rejects(() => deliverToMailroom('x', { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: fakeOps(t, 1) }), { code: 'WAKE_UNCERTAIN' },
+    'exit 1 can follow a published note: never resent');
+  const big = 'x'.repeat(64 * 1024);
+  await deliverToMailroom(big, { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: written });
+  assert.equal(fs.readFileSync(path.join(written, 'note-alpha-transmogrify-child'), 'utf8').length, big.length, 'never truncated');
   await assert.rejects(() => deliverToMailroom('x', { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: fakeOps(t, 2) }), { code: 'MAILROOM_UNCONFIGURED' });
   await assert.rejects(() => deliverToMailroom('x', { TRANSMOGRIFY_OPS_KEY: 'alpha', TRANSMOGRIFY_OPS_DIR: fakeOps(t, 9) }), { code: 'WAKE_UNCERTAIN' });
 });

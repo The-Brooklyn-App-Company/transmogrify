@@ -9,7 +9,8 @@
 
 Knobs: FAKE_CODEX_DEBUG_FAIL=1 (debug fails), FAKE_CODEX_UNTRUSTED=1 (project layer disabled),
 FAKE_CODEX_MANAGED=1 (a managed layer sets auto_review), FAKE_CODEX_STALE=1 (config/read reports another policy),
-FAKE_CODEX_SILENT=1 (app-server never answers). Every call is logged to FAKE_LOG.
+FAKE_CODEX_SILENT=1 (app-server never answers), FAKE_CODEX_REQUIREMENTS=a,b (managed requirement keys),
+FAKE_CODEX_REQUIREMENTS_ERROR=1 (configRequirements/read fails). Every call is logged to FAKE_LOG.
 """
 import json
 import os
@@ -75,7 +76,11 @@ def app_server():
                 origins["auto_review.policy"] = {"name": {"type": "project", "dotCodexFolder": dot}, "version": "v1"}
             out = {"id": m["id"], "result": {"config": cfg, "origins": origins, "layers": layers}}
         elif m.get("method") == "configRequirements/read":
-            out = {"id": m["id"], "result": {"requirements": {}}}
+            if os.environ.get("FAKE_CODEX_REQUIREMENTS_ERROR"):
+                out = {"id": m["id"], "error": {"code": -32601, "message": "unsupported"}}
+            else:
+                keys = [k for k in os.environ.get("FAKE_CODEX_REQUIREMENTS", "").split(",") if k]
+                out = {"id": m["id"], "result": {"requirements": {k: {"set": True} for k in keys}}}
         if out:
             out["jsonrpc"] = "2.0"
             sys.stdout.write(json.dumps(out) + "\n")

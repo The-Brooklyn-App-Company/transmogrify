@@ -33,11 +33,14 @@ const REQUIRED_FILES = [
   'package-lock.json',
 ];
 const OPTIONAL_FILES = [
+  'LICENSE-agent-operations',
   'README.md',
   'CONTRIBUTING.md',
   'ROADMAP.md',
 ];
-const REQUIRED_DIRS = ['scripts', 'docs', 'examples'];
+// ops/, kit/ and skills/ are the operations layer (2.0): its sh tools, rules and
+// thin skills travel with the worker-lane skill so one install carries both.
+const REQUIRED_DIRS = ['scripts', 'docs', 'examples', 'ops', 'kit', 'skills'];
 
 function fail(message) {
   throw new Error(message);

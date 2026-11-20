@@ -12,7 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { OWNER_ACTIONS, opsHostApply, opsHostCheck, opsOwnerActions, parseHostReport } = require('../scripts/lib/ops-host');
-const { parseDoctorArgs } = require('../scripts/doctor');
+const { parseDoctorArgs, renderSetupSummary } = require('../scripts/doctor');
 const { parseSetupArgs, runHostSetup } = require('../scripts/setup');
 const { doctorReport } = require('./helpers/onboarding-fixture');
 
@@ -78,6 +78,8 @@ test('the doctor adds the operations checks only when asked, and they never bloc
   assert.equal(withOps.operations.state, 'needsOwner');
   assert.ok(withOps.setup.ownerActions.some((a) => a.provider === 'operations' && a.reason === 'operations-host-pending' && a.blocking === false));
   assert.equal(withOps.setup.ready, without.setup.ready, 'operations actions never change lane readiness');
+  assert.match(renderSetupSummary(withOps), /^Operations: Allow setup to apply the host steps/m, 'the terminal summary shows them');
+  assert.doesNotMatch(renderSetupSummary(without), /^Operations:/m);
 });
 
 test('setup applies the host steps only on --apply-host, alone, after a read-only check', async () => {

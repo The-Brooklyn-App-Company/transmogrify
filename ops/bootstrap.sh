@@ -29,6 +29,7 @@
 # Then the checklist: each in-app step with what to do and the check that
 # proves it (a registry id, the Codex watcher's heartbeat, a test note's
 # delivery); steps no script can see are confirmed with `bootstrap.sh mark`.
+# `bootstrap.sh status` prints the checklist only: it sends no test note.
 # Guided, it waits for you and re-checks; unattended, it prints what is left.
 # docs/operations/hosts-and-ci.md#first-run.
 #
@@ -232,7 +233,7 @@ bs_checklist() {
   # The proof: a test note to the Oracle comes back as a delivered ring.
   _ms=$(bs_marks_file)
   _sent=$(ao_st_get "$_ms" test-note)
-  if [ -z "$_sent" ] && bs_has "$AO_ORACLE_KEY" && { [ -z "$_bc" ] || bs_has mailroom-claude; }; then
+  if [ -z "${BS_READONLY-}" ] && [ -z "$_sent" ] && bs_has "$AO_ORACLE_KEY" && { [ -z "$_bc" ] || bs_has mailroom-claude; }; then
     if _tn=$(printf 'First-run check (bootstrap.sh, automated): if you can read this, the mailroom reached the Oracle. No action needed.\n' |
       ao_inbox_put "$AO_ORACLE_KEY" bootstrap-check); then
       ao_st_set "$_ms" test-note-name "${_tn##*/}"
@@ -240,7 +241,9 @@ bs_checklist() {
     fi
     _sent=$(ao_st_get "$_ms" test-note)
   fi
-  if [ -z "$_sent" ]; then
+  if [ -z "$_sent" ] && [ -n "${BS_READONLY-}" ]; then
+    ao_step WAIT round-trip "no test note sent yet (status only reads; bootstrap.sh sends it once the Oracle and its Mailroom have ids)"
+  elif [ -z "$_sent" ]; then
     ao_step WAIT round-trip "a test note to the Oracle goes out once the Oracle and its Mailroom have ids"
   elif ao_mr_note_received "$(ao_st_get "$_ms" test-note-name)" "$_sent"; then
     ao_step PASS round-trip "the test note reached the Oracle"
@@ -270,7 +273,7 @@ main() {
   esac
   ao_guide_init "$_yes"
   case ${1-} in
-    status) ao_load; bs_checklist; [ "$AO_STEPS_LEFT" -eq 0 ] || exit "$AO_E_FAIL" ;;
+    status) ao_load --no-state; BS_READONLY=1; bs_checklist; [ "$AO_STEPS_LEFT" -eq 0 ] || exit "$AO_E_FAIL" ;;
     mark)
       ao_load
       case " $BS_MARKS " in *" ${2-} "*) ;; *) ao_die "$AO_E_USAGE" "STEP must be one of: $BS_MARKS" ;; esac

@@ -47,7 +47,10 @@
 # Profile keys: grants_file (default operators/GRANTS.md in the Oracle home),
 # grants_accepted (default operators/GRANTS-ACCEPTED.tsv),
 # grants_claude_settings (default $CLAUDE_CONFIG_DIR or ~/.claude, then
-# settings.json), grants_codex_bin (default: codex on PATH). Needs
+# settings.json), grants_codex_bin (default: codex on PATH),
+# grants_managed_requirements_ok (managed Codex requirement keys a person
+# has checked and found to set no reviewer policy; any other managed
+# requirement, or no answer, leaves Codex unresolved). Needs
 # /usr/bin/python3 (the system Python; standard library only).
 #
 # Never prints a config file, a policy or the model catalog: hashes, lengths
@@ -71,16 +74,19 @@ grants_env() {
   if [ -n "$_gc" ]; then GRANTS_CLAUDE_SETTINGS=$(ao_expand_path "$_gc")
   else GRANTS_CLAUDE_SETTINGS=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json; fi
   GRANTS_CODEX_BIN=$(ao_cfg grants_codex_bin codex)
+  GRANTS_MANAGED_REQUIREMENTS_OK=$(ao_cfg grants_managed_requirements_ok '')
   export GRANTS_SOURCE GRANTS_ACCEPTED GRANTS_REGISTRY GRANTS_ORACLE_KEY GRANTS_STATE \
-    GRANTS_CLAUDE_SETTINGS GRANTS_CODEX_BIN
+    GRANTS_CLAUDE_SETTINGS GRANTS_CODEX_BIN GRANTS_MANAGED_REQUIREMENTS_OK
 }
 
 main() {
   case ${1-} in -h | --help) ao_usage; exit 0 ;; '') ao_die "$AO_E_USAGE" "usage: grants.sh COMMAND (see --help)" ;; esac
   [ -x /usr/bin/python3 ] || ao_die "$AO_E_FAIL" "grants.sh needs /usr/bin/python3 (the system Python)"
-  ao_load
+  # Read commands create nothing: the state dir is made only by a render.
+  ao_load --no-state
   grants_env
-  exec /usr/bin/python3 -I "$AO_SCRIPTS/lib/grants.py" "$@"
+  /usr/bin/python3 -I "$AO_SCRIPTS/lib/grants.py" "$@"
+  exit $?
 }
 
 main "$@"

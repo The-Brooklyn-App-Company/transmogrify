@@ -16,7 +16,6 @@ const ROUTES = Object.freeze(['wake', 'mailroom']);
 const KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const NOTE_SLUG = 'transmogrify-child';
 const PUT_TIMEOUT_MS = 20_000;
-const MAX_NOTE_BYTES = 16 * 1024;
 
 class RouteError extends Error {
   constructor(code, message) {
@@ -50,13 +49,14 @@ function mailroomTarget(env = process.env) {
   return { key, script };
 }
 
-// Write one note. inbox-put.sh writes through a temp file and a rename: exit
-// 1 means nothing was written (safe to retry), exit 2 a configuration
-// problem (never retried); a timeout or a signal may have written it, so it
-// is never retried.
+// Write one note, whole. Exit 2 is a configuration problem found before any
+// write (never retried). Any other failure may come after the note was
+// published (inbox-put.sh can fail cleaning up after its rename), so it is
+// uncertain and never resent; the durable event still waits for wait and
+// ack. Only a shell that could not start at all is safe to retry.
 function deliverToMailroom(text, env = process.env, dependencies = {}) {
   const { key, script } = mailroomTarget(env);
-  const body = Buffer.from(String(text), 'utf8').subarray(0, MAX_NOTE_BYTES);
+  const body = Buffer.from(String(text), 'utf8');
   const run = dependencies.spawn || spawn;
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -81,8 +81,6 @@ function deliverToMailroom(text, env = process.env, dependencies = {}) {
       clearTimeout(timer);
       if (code === 0) {
         resolve({ channel: 'mailroom', method: 'mailroom-inbox', certainty: 'written', note: path.basename(stdout.trim()) });
-      } else if (code === 1) {
-        reject(new RouteError('WAKE_UNDELIVERED', 'the inbox note could not be written'));
       } else if (code === 2) {
         reject(new RouteError('MAILROOM_UNCONFIGURED', 'the operations layer refused the note (profile or registry key)'));
       } else {

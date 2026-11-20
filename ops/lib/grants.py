@@ -59,6 +59,9 @@ STATE = env("GRANTS_STATE", "")
 REVIEW_SLUG = os.environ.get("GRANTS_CODEX_REVIEW_SLUG", "codex-auto-review")
 READBACK_TIMEOUT = int(os.environ.get("GRANTS_READBACK_TIMEOUT", "45"))
 TODAY = os.environ.get("GRANTS_TODAY") or datetime.date.today().isoformat()
+# Managed requirement keys a person has checked and found to set no reviewer policy (profile key
+# grants_managed_requirements_ok, comma-separated).
+REQUIREMENTS_OK = [k.strip() for k in os.environ.get("GRANTS_MANAGED_REQUIREMENTS_OK", "").split(",") if k.strip()]
 
 BEGIN = "# >>> transmogrify grants: managed by ops/grants.sh from the grants file; do not edit by hand >>>"
 END = "# <<< transmogrify grants <<<"
@@ -372,7 +375,7 @@ def claude_plan(src, data, prune=False):
     grants = live(src)
     byid = {g["id"]: g for g in grants}
     gone = {g["id"] for g in src["grants"] if expired(g)}
-    legacy = {g["claude"]: g["id"] for g in src["grants"]}
+    legacy = {g["claude"]: g["id"] for g in grants}  # an expired grant's untagged copy is the owner's to remove
     heads = {claude_head(g["claude"]): g["id"] for g in grants}
     seen, out, changes, problems = set(), [], [], []
     for e in allow:
@@ -489,7 +492,8 @@ def claude_state(src, path):
         if not live(src):
             return {"rendered": (True, "no grants to render"), "resolved": (True, "nothing to resolve")}
         return {"rendered": (False, why), "resolved": (False, why)}
-    allow = (data.get("autoMode") or {}).get("allow") if isinstance(data.get("autoMode", {}), dict) else None
+    auto = data.get("autoMode", {})
+    allow = auto.get("allow", []) if isinstance(auto, dict) else None
     ok = isinstance(allow, list) and all(isinstance(x, str) for x in allow)
     resolved = (True, "settings parse; autoMode.allow is a list of strings") if ok else (
         False, "autoMode.allow missing or malformed")
@@ -632,28 +636,73 @@ def toml_unstring(v):
     return None
 
 
+def toplevel_lines(text):
+    """For each line of text, whether it starts outside every TOML string, so that a marker, a key or a table
+    header on it is real and not part of a (multi-line) string value."""
+    out, state, i, n = [True], None, 0, len(text)
+    while i < n:
+        c = text[i]
+        if state is None:
+            if c == "#":
+                j = text.find("\n", i)
+                i = n if j < 0 else j
+                continue
+            for q in ('"""', "'''", '"', "'"):
+                if text.startswith(q, i):
+                    state = q
+                    i += len(q)
+                    break
+            else:
+                if c == "\n":
+                    out.append(True)
+                i += 1
+            continue
+        if state in ('"""', '"') and c == "\\":
+            i += 1
+            if i < n and text[i] == "\n":
+                out.append(False)
+            i += 1
+            continue
+        if text.startswith(state, i):
+            if len(state) == 3:
+                while text.startswith(state + state[0], i):
+                    i += 1
+            i += len(state)
+            state = None
+            continue
+        if c == "\n":
+            if len(state) == 1:
+                state = None  # an unterminated one-line string ends with its line
+            out.append(state is None)
+        i += 1
+    return out
+
+
 def split_managed(text):
-    """(text outside the managed block, block or None). Raises when the file can't be managed safely."""
+    """(text outside the managed block, block or None). Raises when the file can't be managed safely. Markers,
+    keys and table headers count only on lines that start outside TOML strings."""
     lines = text.split("\n")
-    if lines.count(BEGIN) > 1 or lines.count(END) > 1 or (BEGIN in lines) != (END in lines):
+    top = toplevel_lines(text)
+    begins = [i for i, line in enumerate(lines) if line == BEGIN and top[i]]
+    ends = [i for i, line in enumerate(lines) if line == END and top[i]]
+    if len(begins) > 1 or len(ends) > 1 or bool(begins) != bool(ends):
         raise Fail("managed markers are missing a pair or repeated")
     block = None
-    if BEGIN in lines:
-        b, e = lines.index(BEGIN), lines.index(END)
+    if begins:
+        b, e = begins[0], ends[0]
         if e < b:
             raise Fail("managed markers are out of order")
         block = "\n".join(lines[b:e + 1])
-        after = lines[e + 1:]
-        for line in after:
-            s = line.strip()
-            if s and not s.startswith("#"):
-                if not s.startswith("["):
+        for k in range(e + 1, len(lines)):
+            st = lines[k].strip()
+            if top[k] and st and not st.startswith("#"):
+                if not st.startswith("["):
                     raise Fail("a key follows the managed block without a table header (it would join [auto_review])")
                 break
-        lines = lines[:b] + after
-    for line in lines:
+        lines, top = lines[:b] + lines[e + 1:], top[:b] + top[e + 1:]
+    for k, line in enumerate(lines):
         s = line.strip()
-        if not s or s.startswith("#"):
+        if not top[k] or not s or s.startswith("#"):
             continue
         keypart = s if s.startswith("[") else s.split("=", 1)[0] if "=" in s else ""
         if re.search(r"auto.{0,12}review", keypart, re.I) or (keypart and "\\" in keypart):
@@ -680,9 +729,12 @@ def block_policy(block):
 def compose(existing, block):
     rest, _ = split_managed(existing)
     rest = rest.rstrip("\n")
-    if block is None:
-        return rest + "\n" if rest else ""
-    return (rest + "\n\n" if rest else "") + block + "\n"
+    new = (rest + "\n" if rest else "") if block is None else (rest + "\n\n" if rest else "") + block + "\n"
+    # Everything outside the managed block must survive byte for byte, and the block must read back as written.
+    again, blk = split_managed(new)
+    if again.rstrip("\n") != rest or blk != block:
+        raise Fail("internal check failed: the text outside the managed block would change")
+    return new
 
 
 def app_server_read(cwd, timeout=READBACK_TIMEOUT):
@@ -781,14 +833,15 @@ def resolve_verdict(rb, home, want_sha):
         return False, "auto_review.policy comes from %s %s, not the home's .codex" % (
             rb["origin_type"], rb["origin_path"])
     why = "config/read: policy %s from the home's .codex (%s)" % (short(rb["policy_sha"]), rb["origin_version"])
+    if rb["requirements"] is None:
+        return False, "configRequirements/read gave no answer: a managed reviewer policy can't be ruled out"
+    unchecked = [k for k in rb["requirements"] if k not in REQUIREMENTS_OK]
+    if unchecked:
+        return False, ("managed requirements present (%s): a managed reviewer policy can't be ruled out; once a "
+                       "person has checked them, list them in grants_managed_requirements_ok" % ",".join(unchecked))
     if rb["requirements"]:
-        why += "; managed requirements present (%s): a managed reviewer policy can't be ruled out" % ",".join(
-            rb["requirements"])
-    elif rb["requirements"] is None:
-        why += "; configRequirements/read gave no answer"
-    else:
-        why += "; no managed requirements"
-    return True, why
+        return True, why + "; managed requirements checked by a person (%s)" % ",".join(rb["requirements"])
+    return True, why + "; no managed requirements"
 
 
 def safe_target(path, root):
@@ -827,8 +880,6 @@ def render_codex(src, reg, key, out_dir=None, dry=False, readback=True):
     live_path = os.path.join(home, ".codex", "config.toml")
     path = os.path.join(out_dir, key, ".codex", "config.toml") if out_dir else live_path
     root = os.path.join(out_dir, key) if out_dir else home
-    if out_dir:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
     safe_target(path, root)
     snap = current(path)
     existing = snap if snap is not None else ((current(live_path) or "") if out_dir else "")
@@ -871,8 +922,11 @@ def render_codex(src, reg, key, out_dir=None, dry=False, readback=True):
             ok, why = resolve_verdict(app_server_read(home), home, sha(policy))
             if not ok:
                 raise Fail("written but not resolved (%s)" % why)
-    except Exception as e:  # any failure after the write restores the previous file
+    except BaseException as e:  # any failure or interruption after the write restores the previous file
         msg = rollback(path, bak, before, new)
+        if not isinstance(e, Exception):
+            print("codex %s: interrupted; %s" % (key, msg), file=sys.stderr)
+            raise
         log("render-codex", "codex", key, "rolled-back", sha(policy) if policy else "-")
         raise Fail("codex %s: %s; %s" % (key, e if isinstance(e, Fail) else "readback failed: %s" % type(e).__name__,
                                           msg))
@@ -900,9 +954,11 @@ def codex_state(src, reg, key, resolve=True):
     _, home = reg[key]
     path = os.path.join(home, ".codex", "config.toml")
     try:
+        safe_target(path, home)
         _, blk = split_managed(current(path) or "")
     except Fail as e:
         st["rendered"] = (False, "%s: %s" % (path, e))
+        st["resolved"] = (False, "not rendered") if resolve else st["resolved"]
         return st
     if not codex_grants(src, reg, key):
         st["rendered"] = (blk is None, "no grant applies" if blk is None else
@@ -1089,7 +1145,12 @@ def cmd_baseline(args):
     return E_OK
 
 
+def _interrupt(signum, frame):
+    raise KeyboardInterrupt()
+
+
 def main(argv):
+    signal.signal(signal.SIGTERM, _interrupt)
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.strip())
         return E_USAGE if not argv else E_OK
@@ -1141,6 +1202,9 @@ def main(argv):
     except IndexError:
         print("grants: bad arguments (see --help)", file=sys.stderr)
         return E_USAGE
+    except KeyboardInterrupt:
+        print("grants: interrupted; nothing reported as synchronized", file=sys.stderr)
+        return E_FAIL
     except Exception as e:  # never a silent crash: hygiene and the switch gate treat this as not synchronized
         print("grants: internal error (%s); nothing reported as synchronized" % type(e).__name__, file=sys.stderr)
         return E_FAIL

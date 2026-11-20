@@ -690,11 +690,15 @@ function renderSetupSummary(result) {
     : plan.steps.map((entry) => entry.what).join(' ');
   const nextAction = plan.steps[0]?.what || 'You can start lanes now.';
   const nextText = plan.context ? `${plan.context} ${nextAction}` : nextAction;
+  // The operations layer's owner actions (doctor --operations) never block
+  // lanes, so they are listed after the lane summary instead of in the plan.
+  const operations = (result.setup?.ownerActions || []).filter((action) => action.provider === 'operations');
   return [
     `Found: ${found.length > 0 ? `${found.join(' and ')}.` : 'No lane host was found.'}`,
     `Ready: ${readyText}`,
     `Needed: ${neededText}`,
     `Next: ${nextText}`,
+    ...operations.map((action) => `Operations: ${action.ownerAction}`),
   ].join('\n');
 }
 

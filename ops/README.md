@@ -42,7 +42,7 @@ and exit codes.
 Normally `install.sh` does steps 1 and 2; see
 [install and bootstrap](../docs/operations/operators-and-repos.md#install-and-bootstrap).
 
-1. Copy one of `../profiles/*.profile` to `~/.config/agent-operations/profile`
+1. Copy one of `profiles/*.profile` to `~/.config/agent-operations/profile`
    (or anywhere, and set `AO_PROFILE`). Keep it out of git. Set
    `oracle_home` and replace every `CHANGE-ME`.
 2. In the Oracle home, create `operators/REGISTRY.tsv` (below) with a row
@@ -237,7 +237,7 @@ next tick. A hook gets `AO_PROFILE`, `AO_HOME`, `AO_INBOX`, `AO_STATE`,
 then KILL after the grace period) before the tick exits. To tell a session
 something, a hook writes a note with `inbox-put.sh`. One-shot watches carry
 their own end date and exit quietly after it. Examples:
-`../examples/hooks/`.
+`examples/hooks/`.
 
 Hooks run outside any client's permission system, as you: anything that
 can write the hooks folder gets scheduled execution. Keep `hooks_dir` where

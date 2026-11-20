@@ -281,4 +281,115 @@ test_hygiene_reports_grant_findings() {
   assert_has "$T/out" "- grants: codex alpha not rendered"
 }
 
+test_markers_inside_a_toml_string_are_not_a_managed_block() {
+  gsetup
+  mkdir -p "$T/proj/alpha/.codex"
+  {
+    printf 'developer_instructions = """\n'
+    printf '# >>> transmogrify grants: managed by ops/grants.sh from the grants file; do not edit by hand >>>\n'
+    printf 'keep this instruction\n'
+    printf '# <<< transmogrify grants <<<\n'
+    printf '"""\n\n[projects."/x"]\ntrust_level = "trusted"\n'
+  } >"$T/proj/alpha/.codex/config.toml"
+  cp "$T/proj/alpha/.codex/config.toml" "$T/before"
+  run grants.sh render-codex --actor alpha
+  assert_rc 0
+  assert_has "$T/proj/alpha/.codex/config.toml" "keep this instruction"
+  head -c "$(wc -c <"$T/before")" "$T/proj/alpha/.codex/config.toml" | cmp -s - "$T/before" || _fail "the existing text changed"
+  run grants.sh check --side codex --actor alpha
+  assert_rc 0
+}
+
+test_an_expired_grant_never_removes_an_untagged_entry() {
+  gsetup
+  text=$(awk '/^### grant: cheap-calls/ { g = 1 } g && /^~~~text$/ { getline; print; exit }' "$T/home/operators/GRANTS.md")
+  /usr/bin/python3 -I -c 'import json,sys; json.dump({"autoMode": {"allow": [sys.argv[1]]}}, open(sys.argv[2], "w"))' \
+    "$text" "$T/claude/settings.json"
+  sed -i.bak 's/^- expires: 2099-12-31$/- expires: 2020-01-01/' "$T/home/operators/GRANTS.md"
+  run grants.sh render-claude
+  assert_rc 0
+  assert_has "$T/claude/settings.json" "Paid Calls Under One Dollar (the owner"
+  assert_lacks "$T/claude/settings.json" "[grant:cheap-calls]"
+}
+
+test_the_gate_refuses_a_symlinked_codex_folder() {
+  gsetup
+  run grants.sh render-codex --all
+  mkdir -p "$T/elsewhere"
+  mv "$T/proj/alpha/.codex" "$T/elsewhere/.codex"
+  ln -s "$T/elsewhere/.codex" "$T/proj/alpha/.codex"
+  run grants.sh check --gate alpha codex
+  assert_rc 1
+  assert_has "$T/out" "is a symlink"
+}
+
+test_managed_requirements_must_be_checked_by_a_person() {
+  gsetup
+  run grants.sh render-codex --all
+  FAKE_CODEX_REQUIREMENTS=allowedSandboxModes
+  export FAKE_CODEX_REQUIREMENTS
+  run grants.sh check --gate alpha codex
+  assert_rc 1
+  assert_has "$T/out" "managed requirements present (allowedSandboxModes)"
+  profile_set grants_managed_requirements_ok allowedSandboxModes
+  run grants.sh check --gate alpha codex
+  assert_rc 0
+  unset FAKE_CODEX_REQUIREMENTS
+  FAKE_CODEX_REQUIREMENTS_ERROR=1
+  export FAKE_CODEX_REQUIREMENTS_ERROR
+  run grants.sh check --gate alpha codex
+  assert_rc 1
+  assert_has "$T/out" "configRequirements/read gave no answer"
+}
+
+test_read_commands_and_dry_runs_create_nothing() {
+  gsetup
+  rm -rf "$T/state"
+  run grants.sh check
+  run grants.sh validate
+  run grants.sh check --gate alpha codex
+  assert_no_file "$T/state"
+  run grants.sh render-codex --all --out-dir "$T/proof" --dry-run
+  assert_rc 0
+  assert_no_file "$T/proof"
+  assert_no_file "$T/proj/alpha/.codex"
+}
+
+test_an_empty_grants_file_passes_with_settings_without_auto_mode() {
+  cp "$SCRIPTS/templates/oracle/GRANTS.md" "$T/home/operators/GRANTS.md"
+  profile_set grants_codex_bin "$TESTS_DIR/fakes/fake-codex-grants"
+  mkdir -p "$T/claude"
+  printf '{"model": "x"}\n' >"$T/claude/settings.json"
+  run grants.sh check
+  assert_rc 0
+  assert_has "$T/out" "claude: rendered OK"
+  run grants.sh check --gate alpha claude
+  assert_rc 0
+  run grants.sh check --gate alpha codex
+  assert_rc 0
+}
+
+test_an_interrupted_render_rolls_back() {
+  gsetup
+  mkdir -p "$T/proj/alpha/.codex"
+  printf 'model = "m"\n' >"$T/proj/alpha/.codex/config.toml"
+  FAKE_CODEX_SILENT=1 GRANTS_READBACK_TIMEOUT=30
+  export FAKE_CODEX_SILENT GRANTS_READBACK_TIMEOUT
+  "$AO_TEST_SHELL" "$SCRIPTS/grants.sh" render-codex --actor alpha </dev/null >"$T/out" 2>"$T/err" &
+  bg=$!
+  n=0
+  until grep -q 'transmogrify grants: managed' "$T/proj/alpha/.codex/config.toml" 2>/dev/null || [ "$n" -ge 100 ]; do
+    sleep 0.1
+    n=$((n + 1))
+  done
+  pid=$(ps -axo pid=,command= | awk -v f="$SCRIPTS/lib/grants.py" 'index($0, f) && /render-codex/ { print $1; exit }')
+  [ -n "$pid" ] || _fail "no render process found"
+  [ -z "$pid" ] || kill -TERM "$pid"
+  wait "$bg"
+  rc=$?
+  assert_rc 1
+  assert_has "$T/err" "interrupted"
+  assert_eq "$(cat "$T/proj/alpha/.codex/config.toml")" 'model = "m"'
+}
+
 ao_test_main "$0"

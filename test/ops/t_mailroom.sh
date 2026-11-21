@@ -351,6 +351,8 @@ test_codex_watcher_delivers_a_burst_once_in_order_and_holds_queue_rings() {
   mr_setup
   mkdir -p "$MR/codex" "$T/busy"
   put_ring thread-a--a-0--queue.md "waiting at start"
+  # A startup backlog has the catch-up tier even when Node starts slowly.
+  age_file "$MR/codex/thread-a--a-0--queue.md" 5
   : >"$T/busy/thread-q"
   rollout thread-q
   watcher
@@ -374,7 +376,7 @@ test_codex_watcher_delivers_a_burst_once_in_order_and_holds_queue_rings() {
   kill "$WPID"
   wait "$WPID"
   assert_eq "$?" 0 "stopped by TERM"
-  assert_has "$MR/codex/delivered/log.tsv" "thread-a--a-0--queue.md${TAB}t1-native${TAB}queue${TAB}ok"
+  assert_has "$MR/codex/delivered/log.tsv" "thread-a--a-0--queue.md${TAB}t2-bridge${TAB}queue${TAB}ok"
   assert_has "$MR/codex/delivered/log.tsv" "thread-q--q-1--queue.md${TAB}t1-native${TAB}queue${TAB}ok"
   assert_has "$MR/codex/delivered/log.tsv" "echo--probe-1--queue.md${TAB}none${TAB}echo${TAB}ok"
   assert_has "$MR/codex/.watcher/fingerprint" "tools="

@@ -193,6 +193,24 @@ describe('legal documents', () => {
   });
 });
 
+describe('scrolling regions', () => {
+  // Content that can overflow sideways sits in a labelled, focusable region, so
+  // keyboard users can scroll it too.
+  for (const [file, wrapper] of [
+    ['src/components/SystemModule.astro', 'diagram-wrap'],
+    ['src/components/MatrixModule.astro', 'table-wrap'],
+  ]) {
+    test(`${file}: the ${wrapper} is a labelled, focusable region`, () => {
+      const source = readFileSync(resolve(siteRoot, file), 'utf8');
+      const tag = new RegExp(`<div class="${wrapper}"([^>]*)>`).exec(source)?.[1] ?? '';
+      assert.match(tag, /tabindex="0"/);
+      assert.match(tag, /role="region"/);
+      assert.match(tag, /aria-label=/);
+      assert.match(source, new RegExp(`\\.${wrapper} \\{[^}]*overflow-x: auto`));
+    });
+  }
+});
+
 describe('the landing sections', () => {
   const dir = resolve(siteRoot, 'src/content/sections');
   const sections = readdirSync(dir)

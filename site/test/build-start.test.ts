@@ -164,8 +164,16 @@ describe('renderStart', () => {
     const source = renderStart({ releaseCommit: '2'.repeat(40), version: '2.0.0' });
     assert.match(source, /--explain \\\n\s+--operations/);
     assert.match(source, /operations layer as not set up, offer its guided\s+first run once/);
-    assert.match(source, /sh "\$SKILL_ROOT\/ops\/bootstrap\.sh"/);
-    assert.match(source, /rather than running\s+it for them/);
+    // The handoff runs in a fresh terminal, where the agent's SKILL_ROOT is not set:
+    // the block defines it before using it.
+    const block = /operations layer as not set up[\s\S]*?```bash\n([\s\S]*?)```/.exec(source)?.[1] ?? '';
+    const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+    assert.deepEqual(lines, [
+      'SKILL_ROOT="$HOME/.agents/skills/transmogrify"',
+      'test -f "$SKILL_ROOT/SKILL.md" || SKILL_ROOT="$HOME/.claude/skills/transmogrify"',
+      'sh "$SKILL_ROOT/ops/bootstrap.sh"',
+    ]);
+    assert.match(source, /into a new terminal\s+rather than running them for them/);
   });
 
   test('uses the explaining doctor and guided setup one consented step at a time', () => {

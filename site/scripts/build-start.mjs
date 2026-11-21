@@ -187,10 +187,13 @@ ${PREREQUISITE_BLOCK.split('\n').map((line) => `   ${line}`).join('\n')}
 10. If the doctor lists the operations layer as not set up, offer its guided
     first run once, in one sentence: it sets up the Oracle, the always-on host
     and the mailroom, asking before each change. It asks its own questions at
-    a terminal, so give the user the command to run there rather than running
-    it for them:
+    a terminal, so give the user these lines to paste into a new terminal
+    rather than running them for them (they find the installed copy on
+    their own):
 
     \`\`\`bash
+    SKILL_ROOT="$HOME/.agents/skills/transmogrify"
+    test -f "$SKILL_ROOT/SKILL.md" || SKILL_ROOT="$HOME/.claude/skills/transmogrify"
     sh "$SKILL_ROOT/ops/bootstrap.sh"
     \`\`\`
 

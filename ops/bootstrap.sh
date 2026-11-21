@@ -86,8 +86,11 @@ bs_profile_set() {
 # installer puts claude, when claude is there but not on PATH) is appended
 # when missing. Appended, never prepended, so the profile's order wins.
 # Nothing changes when the profile has no `path` (PATH then stays as is).
+# The parsed value is extended and written back unquoted (values are
+# literal), so a quoted `path="..."` stays a valid search path.
 bs_path_add_clis() {
-  _pa_cur=$(sed -n 's/^path=//p' "$(ao_profile_path)" | tail -n 1)
+  # The parsed value (quotes removed, last line wins), as ao_load will read it.
+  _pa_cur=$(ao_profile_parse "$(ao_profile_path)" 2>/dev/null && ao_cfg path '')
   [ -n "$_pa_cur" ] || return 0
   _pa_new=$_pa_cur _pa_added=''
   for _pa_cli in claude codex; do

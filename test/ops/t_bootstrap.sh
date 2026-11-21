@@ -275,6 +275,35 @@ test_profile_path_gains_the_cli_folders() {
   export PATH
 }
 
+test_quoted_profile_path_is_extended_unquoted() {
+  [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
+  fresh
+  # shellcheck disable=SC2086 # deliberate split of the option list
+  run bootstrap.sh --yes --client claude --home "$T/ops/oracle" --tz Etc/UTC --set "path=$T/bin:/usr/bin:/bin" $SETS
+  assert_lacks "$T/out" "path: added"
+  # Both quote styles the profile parser accepts; the CLIs then move out of
+  # the profile's path (claude to ~/.local/bin, codex to a folder of its own).
+  mkdir -p "$T/clis" "$HOME/.local/bin"
+  mv "$T/bin/claude" "$T/fake-claude"
+  printf '#!/bin/sh\nif [ "$1 $2" = "auth status" ]; then echo %s; exit 0; fi\nexec "%s" "$@"\n' \
+    "'{\"loggedIn\": true}'" "$T/fake-claude" >"$HOME/.local/bin/claude"
+  chmod +x "$HOME/.local/bin/claude"
+  mv "$T/bin/codex" "$T/clis/codex"
+  PATH=$T/bin:$T/clis:/usr/bin:/bin
+  export PATH
+  for _tq in '"' "'"; do
+    grep -v '^path=' "$AO_PROFILE" >"$T/p"
+    printf 'path=%s%s:/usr/bin:/bin%s\n' "$_tq" "$T/bin" "$_tq" >>"$T/p"
+    cat "$T/p" >"$AO_PROFILE"
+    run bootstrap.sh --yes --home "$T/ops/oracle"
+    assert_has "$AO_PROFILE" "path=$T/bin:/usr/bin:/bin:$HOME/.local/bin:$T/clis"
+    assert_lacks "$AO_PROFILE" "$_tq:"
+    assert_eq "$(grep -c '^path=' "$AO_PROFILE")" 1 "path lines"
+    assert_has "$T/out" "PASS  sign-in-claude the Claude CLI reports signed in"
+    assert_has "$T/out" "PASS  sign-in-codex the Codex CLI reports signed in"
+  done
+}
+
 test_claude_attribution_is_switched_off_on_consent() {
   [ "$(uname -s)" = Darwin ] || { echo "    (skipped: launchd units are macOS)"; return 0; }
   fresh

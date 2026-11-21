@@ -1,11 +1,5 @@
 # Changelog
 
-## 2.0.1 (in progress)
-
-- Make the mailroom startup-backlog fixture independent of Node startup
-  speed by checking its existing catch-up tier; burst order, held queues
-  and once-only sends remain checked (K-10, K-36).
-
 ## 2.0.0
 
 Released 2026-11-20, on the owner's decision under the dated exception in

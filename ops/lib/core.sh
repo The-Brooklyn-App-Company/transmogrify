@@ -396,6 +396,17 @@ _ao_link_noclobber() {
 
 # ---------------------------------------------------------------- locking
 
+# ao_mkdir_excl DIR  Create DIR and claim it; true for exactly one caller.
+# mkdir(1)'s status alone is not a lock: uutils coreutils (Ubuntu 26.04's
+# default mkdir) reports success when its mkdir(2) loses a race with EEXIST
+# and the directory exists, so two contenders can both "create" it. The
+# claim is a file created with O_EXCL (the shell's noclobber) inside DIR,
+# which only one caller can create.
+ao_mkdir_excl() {
+  mkdir "$1" 2>/dev/null || return 1
+  (set -C; printf '%s\n' "$$" >"$1/.claim") 2>/dev/null
+}
+
 # ao_lock NAME  Take this process's one exclusive lock; returns 3 while
 # another process holds it. The lock is a kernel lock on
 # <state_dir>/locks/NAME.lock held through file descriptor 9: flock(1) on
@@ -439,7 +450,7 @@ _ao_lock_dir() {
     _ao_gen=$(_ao_lock_owner "$_ao_ld")
     _ao_lock_live "$_ao_ld" "$_ao_gen" && return "$AO_E_BUSY"
     _ao_mark=$_ao_ld.reclaim-$_ao_gen
-    if ! mkdir "$_ao_mark" 2>/dev/null; then
+    if ! ao_mkdir_excl "$_ao_mark"; then
       # A reclaimer that died mid-way leaves its marker: clear it once its
       # own pid is gone (or it never wrote one and is old), and try again
       # on the next run.
@@ -464,7 +475,7 @@ _ao_lock_dir() {
 }
 
 _ao_lock_take() {
-  mkdir "$1" 2>/dev/null && printf '%s\n' "$$" >"$1/pid"
+  ao_mkdir_excl "$1" && printf '%s\n' "$$" >"$1/pid"
 }
 
 # _ao_lock_owner DIR  Print the holder's pid, `nopid` if none is recorded

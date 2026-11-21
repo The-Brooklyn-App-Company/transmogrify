@@ -162,7 +162,7 @@ do_forward() {
     rm -rf "$_mark"
   fi
   # mkdir is atomic: of two concurrent forwards of one turn, one sends.
-  mkdir "$_mark" 2>/dev/null || { echo "already forwarded; not sent again"; return 0; }
+  ao_mkdir_excl "$_mark" || { echo "already forwarded; not sent again"; return 0; }
   if ! _id=$(publish "$H_HOME" "human-via-$o_via" "$H_KEY" forward "$_body") || [ -z "$_id" ]; then
     rm -rf "$_mark"
     ao_die "$AO_E_FAIL" "not forwarded: cannot publish in $H_OP/inbox"

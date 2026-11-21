@@ -59,6 +59,14 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   appends the folders of `claude` and `codex` (and `~/.local/bin` when
   `claude` is there but not on `PATH`) to the profile's `path` when missing.
   Found in the live first run.
+- **Locks that hold on every host.** Directory locks (the lease lock and
+  guard, the `mkdir` fallback of `ao_lock`, forwarding marks) are claimed
+  with an exclusive file inside the new directory, since uutils coreutils'
+  `mkdir` (Ubuntu 26.04's default) can report success after losing a race;
+  the descriptor of a kernel lock is closed inside each background subshell,
+  since dash keeps a saved copy of a redirected descriptor open there; and
+  the portable timeout watchdog (hosts without `timeout`) no longer holds
+  the lock. Found by the first CI runs on hosted runners.
 - **Leak guard** (`ops/check.sh leaks`). Nothing owner- or
   company-specific reaches the public tree: generic rules (home folders,
   e-mail addresses other than the project contact, Slack ids, API-key

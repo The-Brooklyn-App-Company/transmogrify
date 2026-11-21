@@ -142,6 +142,20 @@ test_kernel_lock_ignores_a_recycled_pid() {
   assert_has "$T/out" "rc=3"
 }
 
+test_mkdir_lock_does_not_trust_a_mkdir_that_reports_a_lost_race() {
+  # The directory-lock fallback must stay exclusive when mkdir(1) reports
+  # success for a directory that already exists (uutils coreutils on a lost
+  # race): a lock held by a live process stays held.
+  mkdir -p "$T/state/locks/demo.lock"
+  printf '%s\n' "$$" >"$T/state/locks/demo.lock/pid"
+  : >"$T/state/locks/demo.lock/.claim"
+  printf '#!/bin/sh\n/bin/mkdir "$@" 2>/dev/null\nexit 0\n' >"$T/bin/mkdir"
+  chmod +x "$T/bin/mkdir"
+  lib 'AO_LOCK_TOOL=mkdir; ao_lock demo; echo "rc=$?"'
+  assert_has "$T/out" "rc=3"
+  assert_eq "$(cat "$T/state/locks/demo.lock/pid")" "$$" "lock holder"
+}
+
 test_lock_is_not_inherited_by_children() {
   # A child that outlives the script (say, a stray background process)
   # must not keep the lock.

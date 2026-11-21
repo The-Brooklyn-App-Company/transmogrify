@@ -83,6 +83,25 @@ test_two_holders_cannot_both_acquire() {
 }
 
 
+test_acquire_does_not_trust_a_mkdir_that_reports_a_lost_race() {
+  lsetup
+  # uutils coreutils' mkdir (Ubuntu 26.04's default) reports success when its
+  # mkdir(2) loses a race with EEXIST. Model the worst case, success whenever
+  # the directory exists, while another (live) process holds the lease lock.
+  _lk=$T/ops/ws/.operator/lease.lock
+  mkdir "$_lk"
+  printf '%s\n' "$$" >"$_lk/pid"
+  : >"$_lk/.claim"
+  touch -t 202001010000 "$_lk"
+  printf '#!/bin/sh\n/bin/mkdir "$@" 2>/dev/null\nexit 0\n' >"$T/bin/mkdir"
+  chmod +x "$T/bin/mkdir"
+  lease acquire --provider codex --session B
+  assert_rc 3
+  assert_no_file "$T/ops/ws/.operator/lease"
+  assert_eq "$(cat "$_lk/pid")" "$$" "lock holder"
+  assert_no_file "$T/ops/ws/.operator/lease.guard"
+}
+
 test_acquire_retries_a_guard_removed_after_contention() {
   lsetup
   acq claude Workshop

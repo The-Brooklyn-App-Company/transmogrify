@@ -294,7 +294,7 @@ ao_lease_lock() {
       _lease_guard_stuck
       return "$AO_E_BUSY"
     fi
-    if mkdir "$_ao_lck" 2>/dev/null; then
+    if ao_mkdir_excl "$_ao_lck"; then
       printf '%s\n' "$$" >"$_ao_lck/pid"
       AO_LEASE_LOCKED=$_ao_lck
       ao_lease_unguard
@@ -321,7 +321,7 @@ ao_lease_lock() {
 ao_lease_guard() {
   _ao_gd=$H_OP/lease.guard
   _ao_gw=0
-  while ! mkdir "$_ao_gd" 2>/dev/null; do
+  while ! ao_mkdir_excl "$_ao_gd"; do
     # A contender can fail mkdir just before the owner removes its guard.
     # Absence alone is not a permissions failure: retry within the same
     # bound as contention. A genuinely unwritable parent still fails fast.
@@ -336,12 +336,12 @@ ao_lease_guard() {
 }
 
 ao_lease_unguard() {
-  [ -z "${AO_LEASE_GUARDED:-}" ] || rmdir "$AO_LEASE_GUARDED" 2>/dev/null
+  [ -z "${AO_LEASE_GUARDED:-}" ] || { rm -f "$AO_LEASE_GUARDED/.claim"; rmdir "$AO_LEASE_GUARDED" 2>/dev/null; }
   AO_LEASE_GUARDED=
 }
 
 _lease_guard_stuck() {
-  ao_msg "lease guard $H_OP/lease.guard could not be acquired: failing closed. A human checks that no lease.sh runs for this operator, then removes that directory"
+  ao_msg "lease guard $H_OP/lease.guard could not be acquired: failing closed. A human checks that no lease.sh runs for this operator, then removes that directory (rm -r)"
 }
 
 

@@ -102,6 +102,19 @@ test_acquire_does_not_trust_a_mkdir_that_reports_a_lost_race() {
   assert_no_file "$T/ops/ws/.operator/lease.guard"
 }
 
+test_unlock_keeps_a_successor_that_claimed_mid_cleanup() {
+  lsetup
+  # As in t_core: a successor claims the lease lock between the holder's
+  # removal of its claim and its rmdir; the holder must not erase it.
+  _lk=$T/ops/ws/.operator/lease.lock
+  printf '#!/bin/sh\ncase $1 in *lease.lock) (set -C; printf "%%s\\n" %s >"$1/.claim") 2>/dev/null && printf "%%s\\n" %s >"$1/pid" ;; esac\nexec /bin/rmdir "$@"\n' "$$" "$$" >"$T/bin/rmdir"
+  chmod +x "$T/bin/rmdir"
+  acq claude Workshop
+  [ -n "$TOK" ] || _fail "no token: $(cat "$T/err")"
+  assert_eq "$(cat "$_lk/pid" 2>/dev/null)" "$$" "successor pid"
+  assert_file "$_lk/.claim"
+}
+
 test_acquire_retries_a_guard_removed_after_contention() {
   lsetup
   acq claude Workshop

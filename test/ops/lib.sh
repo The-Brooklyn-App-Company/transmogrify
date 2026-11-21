@@ -37,8 +37,11 @@ ao_test_setup() {
   PATH="$T/bin:$PATH" HOME=$T/user CLAUDE_CONFIG_DIR=$T/claude CODEX_HOME=$T/codex
   AO_PROFILE=$T/profile FAKE_LOG=$T/fake.log
   export PATH HOME CLAUDE_CONFIG_DIR CODEX_HOME AO_PROFILE FAKE_LOG
+  # A suite run from inside an agent session must not inherit its identity
+  # (bootstrap.sh, for one, takes the Codex thread as the Oracle's session).
   unset XDG_CONFIG_HOME XDG_STATE_HOME AO_NOW FAKE_MODE FAKE_OUTPUT FAKE_MCP AO_TIMEOUT_BIN \
-    AO_PRIVACY_DENYLIST AO_LOCK_TOOL AO_KEEP_STREAM
+    AO_PRIVACY_DENYLIST AO_LOCK_TOOL AO_KEEP_STREAM \
+    CLAUDECODE CLAUDE_PID CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID CODEX_SANDBOX CODEX_SESSION_ID
   # A short TERM-to-KILL grace keeps the timeout tests fast.
   AO_GRACE=1
   export AO_GRACE

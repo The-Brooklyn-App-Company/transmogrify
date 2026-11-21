@@ -90,7 +90,7 @@ ao_cleanup() {
   # A directory lock is released only if this process still owns it; a
   # kernel lock goes with the descriptor when the process exits.
   if [ -n "$AO_LOCK" ] && [ -z "$AO_LOCK_FD" ] && [ "$(cat "$AO_LOCK/pid" 2>/dev/null)" = "$$" ]; then
-    rm -rf "$AO_LOCK"
+    ao_rmdir_claimed "$AO_LOCK"
   fi
   AO_LOCK=
   rm -rf "$AO_TMPDIR"
@@ -407,6 +407,17 @@ ao_mkdir_excl() {
   (set -C; printf '%s\n' "$$" >"$1/.claim") 2>/dev/null
 }
 
+# ao_rmdir_claimed DIR  Remove a directory made by ao_mkdir_excl: its pid
+# first, the claim last, then the directory itself. Never recursive: a
+# contender whose mkdir(1) reported success on a lost race can claim DIR as
+# soon as the claim is gone, and then writes its own pid; the rmdir then
+# fails and leaves that successor's files alone. Returns rmdir's status.
+ao_rmdir_claimed() {
+  rm -f "$1/pid"
+  rm -f "$1/.claim"
+  rmdir "$1" 2>/dev/null
+}
+
 # ao_lock NAME  Take this process's one exclusive lock; returns 3 while
 # another process holds it. The lock is a kernel lock on
 # <state_dir>/locks/NAME.lock held through file descriptor 9: flock(1) on
@@ -457,7 +468,7 @@ _ao_lock_dir() {
       _ao_rp=$(_ao_lock_owner "$_ao_mark")
       if ! _ao_lock_live "$_ao_mark" "$_ao_rp"; then
         ao_warn "clearing an abandoned reclaim marker $_ao_mark"
-        rm -rf "$_ao_mark"
+        ao_rmdir_claimed "$_ao_mark"
       fi
       return "$AO_E_BUSY"
     fi
@@ -465,10 +476,10 @@ _ao_lock_dir() {
     _ao_got=$AO_E_BUSY
     if [ "$(_ao_lock_owner "$_ao_ld")" = "$_ao_gen" ] && ! _ao_lock_live "$_ao_ld" "$_ao_gen"; then
       ao_warn "reclaiming stale lock $_ao_ld (holder $_ao_gen is gone)"
-      rm -rf "$_ao_ld"
+      ao_rmdir_claimed "$_ao_ld"
       _ao_lock_take "$_ao_ld" && _ao_got=0
     fi
-    rm -rf "$_ao_mark"
+    ao_rmdir_claimed "$_ao_mark"
     [ "$_ao_got" -eq 0 ] || return "$AO_E_BUSY"
   fi
   AO_LOCK=$_ao_ld

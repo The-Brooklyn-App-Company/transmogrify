@@ -156,6 +156,23 @@ test_mkdir_lock_does_not_trust_a_mkdir_that_reports_a_lost_race() {
   assert_eq "$(cat "$T/state/locks/demo.lock/pid")" "$$" "lock holder"
 }
 
+test_release_keeps_a_successor_that_claimed_mid_cleanup() {
+  # uutils mkdir: a contender that checked the lock absent can "create" it
+  # while the holder is removing it. It can claim the lock only once the
+  # holder's claim is gone; the holder's removal must then leave the
+  # successor's claim and pid alone. The fake rmdir models that successor
+  # (this live test shell) entering just before the holder's rmdir.
+  printf '#!/bin/sh\ncase $1 in *demo.lock) (set -C; printf "%%s\\n" %s >"$1/.claim") 2>/dev/null && printf "%%s\\n" %s >"$1/pid" ;; esac\nexec /bin/rmdir "$@"\n' "$$" "$$" >"$T/bin/rmdir"
+  chmod +x "$T/bin/rmdir"
+  lib 'AO_LOCK_TOOL=mkdir; ao_lock demo && echo held'
+  assert_has "$T/out" held
+  assert_eq "$(cat "$T/state/locks/demo.lock/pid" 2>/dev/null)" "$$" "successor pid"
+  assert_file "$T/state/locks/demo.lock/.claim"
+  rm -f "$T/bin/rmdir"
+  lib 'AO_LOCK_TOOL=mkdir; ao_lock demo; echo "rc=$?"'
+  assert_has "$T/out" "rc=3"
+}
+
 test_lock_is_not_inherited_by_children() {
   # A child that outlives the script (say, a stray background process)
   # must not keep the lock.

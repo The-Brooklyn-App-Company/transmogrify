@@ -79,7 +79,7 @@ ao_pause() {
 # kit script that takes the same lock).
 ao_unlock() {
   if [ -n "$AO_LOCK_FD" ]; then exec 9>&-
-  elif [ -n "$AO_LOCK" ] && [ "$(cat "$AO_LOCK/pid" 2>/dev/null)" = "$$" ]; then rm -rf "$AO_LOCK"; fi
+  elif [ -n "$AO_LOCK" ] && [ "$(cat "$AO_LOCK/pid" 2>/dev/null)" = "$$" ]; then ao_rmdir_claimed "$AO_LOCK"; fi
   AO_LOCK='' AO_LOCK_FD=''
 }
 

@@ -361,7 +361,7 @@ _ao_lease_stuck() {
 # ao_lease_unlock  Release the lease lock if this process holds it.
 ao_lease_unlock() {
   if [ -n "$AO_LEASE_LOCKED" ] && [ "$(cat "$AO_LEASE_LOCKED/pid" 2>/dev/null)" = "$$" ]; then
-    rm -rf "$AO_LEASE_LOCKED"
+    ao_rmdir_claimed "$AO_LEASE_LOCKED"
   fi
   AO_LEASE_LOCKED=
   ao_lease_unguard

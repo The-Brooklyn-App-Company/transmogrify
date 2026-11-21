@@ -530,15 +530,19 @@ ao_timeout() {
   trap 'ao_on_signal 130' INT
   trap 'ao_on_signal 143' TERM
   # Job control gives the background command its own process group.
+  # Descriptor 9 is closed inside the subshell, not by a redirection on the
+  # function call: dash keeps a saved copy of a redirected descriptor open in
+  # a backgrounded function's subshell, which would hold the lock.
   set -m 2>/dev/null
-  _ao_child "$@" </dev/null 9>&- &
+  (exec 9>&-; _ao_child "$@") </dev/null &
   AO_CHILD=$!
   set +m 2>/dev/null
   _ao_pg=$AO_CHILD _ao_wpid=
   if [ -z "$_ao_core" ] && [ "$_ao_secs" -gt 0 ]; then
-    # The watchdog (and its `sleep`) must not hold the lock either: killed
-    # after the child ends, its last `sleep 1` would keep descriptor 9 open.
-    _ao_watch "$AO_CHILD" "$_ao_secs" "$_ao_mark" 9>&- &
+    # The watchdog (and its `sleep`) must not hold the lock either: it can
+    # outlive this shell by a second (an interrupt does not stop it), and
+    # its `sleep 1` would keep descriptor 9 open.
+    (exec 9>&-; _ao_watch "$AO_CHILD" "$_ao_secs" "$_ao_mark") &
     _ao_wpid=$!
   fi
   wait "$AO_CHILD"
@@ -574,7 +578,7 @@ _ao_child() {
 # handled at once and forwarded to it rather than deferred until it ends.
 # Returns CMD's status.
 ao_bg() {
-  "$@" 9>&- &
+  (exec 9>&-; "$@") &
   AO_CHILD=$!
   wait "$AO_CHILD"
   _ao_bgrc=$?

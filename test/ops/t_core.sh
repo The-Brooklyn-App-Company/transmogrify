@@ -265,6 +265,21 @@ test_timeout_kills_descendants() {
   assert_no_file "$T/home/stubborn"
 }
 
+test_killed_holder_leaves_no_lock_in_its_watchdog() {
+  # dash keeps a saved copy of a descriptor redirected on a backgrounded
+  # function call open in that subshell: the portable watchdog of a holder
+  # killed outright must not keep the lock while its timed command runs on.
+  "$AO_TEST_SHELL" -c '
+    AO_SCRIPTS=$1; . "$AO_SCRIPTS/lib/core.sh"; ao_load; ao_lock demo
+    AO_TIMEOUT_BIN=none; ao_timeout 30 sleep 6' sh "$SCRIPTS" </dev/null >"$T/out" 2>"$T/err" &
+  sup=$!
+  sleep 2
+  kill -s KILL "$sup"
+  wait "$sup" 2>/dev/null
+  lib 'ao_lock demo && echo free'
+  assert_has "$T/out" free
+}
+
 test_interrupt_stops_children_before_releasing_lock() {
   # A supervisor holding a lock is told to stop while its child ignores TERM:
   # the child must be gone before the lock is released.

@@ -150,6 +150,17 @@ test_lock_is_not_inherited_by_children() {
   assert_has "$T/out" free
 }
 
+test_lock_is_not_inherited_without_a_timeout_binary() {
+  # Hosts with no timeout(1) (macOS before 26) use the portable watchdog: it
+  # and its sleep must not keep the lock after the timed command ends.
+  lib 'AO_TIMEOUT_BIN=none; ao_lock demo; ao_timeout 5 sh -c "sleep 4 &"; echo started'
+  lib 'ao_lock demo && echo free'
+  assert_has "$T/out" free
+  lib 'AO_TIMEOUT_BIN=none; ao_lock demo; ao_timeout 5 true; echo done'
+  lib 'ao_lock demo && echo free'
+  assert_has "$T/out" free
+}
+
 test_cleanup_only_releases_own_lock() {
   AO_LOCK_TOOL='mkdir'
   export AO_LOCK_TOOL

@@ -536,7 +536,9 @@ ao_timeout() {
   set +m 2>/dev/null
   _ao_pg=$AO_CHILD _ao_wpid=
   if [ -z "$_ao_core" ] && [ "$_ao_secs" -gt 0 ]; then
-    _ao_watch "$AO_CHILD" "$_ao_secs" "$_ao_mark" &
+    # The watchdog (and its `sleep`) must not hold the lock either: killed
+    # after the child ends, its last `sleep 1` would keep descriptor 9 open.
+    _ao_watch "$AO_CHILD" "$_ao_secs" "$_ao_mark" 9>&- &
     _ao_wpid=$!
   fi
   wait "$AO_CHILD"

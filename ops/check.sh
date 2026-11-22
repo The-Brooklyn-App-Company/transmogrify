@@ -565,13 +565,19 @@ check_leak_scan() {
     # Only a token inside the payload of an explicitly labelled integrity
     # hash is exempt. A hash elsewhere on the line, or +/= in an arbitrary
     # run, is not evidence that a URL/path identifier is encoded data.
-    function inhash(line, st, len,   i, j, run, prefix) {
+    function inhash(line, st, len,   i, j, run, prefix, algorithm, payload) {
       i = st; while (i > 1 && substr(line, i - 1, 1) ~ /[A-Za-z0-9+\/=]/) i--
       j = st + len; while (j <= length(line) && substr(line, j, 1) ~ /[A-Za-z0-9+\/=]/) j++
       run = substr(line, i, j - i)
       prefix = substr(line, 1, i - 1)
-      return length(run) >= 24 && run !~ /=[^=]/ && run !~ /===/ && \
-        prefix ~ /(^|[^A-Za-z0-9_\/])sha(1|256|384|512)-$/
+      if (prefix !~ /(^|[^A-Za-z0-9_\/])sha(1|256|384|512)-$/) return 0
+      algorithm = prefix; sub(/^.*sha/, "", algorithm); sub(/-$/, "", algorithm)
+      payload = run; sub(/=+$/, "", payload)
+      if (payload ~ /[^A-Za-z0-9+\/]/) return 0
+      # Require the digest length and canonical base64 padding for this algorithm.
+      if (algorithm == "384") return length(run) == 64 && run !~ /=/
+      if (algorithm == "512") return length(run) == 88 && run ~ /[AQgw]==$/
+      return length(run) == (algorithm == "1" ? 28 : 44) && run ~ /[AEIMQUYcgkosw048]=$/
     }
     # jwt(line): three dot-separated base64url parts after "eyJ".
     function jwt(line,   t, k, parts, np, x) {

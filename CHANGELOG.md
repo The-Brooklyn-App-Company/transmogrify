@@ -3,13 +3,14 @@
 ## 2.0.1 (in progress)
 
 - **Leak guard and its timeout regression** (K-31, K-25): L03 exempts only
-  the candidate inside an explicitly labelled integrity-hash payload.
+  the candidate inside an explicitly labelled integrity-hash payload with
+  the stated algorithm's digest length and canonical base64 padding.
   Hash words elsewhere on a line and unlabelled runs containing `+` or `=`
   no longer hide URL/path identifiers. Unlabelled encoded text with an
   identifier-shaped fragment is checked normally; a reviewed false positive
   can use the existing `leak-ok: L03` marker. The test guard now gives its
-  command a private process group under either shell and stops its owned
-  descendants on timeout, including under non-interactive dash.
+  command an owned process tree and stops nested groups on timeout under
+  either shell. Timeout fixtures self-expire if cleanup regresses.
 
 ## 2.0.0
 

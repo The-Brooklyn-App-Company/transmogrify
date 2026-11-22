@@ -370,10 +370,10 @@ test_check_leaks_staged_only_and_the_precommit_hook() {
   assert_has "$T/err" "was not written by this kit; left alone"
 }
 
-# ao_timeout_run CMD...  Give the command a private process group even in
-# non-interactive dash, which cannot enable job control. A timeout stops
-# that group, including descendants that ignore TERM, without a watchdog
-# shell or sleep surviving a normally completed command.
+# ao_timeout_run CMD...  Stop an owned test command tree at its deadline,
+# including nested process groups. Freeze each parent before finding its
+# children, then kill children first: stopped parents cannot reap/recycle
+# the PIDs while cleanup uses them.
 ao_timeout_run() {
   /usr/bin/python3 -I - "${AO_TEST_TIMEOUT_SECONDS:-20}" "$@" <<'PY'
 import os
@@ -383,20 +383,34 @@ import sys
 
 seconds = float(sys.argv[1])
 child = subprocess.Popen(sys.argv[2:], stdin=subprocess.DEVNULL, start_new_session=True)
+
+def freeze_tree(pid, frozen):
+    try:
+        os.kill(pid, signal.SIGSTOP)
+    except ProcessLookupError:
+        return
+    frozen.append(pid)
+    children = subprocess.run(
+        ["/usr/bin/pgrep", "-P", str(pid)], stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2)
+    if children.returncode not in (0, 1):
+        raise RuntimeError("cannot enumerate the owned test children")
+    for value in children.stdout.split():
+        freeze_tree(int(value), frozen)
+
 try:
     status = child.wait(timeout=seconds)
 except subprocess.TimeoutExpired:
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(child.pid, sig)
-        except ProcessLookupError:
-            pass
-        if sig == signal.SIGTERM:
+    frozen = []
+    try:
+        freeze_tree(child.pid, frozen)
+    finally:
+        for pid in reversed(frozen):
             try:
-                child.wait(timeout=1)
-            except subprocess.TimeoutExpired:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
                 pass
-    child.wait()
+        child.wait()
     status = 124
 sys.exit(status if status >= 0 else 128 - status)
 PY
@@ -427,6 +441,9 @@ test_check_leaks_more_forms() {
     printf 'query https://example.com/?q=a+b/archives/%s\n' "C0""6ABCDEF12"
     printf 'path docs/operations/slack/channels/exports/%s=\n' "C0""6ABCDEF12"
   } >"$T/repo/more.md"
+  # Hash-like path names are not integrity values.
+  printf 'path sha256-exports/%s/notes\n' "C0""6ABCDEF12" >>"$T/repo/more.md"
+  printf 'url https://example.com/?path=sha512-exports/%s/notes\n' "C0""6ABCDEF12" >>"$T/repo/more.md"
   (cd "$T/repo" && git add -A)
   (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
   rc=$?
@@ -439,6 +456,7 @@ test_check_leaks_more_forms() {
   for l in 15 16 17; do assert_has "$T/out" "more.md:$l: L03"; done
   assert_lacks "$T/out" "more.md:18:"
   for l in 19 20 21; do assert_has "$T/out" "more.md:$l: L03"; done
+  for l in 22 23; do assert_has "$T/out" "more.md:$l: L03"; done
   assert_has "$T/err" "leaks: no denylist: generic rules only"
   # A tracked symlink is scanned as its target path, not followed.
   rm "$T/repo/more.md"
@@ -514,11 +532,36 @@ test_precommit_hook_carries_this_checkouts_denylist() {
   assert_has "$T/err" "must live outside"
 }
 
+test_check_leaks_hash_payload_shapes() {
+  leak_repo || return 0
+  /usr/bin/python3 -I - "$T/repo/hashes.md" <<'PY'
+import base64
+import pathlib
+import sys
+
+identifier = "C0" "6ABCDEF12"
+values = []
+for name, length, padding in (("sha1", 28, 1), ("sha256", 44, 1), ("sha384", 64, 0), ("sha512", 88, 2)):
+    value = "A" * (length - padding - len(identifier) - 3) + "/" + identifier + "+A" + "=" * padding
+    assert base64.b64encode(base64.b64decode(value)).decode() == value
+    values.append(value)
+lines = [name + "-" + value for name, value in zip(("sha1", "sha256", "sha384", "sha512"), values)]
+lines += ["sha256-" + values[0], "sha512-" + values[3][:-2] + "AA"]
+pathlib.Path(sys.argv[1]).write_text("\n".join(lines) + "\n")
+PY
+  (cd "$T/repo" && git add -A)
+  (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 1
+  for l in 1 2 3 4; do assert_lacks "$T/out" "hashes.md:$l:"; done
+  for l in 5 6; do assert_has "$T/out" "hashes.md:$l: L03"; done
+}
+
 test_timeout_guard_stops_owned_descendants() {
   cat >"$T/bin/guard-tree" <<'EOF'
 #!/bin/sh
 trap '' TERM
-sleep 7331 &
+sleep 5 &
 printf '%s\n' "$!" >"$1"
 wait
 EOF
@@ -526,24 +569,55 @@ EOF
   start=$(date +%s)
   AO_TEST_TIMEOUT_SECONDS=2 ao_timeout_run "$T/bin/guard-tree" "$T/guard-child.pid"
   rc=$?
-  [ "$rc" -ne 0 ] || _fail "the guard reported success for a hung command"
+  assert_rc 124
   [ $(($(date +%s) - start)) -lt 8 ] || _fail "the timeout guard did not return promptly"
   child=$(cat "$T/guard-child.pid" 2>/dev/null)
   [ -n "$child" ] || { _fail "the guarded child never started"; return; }
   state=$(ps -o stat= -p "$child" 2>/dev/null)
   case $state in
     '' | *Z*) ;;
-    *) kill -KILL "$child" 2>/dev/null; _fail "the owned descendant outlived the timeout guard" ;;
+    *) _fail "the owned descendant outlived the timeout guard" ;;
   esac
+}
+
+test_timeout_guard_stops_nested_scan_groups() {
+  leak_repo || return 0
+  printf 'clean\n' >"$T/repo/a.md"
+  (cd "$T/repo" && git add -A)
+  real=$(command -v awk)
+  cat >"$T/bin/awk" <<EOF
+#!/bin/sh
+for a in "\$@"; do
+  case \$a in
+    *"function exempt(rule"*)
+      trap '' TERM
+      printf '%s\n' "\$\$" >"$T/nested-awk.pid"
+      sleep 5
+      exit 0 ;;
+  esac
+done
+exec "$real" "\$@"
+EOF
+  chmod +x "$T/bin/awk"
+  start=$(date +%s)
+  (cd "$T/repo" && AO_TEST_TIMEOUT_SECONDS=2 TRANSMOGRIFY_LEAK_DENYLIST='' TRANSMOGRIFY_LEAK_FILE_SECONDS=10 \
+    ao_timeout_run "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
+  rc=$?
+  assert_rc 124
+  [ $(($(date +%s) - start)) -lt 5 ] || _fail "the nested scan was not stopped by the outer deadline"
+  child=$(cat "$T/nested-awk.pid" 2>/dev/null)
+  [ -n "$child" ] || { _fail "the nested scanner never started"; return; }
+  state=$(ps -o stat= -p "$child" 2>/dev/null)
+  case $state in '' | *Z*) ;; *) _fail "the nested scanner outlived the guard" ;; esac
 }
 
 test_check_leaks_stops_a_scan_that_hangs() {
   leak_repo || return 0
   printf 'clean\n' >"$T/repo/a.md"
   (cd "$T/repo" && git add -A)
-  # An awk that never returns on the leak program (everything else goes to the real awk).
+  # A slow awk for the leak program; it self-expires even if both guards regress.
   real=$(command -v awk)
-  printf '#!/bin/sh\nfor a in "$@"; do case $a in *"function exempt(rule"*) exec sleep 7319 ;; esac; done\nexec "%s" "$@"\n' "$real" >"$T/bin/awk"
+  printf '#!/bin/sh\nfor a in "$@"; do case $a in *"function exempt(rule"*) exec sleep 9 ;; esac; done\nexec "%s" "$@"\n' "$real" >"$T/bin/awk"
   chmod +x "$T/bin/awk"
   start=$(date +%s)
   (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' TRANSMOGRIFY_LEAK_FILE_SECONDS=2 \
@@ -554,7 +628,6 @@ test_check_leaks_stops_a_scan_that_hangs() {
   assert_rc 1
   assert_has "$T/out" "a.md: not scanned (stopped after the 2 s budget)"
   assert_has "$T/err" "leak scan incomplete"
-  ! pgrep -f 'sleep 7319' >/dev/null 2>&1 || _fail "the hung scan outlived the guard"
 }
 
 ao_test_main "$0"

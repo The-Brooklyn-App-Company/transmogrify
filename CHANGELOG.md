@@ -12,6 +12,20 @@
   command an owned process tree and stops nested groups on timeout under
   either shell. Timeout fixtures self-expire if cleanup regresses.
 
+### Known issues
+
+- **Integrity context:** a URL or path that has the exact length and
+  alphabet of a digest can still be mistaken for an integrity value. The
+  scanner does not yet require explicit integrity-field context.
+- **Timeout ownership:** the test guard covers the blocking fixture tree
+  it starts. Descendants that daemonize into another session or are
+  reparented before cleanup can escape it; it is not a general process
+  manager.
+- **Timeout PID identity:** cleanup assumes parents keep their children
+  waitable. Ignoring `SIGCHLD` can let the kernel reap a child despite its
+  stopped parent, invalidating that assumption. No signal to an unrelated
+  process was reproduced. Keep the guard confined to controlled fixtures.
+
 ## 2.0.0
 
 Released 2026-11-20, on the owner's decision under the dated exception in

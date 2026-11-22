@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.1 (in progress)
+
+- **Leak guard and its timeout regression** (K-31, K-25): L03 exempts only
+  the candidate inside an explicitly labelled integrity-hash payload.
+  Hash words elsewhere on a line and unlabelled runs containing `+` or `=`
+  no longer hide URL/path identifiers. Unlabelled encoded text with an
+  identifier-shaped fragment is checked normally; a reviewed false positive
+  can use the existing `leak-ok: L03` marker. The test guard now gives its
+  command a private process group under either shell and stops its owned
+  descendants on timeout, including under non-interactive dash.
+
 ## 2.0.0
 
 Released 2026-11-20, on the owner's decision under the dated exception in
@@ -125,17 +136,6 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   `/start` now runs the doctor with `--operations` and offers the
   operations layer's guided first run (`bootstrap.sh`, at a terminal).
   The landing page's size budget was rebased for the new sections.
-
-### Known issues
-
-- **Leak guard edge cases** (`ops/check.sh leaks`, rule L03): a line that
-  also carries a `sha1-`/`sha256-`/`sha384-`/`sha512-` word is exempt as a
-  whole, so a Slack link on such a line is missed; an id inside a run of 24
-  or more characters that holds a `+` or ends in `=` is skipped.
-- **Test harness under dash:** the hang guard in
-  `test/ops/t_tools.sh` (`test_check_leaks_stops_a_scan_that_hangs`) cannot
-  stop a hung scan under dash, which has no job control without a terminal;
-  the test passes because the scan's own per-file budget works.
 
 ### Migrating from Agent Operations 0.3.x (kit users)
 

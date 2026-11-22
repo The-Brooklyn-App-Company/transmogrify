@@ -370,21 +370,36 @@ test_check_leaks_staged_only_and_the_precommit_hook() {
   assert_has "$T/err" "was not written by this kit; left alone"
 }
 
-# ao_timeout_run CMD...  Run CMD in its own process group; after 20 s the
-# whole group gets TERM, then KILL, so a hang fails the test instead of
-# hanging it (a shell that traps TERM cannot defer the KILL).
+# ao_timeout_run CMD...  Give the command a private process group even in
+# non-interactive dash, which cannot enable job control. A timeout stops
+# that group, including descendants that ignore TERM, without a watchdog
+# shell or sleep surviving a normally completed command.
 ao_timeout_run() {
-  set -m
-  "$@" &
-  _tp=$!
-  set +m
-  ( sleep 20; kill -TERM -"$_tp" 2>/dev/null; sleep 2; kill -KILL -"$_tp" 2>/dev/null ) &
-  _tk=$!
-  wait "$_tp"
-  _tr=$?
-  kill "$_tk" 2>/dev/null
-  wait "$_tk" 2>/dev/null
-  return "$_tr"
+  /usr/bin/python3 -I - "${AO_TEST_TIMEOUT_SECONDS:-20}" "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+seconds = float(sys.argv[1])
+child = subprocess.Popen(sys.argv[2:], stdin=subprocess.DEVNULL, start_new_session=True)
+try:
+    status = child.wait(timeout=seconds)
+except subprocess.TimeoutExpired:
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            os.killpg(child.pid, sig)
+        except ProcessLookupError:
+            pass
+        if sig == signal.SIGTERM:
+            try:
+                child.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+    child.wait()
+    status = 124
+sys.exit(status if status >= 0 else 128 - status)
+PY
 }
 
 test_check_leaks_more_forms() {
@@ -408,6 +423,9 @@ test_check_leaks_more_forms() {
     printf 'thread https://app.slack.com/client/%s/%s/thread/%s-1700000000.000100\n' "T0""6ABCDEF12" "C0""6ABCDEF12" "C0""6ABCDEF12"
     printf 'path docs/operations/slack/channels/exports/%s/notes\n' "C0""6ABCDEF12"
     printf 'hash "integrity": "sha1-%sabcdefghijklmnop="\n' "C0""6ABCDEF12"
+    printf 'sha512-unrelated-word link https://app.slack.com/archives/%s\n' "C0""6ABCDEF12"
+    printf 'query https://example.com/?q=a+b/archives/%s\n' "C0""6ABCDEF12"
+    printf 'path docs/operations/slack/channels/exports/%s=\n' "C0""6ABCDEF12"
   } >"$T/repo/more.md"
   (cd "$T/repo" && git add -A)
   (cd "$T/repo" && TRANSMOGRIFY_LEAK_DENYLIST='' "$AO_TEST_SHELL" "$SCRIPTS/check.sh" leaks --no-denylist >"$T/out" 2>"$T/err")
@@ -420,6 +438,7 @@ test_check_leaks_more_forms() {
   assert_lacks "$T/out" "more.md:14:"
   for l in 15 16 17; do assert_has "$T/out" "more.md:$l: L03"; done
   assert_lacks "$T/out" "more.md:18:"
+  for l in 19 20 21; do assert_has "$T/out" "more.md:$l: L03"; done
   assert_has "$T/err" "leaks: no denylist: generic rules only"
   # A tracked symlink is scanned as its target path, not followed.
   rm "$T/repo/more.md"
@@ -493,6 +512,29 @@ test_precommit_hook_carries_this_checkouts_denylist() {
   run install.sh precommit --denylist "$T/repo/deny.txt" "$T/repo"
   assert_rc 2
   assert_has "$T/err" "must live outside"
+}
+
+test_timeout_guard_stops_owned_descendants() {
+  cat >"$T/bin/guard-tree" <<'EOF'
+#!/bin/sh
+trap '' TERM
+sleep 7331 &
+printf '%s\n' "$!" >"$1"
+wait
+EOF
+  chmod +x "$T/bin/guard-tree"
+  start=$(date +%s)
+  AO_TEST_TIMEOUT_SECONDS=2 ao_timeout_run "$T/bin/guard-tree" "$T/guard-child.pid"
+  rc=$?
+  [ "$rc" -ne 0 ] || _fail "the guard reported success for a hung command"
+  [ $(($(date +%s) - start)) -lt 8 ] || _fail "the timeout guard did not return promptly"
+  child=$(cat "$T/guard-child.pid" 2>/dev/null)
+  [ -n "$child" ] || { _fail "the guarded child never started"; return; }
+  state=$(ps -o stat= -p "$child" 2>/dev/null)
+  case $state in
+    '' | *Z*) ;;
+    *) kill -KILL "$child" 2>/dev/null; _fail "the owned descendant outlived the timeout guard" ;;
+  esac
 }
 
 test_check_leaks_stops_a_scan_that_hangs() {

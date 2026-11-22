@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.1 (in progress)
+
+- **Leak guard and its timeout regression** (K-31, K-25): L03 exempts only
+  the candidate inside an explicitly labelled integrity-hash payload with
+  the stated algorithm's digest length and canonical base64 padding.
+  Hash words elsewhere on a line and unlabelled runs containing `+` or `=`
+  no longer hide URL/path identifiers. Unlabelled encoded text with an
+  identifier-shaped fragment is checked normally; a reviewed false positive
+  can use the existing `leak-ok: L03` marker. The test guard now gives its
+  command an owned process tree and stops nested groups on timeout under
+  either shell. Timeout fixtures self-expire if cleanup regresses.
+
+### Known issues
+
+- **Integrity context:** a URL or path that has the exact length and
+  alphabet of a digest can still be mistaken for an integrity value. The
+  scanner does not yet require explicit integrity-field context.
+- **Timeout ownership:** the test guard covers the blocking fixture tree
+  it starts. Descendants that daemonize into another session or are
+  reparented before cleanup can escape it; it is not a general process
+  manager.
+- **Timeout PID identity:** cleanup assumes parents keep their children
+  waitable. Ignoring `SIGCHLD` can let the kernel reap a child despite its
+  stopped parent, invalidating that assumption. No signal to an unrelated
+  process was reproduced. Keep the guard confined to controlled fixtures.
+
 ## 2.0.0
 
 Released 2026-11-20, on the owner's decision under the dated exception in
@@ -125,17 +151,6 @@ Linux best effort for the `sh` layer; Antigravity is on the roadmap.
   `/start` now runs the doctor with `--operations` and offers the
   operations layer's guided first run (`bootstrap.sh`, at a terminal).
   The landing page's size budget was rebased for the new sections.
-
-### Known issues
-
-- **Leak guard edge cases** (`ops/check.sh leaks`, rule L03): a line that
-  also carries a `sha1-`/`sha256-`/`sha384-`/`sha512-` word is exempt as a
-  whole, so a Slack link on such a line is missed; an id inside a run of 24
-  or more characters that holds a `+` or ends in `=` is skipped.
-- **Test harness under dash:** the hang guard in
-  `test/ops/t_tools.sh` (`test_check_leaks_stops_a_scan_that_hangs`) cannot
-  stop a hung scan under dash, which has no job control without a terminal;
-  the test passes because the scan's own per-file budget works.
 
 ### Migrating from Agent Operations 0.3.x (kit users)
 

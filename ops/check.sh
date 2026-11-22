@@ -60,8 +60,7 @@
 #                contact (package.json's author email)
 #            L03 a Slack channel, user or team id (C, D, G, T, U or W, a
 #                digit, then uppercase letters and digits; 9 to 12 long;
-#                in URLs and paths too; not inside base64: a run with "+"
-#                or ending in "=", or an integrity-hash line)
+#                in URLs and paths too; not inside an integrity-hash value)
 #            L04 an API key or token shape (sk-, sk_live_, gh?_,
 #                github_pat_, glpat-, npm_, lin_api_, xox?-, xapp-, AKIA,
 #                ASIA, AIza, a JWT, a Slack webhook URL) or a PEM private key
@@ -563,16 +562,22 @@ check_leak_scan() {
       print n ":" FNR ": " rule; seen[rule] = 1
     }
     function home(name) { if (!(tolower(name) in homes)) hit("L01") }
-    # inb64(line, start, len): the token sits in base64 (a hash or a blob), by
-    # evidence a URL or a path never has: the run of base64 characters
-    # around it holds a "+" or ends in "=", or the line carries an
-    # integrity hash (sha1-, sha256-, sha384-, sha512-).
-    function inb64(line, st, len,   i, j, run) {
-      if (line ~ /sha(1|256|384|512)-/) return 1
+    # Only a token inside the payload of an explicitly labelled integrity
+    # hash is exempt. A hash elsewhere on the line, or +/= in an arbitrary
+    # run, is not evidence that a URL/path identifier is encoded data.
+    function inhash(line, st, len,   i, j, run, prefix, algorithm, payload) {
       i = st; while (i > 1 && substr(line, i - 1, 1) ~ /[A-Za-z0-9+\/=]/) i--
       j = st + len; while (j <= length(line) && substr(line, j, 1) ~ /[A-Za-z0-9+\/=]/) j++
       run = substr(line, i, j - i)
-      return length(run) >= 24 && (index(run, "+") > 0 || substr(run, length(run), 1) == "=")
+      prefix = substr(line, 1, i - 1)
+      if (prefix !~ /(^|[^A-Za-z0-9_\/])sha(1|256|384|512)-$/) return 0
+      algorithm = prefix; sub(/^.*sha/, "", algorithm); sub(/-$/, "", algorithm)
+      payload = run; sub(/=+$/, "", payload)
+      if (payload ~ /[^A-Za-z0-9+\/]/) return 0
+      # Require the digest length and canonical base64 padding for this algorithm.
+      if (algorithm == "384") return length(run) == 64 && run !~ /=/
+      if (algorithm == "512") return length(run) == 88 && run ~ /[AQgw]==$/
+      return length(run) == (algorithm == "1" ? 28 : 44) && run ~ /[AEIMQUYcgkosw048]=$/
     }
     # jwt(line): three dot-separated base64url parts after "eyJ".
     function jwt(line,   t, k, parts, np, x) {
@@ -666,13 +671,13 @@ check_leak_scan() {
         hit("L02"); break
       }
       # L03: Slack ids, on alphanumeric tokens (SLACK_CHANNEL=..., /archives/...,
-      # message, client and thread links, slack-...), unless the token sits in
-      # base64.
+      # message, client and thread links, slack-...), unless the token sits
+      # inside an integrity-hash payload.
       rest = $0; off = 0
       while (match(rest, /[A-Za-z0-9]+/)) {
         st = off + RSTART; t = substr(rest, RSTART, RLENGTH); l = RLENGTH
         off += RSTART + RLENGTH - 1; rest = substr(rest, RSTART + RLENGTH)
-        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && !inb64($0, st, l)) hit("L03")
+        if (l >= 9 && l <= 12 && substr(t, 1, 1) ~ /[CDGTUW]/ && slackid(t) && !inhash($0, st, l)) hit("L03")
       }
       # L04: API keys and tokens by shape.
       rest = $0

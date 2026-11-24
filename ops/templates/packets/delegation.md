@@ -34,7 +34,7 @@ Declare the actual task boundary here. Example implementation scope: return a te
 ## Stop criteria
 
 - All acceptance items pass, or you are blocked and report why.
-- Round limit: `<n, example 3>`. After it, park minor findings with an owner and escalate major ones; a verify-only pass on the last fixes is allowed.
+- Round limit: follow K-20. After it, park valid P2/P3 findings with an owner and link; escalate unresolved P0/P1s. The cap is not clearance.
 
 ## Return format
 

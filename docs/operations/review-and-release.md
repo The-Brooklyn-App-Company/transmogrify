@@ -2,6 +2,11 @@
 
 ## Delegation
 
+Before proposing a build, identify what already does the job, the smallest
+change, and what can be removed (K-09). Explain why an existing mechanism
+cannot cover a proposed new service, route, table or harness. Keep the
+owner's outcome fixed; do not turn implementation preferences into gates.
+
 Delegated work travels as a written packet built from
 [ops/templates/packets/delegation.md](../../ops/templates/packets/delegation.md), so
 any capable client can run it without one conversation's memory: the goal
@@ -48,11 +53,10 @@ Review is independent ([K-19](../../kit/KIT.md)) and bounded
    rejected (a reason the reviewer can check) or deferred (owner, link).
    Verify any external identifier a reviewer cites, such as an advisory ID,
    before recording it.
-5. **Stop** when a round is clean at the current head, or after three
-   rounds. Then park valid minor findings with an owner and escalate open
-   P0 and P1 findings with a recommendation. A narrow verify-only pass on
-   the last fixes is allowed after the cap; a new major finding there stops
-   the work.
+5. **Stop** when a round is clean at the current head, or after two rounds
+   (K-20). After the cap, park valid P2/P3 findings with an owner and link;
+   bring unresolved P0/P1 findings to the human with a recommendation.
+   The cap never establishes clearance for integration or release.
 
 Persistent disagreement about whether a finding is real goes to a third
 model; product, design and architecture disagreements go to the human. A

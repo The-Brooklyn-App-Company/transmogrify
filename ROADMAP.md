@@ -399,6 +399,30 @@ restart.
 
 ## Release gate and recorded exceptions
 
+### 2.0.1 preparation (2026-11-24, unreleased)
+
+Scope: the integrated post-2.0.0 fixes and the K-09/K-10/K-12/K-20
+guidance amendments listed in CHANGELOG. No worker protocol, compatibility
+pin, dependency selection, client approval setting, hook or schedule changes
+in this preparation. Source publication is not installation or adoption.
+
+Activation plan: publish the exact reviewed candidate and obtain required
+CI first; publish and verify the release tag is retrievable before moving
+the site's release pin; merge through the normal required checks; then
+verify the deployment's version and `/start` commit pin. Consumer upgrades
+remain explicit. No live settings or service migration is part of the
+guidance update. Each stage needs its own evidence.
+
+Rollback: retain the previous release tag and exact site pin; reverting
+source guidance does not restore or alter a consumer's local settings.
+The maintainer owns any failed or partial promotion until it settles.
+
+This is preparation only. Local validation and independent review receipts
+must name the exact candidate before publication. Remote CI, the published
+artifact, runtime deployment and consumer acceptance are pending. The
+fresh-machine and operations live-acceptance gaps below remain open; this
+record does not grant an exception or claim those paths were tested.
+
 2026-09-04 exception: 0.6.0 shipped without the fresh-machine acceptance pass.
 
 2026-09-08 exception: 0.6.1 shipped on the owner's decision with every

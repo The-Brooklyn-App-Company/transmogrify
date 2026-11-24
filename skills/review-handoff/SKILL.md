@@ -20,7 +20,8 @@ Stop if it does not resolve.
    `review_family` it prints.
 6. Give every finding a disposition: fixed (commit), rejected (reason) or
    deferred (owner, link).
-7. Stop after a clean round or three rounds; escalate open P0 and P1.
+7. Stop after a clean round or the K-20 cap; the cap is not clearance.
+   Park valid P2/P3s with an owner and link; escalate open P0/P1s.
 8. Cross-review findings in your inbox: triage the same way within a
    working day (`<kit>/docs/operations/review-and-release.md#cross-model-accountability`).
 9. Hand the branch to the merge owner with the packet's handoff section.

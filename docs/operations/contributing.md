@@ -46,7 +46,7 @@ ops/check.sh privacy --denylist <your local list>  # never commit the list
 
 The maintainer tags releases. Before every publish: the privacy scan
 against a local, uncommitted denylist plus a human read of the diff; a
-cross-family review clean within three rounds and a separate privacy-only
+cross-family review clean within the K-20 round cap and a separate privacy-only
 pass by a model that has not seen private sources; a clean-machine install
 per shipped profile that can be run, others marked untested; `shellcheck`
 clean; the "What is proven" table updated.

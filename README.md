@@ -30,7 +30,7 @@ small, accountable team on hardware they control.
 daemon you trust with credentials. It never signs in for you, never stores a
 secret, and needs no server or account of its own.
 
-> **Status: 2.0.0.** The workers layer carries
+> **Status: 2.0.1.** The workers layer carries
 > forward the 0.6 line's measured receipts. Much of the operations layer is
 > proven only against the test suite's fakes; each piece's highest proven
 > stage is in [What is proven](docs/operations/README.md#what-is-proven).
@@ -92,7 +92,7 @@ From a source checkout instead, pinned to a release tag:
 ```bash
 git clone https://github.com/The-Brooklyn-App-Company/transmogrify.git
 cd transmogrify
-git checkout v2.0.0          # a release tag, never a branch
+git checkout v2.0.1          # a release tag, never a branch
 npm ci --ignore-scripts
 ./install.sh --dry-run
 ./install.sh
@@ -369,7 +369,7 @@ Skills: [the skill index](skills/README.md).
 
 [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) (with migration notes for
 kit 0.3 and worker 0.6 users) · [Contributing](CONTRIBUTING.md) ·
-[Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](site/README.md).
+[Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/site/README.md).
 
 Ask questions in
 [GitHub Discussions](https://github.com/The-Brooklyn-App-Company/transmogrify/discussions) and

@@ -399,6 +399,35 @@ restart.
 
 ## Release gate and recorded exceptions
 
+### 2.0.1 preparation (2026-11-24, unreleased)
+
+Scope: the integrated post-2.0.0 fixes and the K-09/K-10/K-12/K-20
+guidance amendments listed in CHANGELOG. No worker protocol, compatibility
+pin, dependency selection, client approval setting, hook or schedule changes
+in this preparation. Source publication is not installation or adoption.
+
+Activation follows the existing [release checklist](CONTRIBUTING.md#release-checklist),
+including its exact tag-to-SHA check and unauthenticated fetch of that SHA
+before advancing the site's pin. Keep one release procedure; consumer
+upgrades and local settings remain separate acceptance stages.
+
+Rollback: retain the previous release tag and exact site pin; reverting
+source guidance does not restore or alter a consumer's local settings.
+The maintainer owns any failed or partial promotion until it settles.
+
+This is preparation only. Local validation and independent review receipts
+must name the exact candidate before publication. Remote CI, the published
+artifact, runtime deployment and consumer acceptance are pending. The
+fresh-machine and operations live-acceptance gaps remain unproven.
+
+2026-11-24 release-owner exception: those gaps are accepted for 2.0.1 only.
+Worker protocol, host integration and dependency selections are unchanged;
+the release includes the already-reviewed leak-guard and timeout-fixture
+fixes plus guidance and version amendments. Full native Node and operations
+checks and the private denylist remain required. No live configuration is
+activated. The gates carry to the next release that changes runtime; this
+exception does not claim the untested paths work.
+
 2026-09-04 exception: 0.6.0 shipped without the fresh-machine acceptance pass.
 
 2026-09-08 exception: 0.6.1 shipped on the owner's decision with every

@@ -21,6 +21,11 @@ and retained checks are recorded in [ROADMAP](ROADMAP.md#release-gate-and-record
 - These are source guidance updates. Upgrading a kit pin does not change
   client approval settings, hooks, schedules or services, and source
   publication does not establish installation or adoption.
+- **Installed documentation stands alone:** the optional website-source
+  and worked-grants-example links open their canonical public source files.
+  They no longer point into website or test trees omitted from the install.
+  The fresh-install regression checks those references in both installed
+  copies using the shipped link checker.
 
 - **Leak guard and its timeout regression** (K-31, K-25): L03 exempts only
   the candidate inside an explicitly labelled integrity-hash payload with

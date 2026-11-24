@@ -34,7 +34,7 @@ marked blocks:
 The Codex clauses restate the Claude text for the Codex reviewer and may
 only be narrower where Codex lacks a Claude mechanism (a Claude session id
 is not a Codex identity). A worked, fictional example is
-[the test fixture](../../test/ops/fixtures/GRANTS.example.md).
+[the source fixture](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/test/ops/fixtures/GRANTS.example.md).
 
 ## Rendering
 

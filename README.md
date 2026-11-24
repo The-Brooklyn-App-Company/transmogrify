@@ -369,7 +369,7 @@ Skills: [the skill index](skills/README.md).
 
 [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) (with migration notes for
 kit 0.3 and worker 0.6 users) · [Contributing](CONTRIBUTING.md) ·
-[Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](site/README.md).
+[Code of Conduct](CODE_OF_CONDUCT.md) · [Website source](https://github.com/The-Brooklyn-App-Company/transmogrify/blob/main/site/README.md).
 
 Ask questions in
 [GitHub Discussions](https://github.com/The-Brooklyn-App-Company/transmogrify/discussions) and

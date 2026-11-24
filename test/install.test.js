@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const test = require('node:test');
 const { REPO_ROOT } = require('./helpers/run-cli');
 const { BACKUP_RECEIPT_FILE, install, resolveWsRoot } = require('../scripts/install');
@@ -72,6 +72,17 @@ test('installer stages complete fresh installs for Claude and Codex', async (t) 
     assert.equal(fs.existsSync(path.join(target, 'scripts', 'runtime-probe.js')), true);
     const installedRequire = require('node:module').createRequire(path.join(target, 'package.json'));
     assert.equal(typeof installedRequire('ws').WebSocket, 'function');
+    const links = spawnSync('/bin/sh', [
+      path.join(target, 'ops', 'check.sh'), 'links',
+      'README.md', 'docs/operations/grants.md',
+    ], {
+      cwd: target,
+      env: { ...process.env, HOME: home },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+    assert.equal(links.status, 0, `${links.error || ''}${links.stderr}${links.stdout}`);
   }
 });
 

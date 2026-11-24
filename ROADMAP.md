@@ -406,12 +406,10 @@ guidance amendments listed in CHANGELOG. No worker protocol, compatibility
 pin, dependency selection, client approval setting, hook or schedule changes
 in this preparation. Source publication is not installation or adoption.
 
-Activation plan: publish the exact reviewed candidate and obtain required
-CI first; publish and verify the release tag is retrievable before moving
-the site's release pin; merge through the normal required checks; then
-verify the deployment's version and `/start` commit pin. Consumer upgrades
-remain explicit. No live settings or service migration is part of the
-guidance update. Each stage needs its own evidence.
+Activation follows the existing [release checklist](CONTRIBUTING.md#release-checklist),
+including its exact tag-to-SHA check and unauthenticated fetch of that SHA
+before advancing the site's pin. Keep one release procedure; consumer
+upgrades and local settings remain separate acceptance stages.
 
 Rollback: retain the previous release tag and exact site pin; reverting
 source guidance does not restore or alter a consumer's local settings.
@@ -420,8 +418,15 @@ The maintainer owns any failed or partial promotion until it settles.
 This is preparation only. Local validation and independent review receipts
 must name the exact candidate before publication. Remote CI, the published
 artifact, runtime deployment and consumer acceptance are pending. The
-fresh-machine and operations live-acceptance gaps below remain open; this
-record does not grant an exception or claim those paths were tested.
+fresh-machine and operations live-acceptance gaps remain unproven.
+
+2026-11-24 release-owner exception: those gaps are accepted for 2.0.1 only.
+Worker protocol, host integration and dependency selections are unchanged;
+the release includes the already-reviewed leak-guard and timeout-fixture
+fixes plus guidance and version amendments. Full native Node and operations
+checks and the private denylist remain required. No live configuration is
+activated. The gates carry to the next release that changes runtime; this
+exception does not claim the untested paths work.
 
 2026-09-04 exception: 0.6.0 shipped without the fresh-machine acceptance pass.
 

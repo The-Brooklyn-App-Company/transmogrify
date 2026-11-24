@@ -84,11 +84,11 @@ screenshots (a browser walk for a web surface); half a feature or a
 backend without its UI is never done. Scope every build by the user
 surfaces it touches.
 
-**K-12 Record commitments and facts.** Log promises in the owning
+**K-12 Commitments and facts.** Log promises in the owning
 backlog before replying; journal decisions, grants and deliveries as they
 happen. State facts freshly checked or in the facts file. Timestamp
-observations from a clock already read or by script; never guess or
-predict. Use the owner's timezone.
+observations and entries from a clock already read or by script; never
+guess or predict. Use the owner's timezone.
 
 **K-35 Daily oversight.** Daily, the Oracle checks each operator's product
 progress (not its machinery), redirects one stuck in plumbing or review
@@ -134,7 +134,7 @@ implementer's reasoning or a hoped-for verdict.
 **K-20 Bounded rounds, every finding settled.** Review until clean, at
 most two rounds; the cap is not clearance. Findings end fixed
 (commit), rejected (checkable reason), or deferred (owner and link).
-After the cap, park valid P2/P3s; bring unresolved P0/P1s to the human.
+At review end, bring open P0/P1s to the human; park valid P2/P3s at cap.
 
 **K-21 Weaker review is labelled.** Same-family or single-model review is
 recorded as such; risky changes then also get a human read.

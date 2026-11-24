@@ -2,6 +2,10 @@
 
 ## 2.0.1
 
+Acceptance exception (2026-11-24): fresh-machine and live-operations checks
+remain unproven and are accepted for this release only. The bounded scope
+and retained checks are recorded in [ROADMAP](ROADMAP.md#release-gate-and-recorded-exceptions).
+
 - **Evidence and time provenance** (K-10, K-12): current-state reports
   distinguish observations from inferences and name their basis. Plans and
   configuration do not prove use. Absence claims name the searched scope.

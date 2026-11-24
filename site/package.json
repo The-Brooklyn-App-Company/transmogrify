@@ -25,7 +25,7 @@
     "verify": "npm run verify:base && npm run verify:no-analytics"
   },
   "dependencies": {
-    "@astrojs/sitemap": "3.7.4",
+    "@astrojs/sitemap": "3.7.6",
     "astro": "7.2.10"
   },
   "devDependencies": {

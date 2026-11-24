@@ -1,6 +1,6 @@
 {
   "name": "transmogrify",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Operate exact-owned Codex and Claude Code lanes with receipt-gated native app visibility, provider-specific steering, recovery, retirement, and worktree cleanup.",
   "license": "MIT",

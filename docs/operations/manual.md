@@ -344,7 +344,7 @@ review/return condition after the usage reset. No paid API fallback (K-26).
 
 ## 9. Review, release and acceptance
 
-Use the independent-review contract (K-19–K-22), at most three rounds. Give a
+Use the independent-review contract (K-19–K-22). Give a
 reviewer goal, exact base/head, raw diff, acceptance and scope; settle every
 finding. Same-family review is labelled, and cross-family review is sought where
 available. Weekly other-family audits cover source, notes, mandates and leftover

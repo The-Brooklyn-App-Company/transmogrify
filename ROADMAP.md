@@ -399,12 +399,12 @@ restart.
 
 ## Release gate and recorded exceptions
 
-### 2.0.1 preparation (2026-11-24, unreleased)
+### 2.0.1 release record (2026-11-24)
 
 Scope: the integrated post-2.0.0 fixes and the K-09/K-10/K-12/K-20
 guidance amendments listed in CHANGELOG. No worker protocol, compatibility
 pin, dependency selection, client approval setting, hook or schedule changes
-in this preparation. Source publication is not installation or adoption.
+in this release. Source publication is not installation or adoption.
 
 Activation follows the existing [release checklist](CONTRIBUTING.md#release-checklist),
 including its exact tag-to-SHA check and unauthenticated fetch of that SHA
@@ -415,10 +415,30 @@ Rollback: retain the previous release tag and exact site pin; reverting
 source guidance does not restore or alter a consumer's local settings.
 The maintainer owns any failed or partial promotion until it settles.
 
-This is preparation only. Local validation and independent review receipts
-must name the exact candidate before publication. Remote CI, the published
-artifact, runtime deployment and consumer acceptance are pending. The
-fresh-machine and operations live-acceptance gaps remain unproven.
+Released as [v2.0.1](https://github.com/The-Brooklyn-App-Company/transmogrify/releases/tag/v2.0.1)
+at commit `e6b76bd0b908c10254fbdf4746a676a7625606b4`.
+
+- **CI:** the [eight-job CI run](https://github.com/The-Brooklyn-App-Company/transmogrify/actions/runs/45468636519)
+  and [two-job Site run](https://github.com/The-Brooklyn-App-Company/transmogrify/actions/runs/45468636486)
+  passed on that exact commit. Later tag and main runs repeated the required
+  Node checks successfully; only their duplicate operations jobs were cancelled
+  after those checks passed, retaining the original full operations result.
+- **Maintainer checks:** Node 817/817 with no skips; operations 814/814
+  (407 under sh and 407 under dash); site 162/162 with no type errors.
+  The focused review, installed-package link checks and exact-pin site
+  build/output audits passed.
+- **Publication:** the annotated public tag resolved to the release commit,
+  and a fresh public fetch of that exact commit succeeded with credentials
+  disabled.
+- **Runtime:** the public landing page and `/start` served 2.0.1, with
+  `/start` pinned to the release commit. The landing page, start prompt,
+  legal pages, a genuine 404 response and fingerprinted CSS matched the
+  audited build byte-for-byte. MIME, security and cache headers passed.
+  The live release pin remains at this immutable commit; documentation
+  closeout edits do not advance it.
+- **Acceptance:** consumer installation and adoption remain unverified.
+  Fresh-machine and operations live-acceptance gaps remain unproven under
+  the dated exception below.
 
 2026-11-24 release-owner exception: those gaps are accepted for 2.0.1 only.
 Worker protocol, host integration and dependency selections are unchanged;

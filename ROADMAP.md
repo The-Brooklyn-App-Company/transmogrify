@@ -425,18 +425,18 @@ at commit `e6b76bd0b908c10254fbdf4746a676a7625606b4`.
   after those checks passed, retaining the original full operations result.
 - **Maintainer checks:** Node 817/817 with no skips; operations 814/814
   (407 under sh and 407 under dash); site 162/162 with no type errors.
-  The focused review, installed-package link checks, private denylist and
-  exact-pin site build/output audits passed.
+  The focused review, installed-package link checks and exact-pin site
+  build/output audits passed.
 - **Publication:** the annotated public tag resolved to the release commit,
   and a fresh public fetch of that exact commit succeeded with credentials
-  disabled before the normal protected main fast-forward.
+  disabled.
 - **Runtime:** the public landing page and `/start` served 2.0.1, with
   `/start` pinned to the release commit. The landing page, start prompt,
   legal pages, a genuine 404 response and fingerprinted CSS matched the
   audited build byte-for-byte. MIME, security and cache headers passed.
   The live release pin remains at this immutable commit; documentation
   closeout edits do not advance it.
-- **Acceptance:** consumer installation and adoption remain separate stages.
+- **Acceptance:** consumer installation and adoption remain unverified.
   Fresh-machine and operations live-acceptance gaps remain unproven under
   the dated exception below.
 

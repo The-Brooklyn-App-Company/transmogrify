@@ -86,9 +86,9 @@ surfaces it touches.
 
 **K-12 Record commitments and facts.** Log promises in the owning
 backlog before replying; journal decisions, grants and deliveries as they
-happen. State facts freshly checked or in the facts file. Use times already
-read from the clock or stamped by scripts; never estimate or predict. Use
-the owner's timezone.
+happen. State facts freshly checked or in the facts file. Timestamp
+observations from a clock already read or by script; never guess or
+predict. Use the owner's timezone.
 
 **K-35 Daily oversight.** Daily, the Oracle checks each operator's product
 progress (not its machinery), redirects one stuck in plumbing or review

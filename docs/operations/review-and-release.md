@@ -58,10 +58,15 @@ Review is independent ([K-19](../../kit/KIT.md)) and bounded
    bring unresolved P0/P1 findings to the human with a recommendation.
    The cap never establishes clearance for integration or release.
 
-Persistent disagreement about whether a finding is real goes to a third
-model; product, design and architecture disagreements go to the human. A
-new head needs current evidence: re-review the changed part, not an
-unchanged whole.
+Within the remaining rounds, persistent disagreement about a finding goes
+to a third model; product, design and architecture disagreements go to the
+human. A new head needs evidence on the changed part, within that same cap.
+Once the rounds are exhausted, use K-20's disposition and escalation path;
+do not start another review.
+
+Observation and entry timestamps use K-12's clock rule. A planned date or
+hold expiry comes from the owner's instruction; a quoted historical event
+time keeps its source. Neither is an estimate of the current clock.
 
 Style preferences the repository does not enforce are not findings. Review
 the useful delta and whether it delivers the outcome: challenge unnecessary

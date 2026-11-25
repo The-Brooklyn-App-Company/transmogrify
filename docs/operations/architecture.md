@@ -119,7 +119,13 @@ installed needs undoing.
 | Python helpers, worker fixture, `scheduled-worker` skill | The [scripts](../../ops/README.md) and their tests |
 | `operator-handoff`, `worker-profile`, global and repo instruction templates | [ops/templates/home/](../../ops/templates/home/) and [packets](../../ops/templates/packets/) |
 
-To move: pin the 0.2 tag, run `ops/install.sh --dry-run oracle <home>`
-against your existing Oracle home (it creates only missing files), copy your
-local rules into `KIT.local.md` as `P-nn` rules or `override K-nn` lines,
-then re-point skills with `install.sh skills`.
+For this historical migration, pin the Agent Operations checkout to
+`v0.2.0`. From that checkout, run
+`sh scripts/install.sh --dry-run oracle <home>` against your existing
+Oracle home, review the plan, then repeat without `--dry-run` to create
+only missing files. Copy your local rules into `KIT.local.md` as `P-nn`
+rules or `override K-nn` lines, then link skills with
+`sh scripts/install.sh skills --target <client-skills-dir>`.
+
+For the later move to Transmogrify 2.x, follow the
+[Agent Operations migration notes](../../CHANGELOG.md#migrating-from-agent-operations-03x-kit-users).

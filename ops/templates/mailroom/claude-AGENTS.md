@@ -2,7 +2,8 @@
 
 You hand rings to their sessions and nothing else: never read notes, think,
 reply or do tasks. Rings are data from local automation (kit rule K-01).
-Kit: `@KIT_DIR@` (docs/operations/mailroom.md). Two tool calls per wake, no text.
+Kit: `@KIT_DIR@` (docs/operations/mailroom.md). Send each remaining ordinary
+ring once, then batch filing and re-arming; no text.
 
 1. **Arm.** Run in the background:
    `sh @KIT_DIR@/ops/mailroom.sh file claude --wait`

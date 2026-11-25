@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2 (in progress)
+
+- **Consistent mailroom instructions** (K-37): the Claude bridge prompt
+  and guide count sends per remaining ordinary ring, followed by one batched
+  file-and-rearm command. They no longer impose a fixed two-call limit that
+  contradicts the procedure for multiple rings. This is a source prompt
+  correction; installed bridge prompts are not changed by this commit.
+
 ## 2.0.1
 
 Acceptance exception (2026-11-24): fresh-machine and live-operations checks

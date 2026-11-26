@@ -170,26 +170,32 @@ rejected for registry state and must not be used to construct a mailbox path.
 
 ## A delegation requests an unavailable skill
 
-Read the installed [skill index](../skills/README.md) and the files from that
-same release. The root [Transmogrify skill](../SKILL.md) coordinates worker
-lanes; the operations skills live under its `skills/` directory. If the
-requested skill is listed there but is not visible to the host, follow the
-index's existing linking procedure within the approved setup scope.
+Check the installed [skill index](../skills/README.md) and the indexed
+`SKILL.md` file from the same release. If the intended version is unknown,
+confirm it with the task owner. If the index or definition is missing,
+compare with a [trusted pinned source checkout](../README.md#install)
+for that release. The root [Transmogrify skill](../SKILL.md) coordinates
+worker lanes; operations skills live under its `skills/` directory. Follow
+the index's linking procedure only when the requested skill's indexed local
+`SKILL.md` exists and the setup scope permits it.
 
 Record the installed package version and skill root, the locations actually
 searched, and the exact source of the requirement: a file and line or the
 original delegation. Include the repository's credential-free remote and
-checkout commit so the calling instruction can be identified. Keep secrets
-and private prompt text out of public issue reports.
+checkout commit. If the caller or owning project is unconfirmed, record
+that uncertainty and ask the delegator for the original instruction and
+owner before resolving the dependent prerequisite. Keep secrets and private
+prompt text out of public issue reports.
 
 If the requested skill is absent from that release, reinstalling the same
 bundle cannot supply it. The owner of the calling requirement resolves the
 reference or supplies the intended definition and scope. Keep the dependent
 action pending rather than inventing a same-named placeholder or silently
 waiving an explicit prerequisite; independent approved work can continue.
-If the required skill is shipped but the local copy is incomplete, use the
-[existing upgrade procedure](#installation-and-upgrades) for the intended
-release. Normal consent, review and task boundaries still apply.
+
+For an incomplete copy of a shipped skill, confirm the trusted checkout's
+tag or commit and package version match the intended release before
+installing from it. Normal consent, review and task boundaries still apply.
 
 ## Managed worktree is not ignored
 

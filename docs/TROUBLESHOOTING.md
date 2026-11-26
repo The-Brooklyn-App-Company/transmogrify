@@ -30,6 +30,7 @@ endpoint. Add `--url` only to override that selection.
 | Symptom or code | Section |
 | --- | --- |
 | Install, upgrade, rollback, or uninstall | [Installation and upgrades](#installation-and-upgrades) |
+| A delegation requests a skill that cannot be found | [A delegation requests an unavailable skill](#a-delegation-requests-an-unavailable-skill) |
 | `consent-required`, `hosting-cli-protected`, `manual-action-required`, `step-not-verified` | [Guided setup stops](#guided-setup-stops) |
 | Refused `WORKTREES` root inside the repository | [Managed worktree is not ignored](#managed-worktree-is-not-ignored) |
 | Ownership or mode refusal on state and seat paths | [Private state or worktree permissions](#private-state-or-worktree-permissions) |
@@ -166,6 +167,29 @@ lanes or remove Transmogrify state. The ownership registry remains under
 `${XDG_STATE_HOME:-$HOME/.local/state}/transmogrify`; preserve it for recovery
 and audit. If `XDG_STATE_HOME` is set, it must be absolute; a relative value is
 rejected for registry state and must not be used to construct a mailbox path.
+
+## A delegation requests an unavailable skill
+
+Read the installed [skill index](../skills/README.md) and the files from that
+same release. The root [Transmogrify skill](../SKILL.md) coordinates worker
+lanes; the operations skills live under its `skills/` directory. If the
+requested skill is listed there but is not visible to the host, follow the
+index's existing linking procedure within the approved setup scope.
+
+Record the installed package version and skill root, the locations actually
+searched, and the exact source of the requirement: a file and line or the
+original delegation. Include the repository's credential-free remote and
+checkout commit so the calling instruction can be identified. Keep secrets
+and private prompt text out of public issue reports.
+
+If the requested skill is absent from that release, reinstalling the same
+bundle cannot supply it. The owner of the calling requirement resolves the
+reference or supplies the intended definition and scope. Keep the dependent
+action pending rather than inventing a same-named placeholder or silently
+waiving an explicit prerequisite; independent approved work can continue.
+If the required skill is shipped but the local copy is incomplete, use the
+[existing upgrade procedure](#installation-and-upgrades) for the intended
+release. Normal consent, review and task boundaries still apply.
 
 ## Managed worktree is not ignored
 

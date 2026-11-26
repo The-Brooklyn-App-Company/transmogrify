@@ -2,6 +2,10 @@
 
 ## 2.0.2 (in progress)
 
+- **Missing-skill troubleshooting:** the guide routes bundled operations
+  skills through the existing index and records the caller and installed
+  release needed to resolve an absent prerequisite. It explains when the
+  task owner must supply or correct that reference before another install.
 - **Consistent mailroom instructions** (K-37): the Claude bridge prompt
   and guide count sends per remaining ordinary ring, followed by one batched
   file-and-rearm command. They no longer impose a fixed two-call limit that

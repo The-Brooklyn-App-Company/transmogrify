@@ -2,6 +2,16 @@
 
 ## 2.0.2 (in progress)
 
+- **Switch routing follows the lease** (K-13, K-22, K-36): `switch.sh
+  verify` passes routing, and sends the switch-in note, only when the
+  resolver delivers to the incoming client and session. A lease held by
+  another session, released, assigned or unreadable, or an active hold,
+  leaves routing open with the next commands. The switch-out note asks a
+  lease holder to release; `switch.sh` never releases, acquires or overrides
+  a lease. The switch-in audit is checked only once routing passes. Without
+  a lease, `verify` records each leg's move as the next numbered registry
+  change, so the return leg's audit can be recorded at once.
+
 - **Missing-skill troubleshooting:** the guide routes bundled operations
   skills through the existing index and records the caller and installed
   release needed to resolve an absent prerequisite. It explains when the

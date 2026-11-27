@@ -9,7 +9,11 @@
 A planned move of an operator between clients runs as the scripted
 checklist in [conventions](conventions.md#switching-an-operator-between-clients)
 (`switch.sh switch` and `verify`); this page covers the optional lease that
-adds a holder token and a human-confirmed takeover.
+adds a holder token and a human-confirmed takeover. With a lease, routing
+passes only once the incoming session holds it: the outgoing holder runs
+`release` (the switch-out note asks it), then the incoming session runs
+`acquire --session-id <its id>`. `switch.sh` never releases, acquires or
+overrides a lease; a released, assigned or unreadable lease routes nothing.
 
 An operator may have a session on each client (Claude Code, Codex): one
 **holder** and one **standby**. The holder works; the standby redirects.
@@ -193,7 +197,7 @@ leftover worktrees and branches, and drift between notes and reality.
 
 | Step | Lease operator | Operator without a lease |
 | --- | --- | --- |
-| Trigger | Any acquire or takeover whose client differs from the previous holder's sets `audit=pending` in the lease, at once | `cross-review.sh` sees the family change (the registry `client` column) at its next run and records it in `<state_dir>/audit/<key>`; `status.sh` shows it pending even before that, once cross-review has seen the operator |
+| Trigger | Any acquire or takeover whose client differs from the previous holder's sets `audit=pending` in the lease, at once | `switch.sh verify` records the family change as the next numbered change in `<state_dir>/audit/<key>` when it routes the switch, on every leg; otherwise `cross-review.sh` records it on its next run (it is meant to run from the hourly tick and records family changes on every run, also with `cross_review=off`). `status.sh` shows it pending even before that, once cross-review has seen the operator |
 | Report | `cross-review.sh` runs the incoming family's reviewer role once, headless, over the last 30 days, and writes `<home>/audits/switch-in-<tag>.md`, starting with the line `audit-done` checks, with a note to the operator's inbox. Without a reviewer of the incoming family, the session writes its own report (`lease.sh audit-brief` prints the first line and the checklist) | same |
 | Triage | The incoming session checks every finding against the repos, records fixed, rejected (with a reason) or deferred (with an owner) under Triage, and commits the report | same |
 | Record | `lease.sh audit-done --instance T --epoch N --report PATH` (holder only) stores the path and commit in the lease | `lease.sh --home H audit-done --report PATH` stores them in `<state_dir>/audit/<key>.done` |
@@ -351,7 +355,11 @@ prefix_rule(pattern=["ops/lease.sh", ["unlock", "settle"]], decision="forbidden"
   `audit-done` records another report is left for the next weekly review.
 - A registry family change is detected against the family `cross-review.sh`
   last saw: a change made before its first run for that operator, or
-  between two runs and back again, is not seen. An operator without a lease
+  between two runs and back again, is not seen, unless `switch.sh verify`
+  routed it. `verify` (registry lock) and `cross-review.sh` (its own lock)
+  are not serialized: a cross-review run that read the registry before the
+  routing write and observes that row after it can number an extra change,
+  which adds an audit but never drops one. An operator without a lease
   has no enforced gate, only `status.sh` and the inbox note.
 
 ## Cold handoff recovery record

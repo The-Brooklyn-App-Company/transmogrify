@@ -17,11 +17,64 @@ commit_handoff() {
   printf '%s\n' "${1:-handoff}" >"$T/proj/alpha/HANDOFF.md"
   git -C "$T/proj/alpha" add HANDOFF.md && git -C "$T/proj/alpha" commit -q -m handoff
 }
-# alpha_notes SLUG  Number of notes named *SLUG.md in alpha's inbox.
+# alpha_notes SLUG  Number of notes named *SLUG.md in alpha's inbox, also
+# under a collision name (*SLUG-2.md, ...).
 alpha_notes() {
   _c=0
-  for _f in "$T/home/inbox/alpha"/*"$1".md; do [ -f "$_f" ] && _c=$((_c + 1)); done
+  for _f in "$T/home/inbox/alpha"/*"$1".md "$T/home/inbox/alpha"/*"$1"-[0-9]*.md; do [ -f "$_f" ] && _c=$((_c + 1)); done
   echo "$_c"
+}
+# switch_in_copies  Switch-in notes for alpha wherever a placed note can be:
+# the inbox (collision names too), claimed by the relay (in flight) or
+# archived in the sent folder. Counted by their text, whatever the name.
+switch_in_copies() {
+  _c=0
+  for _f in "$T/home/inbox/alpha"/*.md "$T/home/inbox/alpha/.claimed"/*/*.md "$T/home/inbox/sent"/*.md; do
+    [ -f "$_f" ] && grep -q '^Operator switch (the Oracle, by switch.sh; automated, not from the human): you are now the active side for alpha ' "$_f" &&
+      _c=$((_c + 1))
+  done
+  echo "$_c"
+}
+# audit_state  The AUDIT column status.sh prints for alpha.
+audit_state() {
+  run status.sh --tsv
+  awk -F'\t' '$1 == "alpha" { print $7 }' "$T/out"
+}
+claude_calls() { _c=$(grep -c '^== claude' "$FAKE_LOG" 2>/dev/null); echo "${_c:-0}"; }
+# shown_acquire  The last lease.sh acquire command verify printed, exactly
+# as printed (run it with: eval "run $(shown_acquire)").
+shown_acquire() {
+  sed -n "s/.*\(lease\.sh --home [^ ]* acquire --provider [a-z]* --session '[^']*' --session-id [A-Za-z0-9._-]*\).*/\1/p" "$T/out" | tail -n 1
+}
+# pause_date DIR  Put a `date` first on the fixture PATH that, in a process
+# whose PAUSE_DIR is DIR, stops at its first `date -u` (ao_utc, called when
+# an audit change is numbered: after the record is read, before it is
+# written): it creates DIR/paused and waits for DIR/go. Every other call,
+# and every other process, gets the real date at once.
+pause_date() {
+  _real=$(command -v date)
+  mkdir -p "$1"
+  cat >"$T/bin/date" <<EOF
+#!/bin/sh
+if [ -n "\${PAUSE_DIR:-}" ] && [ "\${1-}" = -u ] && [ ! -e "\$PAUSE_DIR/paused" ]; then
+  : >"\$PAUSE_DIR/paused"
+  n=0
+  while [ ! -e "\$PAUSE_DIR/go" ] && [ "\$n" -lt 300 ]; do sleep 0.1; n=\$((n + 1)); done
+fi
+exec "$_real" "\$@"
+EOF
+  chmod +x "$T/bin/date"
+}
+# wait_for FILE  Wait up to 5 s for FILE to exist.
+wait_for() {
+  _n=0
+  while [ ! -e "$1" ] && [ "$_n" -lt 50 ]; do sleep 0.1; _n=$((_n + 1)); done
+  assert_file "$1"
+}
+# set_row CLIENT SESSION  Rewrite alpha's registry row (a hand edit).
+set_row() {
+  awk -F'\t' -v c="$1" -v s="$2" 'BEGIN { OFS = "\t" } $1 == "alpha" { $4 = s; $5 = c } { print }' \
+    "$T/home/operators/REGISTRY.tsv" >"$T/reg" && mv "$T/reg" "$T/home/operators/REGISTRY.tsv"
 }
 # last_note SLUG  Path of the last (glob-sorted) note named *SLUG.md in
 # alpha's inbox, or the unmatched pattern when there is none.
@@ -41,13 +94,17 @@ fake_marks() {
 # the pending registry change and records it with lease.sh audit-done (no
 # lease in this home: the registry audit).
 record_audit() {
+  commit_report "$1" "$2"
+  run lease.sh --home "$T/proj/alpha" audit-done --report "audits/switch-in-$_ch.md"
+}
+# commit_report FROM TO  Only the commit of record_audit; sets _ch.
+commit_report() {
   _ch=$(sed -n 's/^change=//p' "$T/state/audit/alpha")
   _at=$(sed -n 's/^since=//p' "$T/state/audit/alpha")
   mkdir -p "$T/proj/alpha/audits"
   printf '# Switch-in audit: alpha, registry change %s at %s (%s -> %s)\n\nFixture report.\n' \
     "$_ch" "$_at" "$1" "$2" >"$T/proj/alpha/audits/switch-in-$_ch.md"
   git -C "$T/proj/alpha" add audits && git -C "$T/proj/alpha" commit -q -m "switch-in audit $_ch"
-  run lease.sh --home "$T/proj/alpha" audit-done --report "audits/switch-in-$_ch.md"
 }
 # lease_home  alpha's home with operator.conf and .operator/ git-ignored,
 # for the lease tests.
@@ -507,16 +564,246 @@ test_switch_with_an_invalid_or_assigned_lease_does_not_route() {
   run switch.sh verify alpha
   assert_rc 1
   assert_has "$T/out" "TODO  routing      a takeover assigned the lease to codex \`Alpha-codex\` (epoch 2), which has not acquired it"
+  # The command shown carries the assigned session id: the assigned name
+  # differs from the registry's, so without it nothing would name thread-a.
+  assert_has "$T/out" "nothing routes until that session runs lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha-codex' --session-id thread-a; if it is not the incoming codex thread-a"
   assert_lacks "$T/out" "PASS  routing"
   assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged (assigned)"
   assert_eq "$(alpha_notes switch-in)" 0 "no switch-in note (assigned)"
-  # That session acquires: now it routes.
-  run lease.sh --home "$T/proj/alpha" acquire --provider codex --session Alpha-codex --session-id thread-a
+  # That session runs the command exactly as shown: now it routes.
+  acq_cmd=$(shown_acquire)
+  assert_eq "$acq_cmd" "lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha-codex' --session-id thread-a" "displayed acquire"
+  eval "run $acq_cmd"
   assert_rc 0
+  assert_eq "$(lget session_id "$T/proj/alpha")" thread-a "the lease names the assigned session"
   run switch.sh verify alpha
   assert_rc 1
   assert_has "$T/out" "PASS  routing      registry updated; lease held by codex \`Alpha-codex\` (epoch 2): thread-a"
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}thread-a${TAB}codex" "registry follows the lease"
+  run switch.sh side alpha
+  assert_eq "$(cat "$T/out")" "codex thread-a Alpha-codex" "side after the displayed acquire"
   assert_eq "$(alpha_notes switch-in)" 1 "switch-in note once acquired"
+}
+
+# A lease acquired without --session-id names no session; the resolver then
+# takes the registry's session for a row of the same client and name. A
+# switch to another session of the same client must not rewrite that row:
+# the rewrite alone would make the lease resolve to the incoming session
+# while whoever acquired it (here the outgoing one) still holds it.
+test_held_lease_without_a_session_id_is_not_rebound_by_a_registry_write() {
+  lease_home
+  run lease.sh --home "$T/proj/alpha" acquire --provider claude --session "Alpha Op"
+  assert_rc 0
+  tok1=$(sed -n 's/^instance: //p' "$T/out")
+  assert_eq "$(lget session_id "$T/proj/alpha")" - "no session id in the lease"
+  run switch.sh side alpha
+  assert_eq "$(cat "$T/out")" "claude sid-alpha Alpha Op" "side falls back to the registry's session"
+  run switch.sh switch alpha --to claude --session sid-new
+  assert_rc 0
+  assert_has "$T/out" "lease: held by claude (epoch 1)"
+  sleep 1
+  commit_handoff
+  for _try in 1 2; do
+    run switch.sh verify alpha
+    assert_rc 1
+    assert_has "$T/out" "PASS  handoff"
+    assert_has "$T/out" "TODO  routing      the lease is held by claude \`Alpha Op\` (epoch 1) without a session id, so it is not known to be the incoming claude sid-new, and verify never binds it to a session by a registry write"
+    assert_has "$T/out" "(lease.sh --home $T/proj/alpha acquire --provider claude --session 'Alpha Op' --session-id sid-new)"
+    assert_lacks "$T/out" "PASS  routing"
+    assert_has "$T/out" "WAIT  ack          sent once routing passes"
+    assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged"
+    run switch.sh side alpha
+    assert_eq "$(cat "$T/out")" "claude sid-alpha Alpha Op" "side unchanged"
+    assert_eq "$(alpha_notes switch-in)" 0 "no switch-in note"
+  done
+  # switch.sh did not touch the lease.
+  assert_eq "$(lget state "$T/proj/alpha")" held "lease still held"
+  assert_eq "$(lget epoch "$T/proj/alpha")" 1 "same epoch"
+  assert_eq "$(lget session_id "$T/proj/alpha")" - "lease still names no session"
+  # The holder releases it after its warm note; the incoming session runs
+  # the acquire exactly as verify showed it: now routing passes.
+  lease_handoff "$tok1" 1
+  run lease.sh --home "$T/proj/alpha" release --instance "$tok1" --epoch 1
+  assert_rc 0
+  run switch.sh verify alpha
+  assert_rc 1
+  acq_cmd=$(shown_acquire)
+  assert_eq "$acq_cmd" "lease.sh --home $T/proj/alpha acquire --provider claude --session 'Alpha Op' --session-id sid-new" "displayed acquire"
+  eval "run $acq_cmd"
+  assert_rc 0
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "PASS  routing      registry updated; lease held by claude \`Alpha Op\` (epoch 2): sid-new"
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-new${TAB}claude" "registry follows the lease"
+  assert_eq "$(alpha_notes switch-in)" 1 "one switch-in note"
+}
+
+# switch.sh verify (registry lock) and cross-review.sh (its own lock) both
+# update alpha's audit record; the record lock serializes them. Fixture:
+# cross-review.sh is stopped inside its update, after reading the record
+# and before writing it (a fake date on PATH), while verify routes the
+# return move.
+test_audit_record_updates_by_verify_and_cross_review_are_serialized() {
+  home_repo "$T/proj/alpha"
+  profile_set cross_review off
+  # Cross-review last saw claude; the row has since moved to codex (a hand
+  # edit), not yet observed.
+  mkdir -p "$T/state/audit"
+  printf 'provider=claude\nfrom=\nto=\nchange=\nsince=\n' >"$T/state/audit/alpha"
+  set_row codex thread-a
+  run switch.sh switch alpha --to claude --session sid-alpha
+  assert_rc 0
+  sleep 1
+  commit_handoff
+  pause_date "$T/pause"
+  # cross-review.sh numbers the move to codex and stops before writing it.
+  PAUSE_DIR=$T/pause "$AO_TEST_SHELL" "$SCRIPTS/cross-review.sh" </dev/null >"$T/cr.out" 2>"$T/cr.err" &
+  cr_pid=$!
+  wait_for "$T/pause/paused"
+  # verify routes the return move meanwhile; it waits for the record.
+  "$AO_TEST_SHELL" "$SCRIPTS/switch.sh" verify alpha </dev/null >"$T/v.out" 2>"$T/v.err" &
+  v_pid=$!
+  _n=0
+  while kill -0 "$v_pid" 2>/dev/null && [ "$_n" -lt 20 ]; do sleep 0.1; _n=$((_n + 1)); done
+  kill -0 "$v_pid" 2>/dev/null || _fail "verify did not wait while cross-review.sh was updating the record"
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}thread-a${TAB}codex" "no routing write before the record is read"
+  : >"$T/pause/go"
+  wait "$cr_pid"
+  cr_rc=$?
+  wait "$v_pid"
+  v_rc=$?
+  assert_eq "$cr_rc" 0 "cross-review rc ($(cat "$T/cr.err"))"
+  assert_eq "$v_rc" 1 "verify rc ($(cat "$T/v.err"))"
+  assert_has "$T/v.out" "PASS  routing      registry updated: claude sid-alpha"
+  # Both moves are numbered, in order; the delayed write did not roll the
+  # return move back.
+  assert_eq "$(sed -n 's/^change=//p' "$T/state/audit/alpha")" 2 "return move is change 2"
+  assert_has "$T/state/audit/alpha" "from=codex"
+  assert_has "$T/state/audit/alpha" "to=claude"
+  assert_has "$T/state/audit/alpha" "provider=claude"
+  # A writer that resolved the row before it got the record resolves it
+  # again under the lock (fixture: the kit's lock, held from outside, and a
+  # hand edit of the row while cross-review.sh waits for it).
+  rm -f "$T/state/audit/oracle"
+  hold_lock audit-alpha
+  "$AO_TEST_SHELL" "$SCRIPTS/cross-review.sh" </dev/null >"$T/cr.out" 2>"$T/cr.err" &
+  cr_pid=$!
+  wait_for "$T/state/audit/oracle"
+  sleep 1
+  set_row codex thread-a
+  release_lock
+  wait "$cr_pid"
+  assert_eq "$?" 0 "cross-review rc ($(cat "$T/cr.err"))"
+  assert_eq "$(sed -n 's/^change=//p' "$T/state/audit/alpha")" 3 "the row as it is now: change 3"
+  assert_has "$T/state/audit/alpha" "from=claude"
+  assert_has "$T/state/audit/alpha" "to=codex"
+  assert_has "$T/state/audit/alpha" "provider=codex"
+}
+
+# lease.sh audit-done records a registry audit under the same record lock,
+# and only while the change it checked is still the pending one. Fixture:
+# audit-done is stopped after its checks (a fake date on PATH) while the
+# operator moves back and cross-review.sh numbers that move.
+test_registry_audit_completion_holds_the_record_lock() {
+  home_repo "$T/proj/alpha"
+  printf 'key=alpha\n' >"$T/proj/alpha/operator.conf"
+  profile_set cross_review off
+  run cross-review.sh
+  assert_rc 0
+  set_row codex thread-a
+  run cross-review.sh
+  assert_rc 0
+  assert_eq "$(sed -n 's/^change=//p' "$T/state/audit/alpha")" 1 "move to codex is change 1"
+  commit_report claude codex
+  pause_date "$T/pause"
+  PAUSE_DIR=$T/pause "$AO_TEST_SHELL" "$SCRIPTS/lease.sh" --home "$T/proj/alpha" audit-done --report audits/switch-in-1.md \
+    </dev/null >"$T/ad.out" 2>"$T/ad.err" &
+  ad_pid=$!
+  wait_for "$T/pause/paused"
+  set_row claude sid-alpha
+  run cross-review.sh
+  assert_rc 0
+  assert_eq "$(sed -n 's/^change=//p' "$T/state/audit/alpha")" 2 "move back is change 2"
+  : >"$T/pause/go"
+  wait "$ad_pid"
+  assert_eq "$?" 5 "audit-done rc ($(cat "$T/ad.err"))"
+  assert_has "$T/ad.err" "the registry switch-in audit changed while audit-done ran"
+  assert_no_file "$T/state/audit/alpha.done"
+  assert_eq "$(audit_state)" pending "change 2 still pending"
+  # Change 2's own report is recorded, after waiting for a writer that
+  # holds the record (fixture: the kit's lock, held from outside).
+  commit_report codex claude
+  hold_lock audit-alpha
+  "$AO_TEST_SHELL" "$SCRIPTS/lease.sh" --home "$T/proj/alpha" audit-done --report audits/switch-in-2.md \
+    </dev/null >"$T/ad.out" 2>"$T/ad.err" &
+  ad_pid=$!
+  sleep 1
+  kill -0 "$ad_pid" 2>/dev/null || _fail "audit-done did not wait for the record lock"
+  assert_no_file "$T/state/audit/alpha.done"
+  release_lock
+  wait "$ad_pid"
+  assert_eq "$?" 0 "audit-done rc ($(cat "$T/ad.err"))"
+  assert_has "$T/ad.out" "switch-in audit recorded (registry, codex -> claude)"
+  assert_eq "$(sed -n 's/^change=//p' "$T/state/audit/alpha.done")" 2 "change 2 recorded"
+  assert_eq "$(audit_state)" "done" "audit done"
+}
+
+# A verify that dies after placing the switch-in note, before recording it,
+# must not place a second one on a retry, wherever the relay has taken the
+# first: claimed (in flight) or archived. The clock is pinned, so a second
+# note would take a collision name (*-switch-in-2.md).
+test_switch_in_note_is_placed_once_across_an_interruption_after_publication() {
+  home_repo "$T/proj/alpha"
+  AO_NOW=$(date +%s)
+  export AO_NOW
+  run switch.sh switch alpha --to claude --session sid-new
+  assert_rc 0
+  tok=$(st token)
+  # A note that quotes the token, even under a switch-in name, is not it.
+  printf 'Reminder: run switch.sh ack alpha %s\n' "$tok" >"$T/home/inbox/alpha/00000000T000000-switch-in.md"
+  sleep 1
+  commit_handoff
+  # Interrupted after publication (fixture: the switch record's folder is
+  # read-only, so recording note_sent fails).
+  chmod 500 "$T/state/switch"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "PASS  routing      registry updated: claude sid-new"
+  assert_has "$T/err" "cannot write $T/state/switch/alpha"
+  assert_eq "$(switch_in_copies)" 1 "placed once"
+  assert_eq "$(st note_sent)" "" "not recorded"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(switch_in_copies)" 1 "no second note on a retry"
+  assert_eq "$(alpha_notes switch-in)" 2 "the decoy and the one note, no collision name"
+  # In flight: a relay claimed it and stopped (fixture: a claim folder).
+  mkdir -p "$T/home/inbox/alpha/.claimed/c.fixture"
+  for _f in "$T/home/inbox/alpha"/*-switch-in.md; do
+    grep -q 'you are now the active side' "$_f" && mv "$_f" "$T/home/inbox/alpha/.claimed/c.fixture/"
+  done
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(switch_in_copies)" 1 "no second note while it is in flight"
+  # The relay archives and delivers it.
+  FAKE_MODE=sent run relay.sh
+  assert_rc 0
+  assert_eq "$(claude_calls)" 1 "one delivery"
+  assert_eq "$(switch_in_copies)" 1 "archived, not copied"
+  for sent_note in "$T/home/inbox/sent"/*-alpha-*-switch-in.md; do :; done
+  assert_has "$sent_note" "switch.sh ack alpha $tok"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(switch_in_copies)" 1 "no second note once archived"
+  # The record is writable again: the note is recorded, not placed again.
+  chmod 700 "$T/state/switch"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "WAIT  ack          the incoming session has not acknowledged the switch-in note"
+  [ -n "$(st note_sent)" ] || _fail "note_sent not recorded"
+  assert_eq "$(switch_in_copies)" 1 "still one switch-in note"
+  FAKE_MODE=sent run relay.sh
+  assert_eq "$(claude_calls)" 1 "still one delivery"
+  assert_no_file "$T/home/inbox/alpha/.claimed"
 }
 
 test_side_check_holds_and_the_oracle_lock() {

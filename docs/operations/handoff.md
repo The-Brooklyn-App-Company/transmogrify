@@ -356,11 +356,14 @@ prefix_rule(pattern=["ops/lease.sh", ["unlock", "settle"]], decision="forbidden"
 - A registry family change is detected against the family `cross-review.sh`
   last saw: a change made before its first run for that operator, or
   between two runs and back again, is not seen, unless `switch.sh verify`
-  routed it. `verify` (registry lock) and `cross-review.sh` (its own lock)
-  are not serialized: a cross-review run that read the registry before the
-  routing write and observes that row after it can number an extra change,
-  which adds an audit but never drops one. An operator without a lease
-  has no enforced gate, only `status.sh` and the inbox note.
+  routed it. `verify`, `cross-review.sh` and `lease.sh audit-done` update
+  an operator's audit record one at a time, under a shared per-operator
+  record lock: each observation reads the registry row again under that
+  lock, and `audit-done` records only while the change it checked is still
+  the pending one (otherwise it records nothing and asks you to rerun
+  `audit-brief` and `audit-done`). A writer that cannot get the lock within
+  10 seconds writes nothing. An operator without a lease has no enforced
+  gate, only `status.sh` and the inbox note.
 
 ## Cold handoff recovery record
 

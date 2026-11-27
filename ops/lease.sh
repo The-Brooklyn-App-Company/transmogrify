@@ -462,9 +462,15 @@ do_audit_done() {
     L_audit="done" L_audit_note=$_short L_audit_report=$o_report
     ao_lease_write || ao_die "$AO_E_FAIL" "cannot write $H_LEASE"
   else
-    printf 'change=%s\nsince=%s\nreport=%s\ncommit=%s\nat=%s\n' "$A_change" "$A_since" "$o_report" "$_short" "$(ao_utc "$AO_T_EPOCH")" |
-      ao_write_atomic "$(ao_audit_file "$H_KEY" .done)" ||
-      ao_die "$AO_E_FAIL" "cannot record the audit in $(ao_audit_file "$H_KEY" .done)"
+    # Under the audit record lock, and only while this change is still the
+    # pending one (cross-review.sh or switch.sh verify may number another).
+    ao_audit_complete "$H_KEY" "$A_change" "$A_since" "$o_report" "$_short" "$(ao_utc "$AO_T_EPOCH")"
+    case $? in
+      0) ;;
+      2) ao_lease_unlock; refuse "switch-in audit record $(ao_audit_file "$H_KEY") became unreadable or invalid: failing closed; a human must inspect it" ;;
+      3) ao_lease_unlock; refuse "the registry switch-in audit changed while audit-done ran (another change was numbered, or it was recorded meanwhile): nothing recorded; run lease.sh audit-brief and audit-done again" ;;
+      *) ao_die "$AO_E_FAIL" "cannot record the audit in $(ao_audit_file "$H_KEY" .done)" ;;
+    esac
   fi
   ao_lease_unlock
   echo "switch-in audit recorded ($a_kind, $a_trans): $o_report at $_short. New work may start."

@@ -10,7 +10,14 @@
   lease holder to release; `switch.sh` never releases, acquires or overrides
   a lease. The switch-in audit is checked only once routing passes. Without
   a lease, `verify` records each leg's move as the next numbered registry
-  change, so the return leg's audit can be recorded at once.
+  change, so the return leg's audit can be recorded at once. A held lease
+  that names no session id is never bound to the incoming session by a
+  registry write, and the acquire command shown carries the session id. A
+  retried `verify` finds a switch-in note it already placed (inbox, claimed
+  or archived) instead of placing another. `verify`, `cross-review.sh` and
+  `lease.sh audit-done` update the audit record under one per-operator
+  lock, re-reading the registry row; `audit-done` records nothing if
+  another change was numbered meanwhile.
 
 - **Missing-skill troubleshooting:** the guide routes bundled operations
   skills through the existing index and records the caller and installed

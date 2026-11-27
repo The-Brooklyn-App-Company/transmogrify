@@ -25,9 +25,11 @@
 #               lease) delivers to the incoming client and session, with no
 #               active hold. verify writes the row once handoff passes; a
 #               lease must be released by its holder and acquired by the
-#               incoming session (lease.sh; switch.sh never moves it). Only
-#               then the incoming session gets a switch-in note with a
-#               one-time token
+#               incoming session with its session id (lease.sh --session-id;
+#               switch.sh never moves it, and never binds a lease that names
+#               no session id by a registry write). Only then the incoming
+#               session gets a switch-in note with a one-time token, once
+#               (a retry after an interruption finds the note it placed)
 #   watchdog    no quiet-list entry silences the operator, and no timed job
 #               in JOBS.tsv still names the old session
 #   labels      (mark) the incoming session is titled with the operator's
@@ -89,13 +91,20 @@ refuse() {
 # sw_row KEY  Set R_NAME, R_DIR, R_SID, R_CLIENT, R_AUDIT, and R_LEASE,
 # R_PROVIDER, R_EPOCH (lease epoch number, or -) from the resolver: the
 # registry row, overridden by a lease in the home; fails when KEY has no row.
+# R_LSID is the session id the lease itself names (held or assigned), or -:
+# a lease without one resolves to the registry's session when the row names
+# the same client and session name, which is not evidence of who holds it.
 _sw_row_cb() {
   [ "$OP_KEY" = "$_sw_want" ] || return 0
   R_FOUND=1 R_NAME=$OP_NAME R_DIR=$OP_DIR R_SID=$OP_SID R_CLIENT=$OP_CLIENT R_AUDIT=${OP_AUDIT:--}
-  R_LEASE=$OP_LEASE R_PROVIDER=$OP_PROVIDER R_EPOCH=${OP_EPOCH##*-}
+  R_LEASE=$OP_LEASE R_PROVIDER=$OP_PROVIDER R_EPOCH=${OP_EPOCH##*-} R_LSID=-
+  # The resolver read this row's lease into L_* just now (held or assigned
+  # means it was read and valid).
+  # shellcheck disable=SC2154 # L_session_id is set by ao_lease_read (lib/lease.sh)
+  case $OP_LEASE in held | assigned) R_LSID=${L_session_id:--} ;; esac
 }
 sw_row() {
-  _sw_want=$1 R_FOUND='' R_NAME='' R_DIR='' R_SID='' R_CLIENT='' R_AUDIT=- R_LEASE=none R_PROVIDER='' R_EPOCH=-
+  _sw_want=$1 R_FOUND='' R_NAME='' R_DIR='' R_SID='' R_CLIENT='' R_AUDIT=- R_LEASE=none R_PROVIDER='' R_EPOCH=- R_LSID=-
   ao_registry_each _sw_row_cb
   [ -n "$R_FOUND" ]
 }
@@ -140,14 +149,25 @@ sw_routed() {
       _why="the lease is released (epoch $R_EPOCH ended): nothing routes until the incoming session acquires it: $_acq"
       return 1 ;;
     assigned)
-      _why="a takeover assigned the lease to $R_PROVIDER \`$R_NAME\` (epoch $R_EPOCH), which has not acquired it: nothing routes until that session runs lease.sh --home $R_DIR acquire --provider $R_PROVIDER --session '$R_NAME'; if it is not the incoming $_tc $_ts, a human settles which session runs $_key (lease.sh --home $R_DIR status)"
+      # The acquire must carry the assigned session id: without it the
+      # lease names no session and routing cannot reach the exact one.
+      _aid=$R_LSID
+      [ "$_aid" != - ] || _aid='<its session id>'
+      _why="a takeover assigned the lease to $R_PROVIDER \`$R_NAME\` (epoch $R_EPOCH), which has not acquired it: nothing routes until that session runs lease.sh --home $R_DIR acquire --provider $R_PROVIDER --session '$R_NAME' --session-id $_aid; if it is not the incoming $_tc $_ts, a human settles which session runs $_key (lease.sh --home $R_DIR status)"
       return 1 ;;
     invalid)
       _why="the lease $R_DIR/.operator/lease cannot be trusted (unreadable, or another operator or host): nothing routes until a human inspects it (lease.sh --home $R_DIR status)"
       return 1 ;;
   esac
   if [ "$R_LEASE" = held ] && { [ "$R_PROVIDER" != "$_tc" ] || [ "$R_SID" != "$_ts" ]; }; then
-    _why="the lease is held by $R_PROVIDER \`$R_NAME\` (session ${R_SID:-unknown}, epoch $R_EPOCH), not the incoming $_tc $_ts: the holder releases it itself after its warm HANDOFF.md (lease.sh --home $R_DIR release --instance <its token> --epoch $R_EPOCH; the switch-out note asks it), then the incoming session acquires it: $_acq. switch.sh never releases, acquires or overrides a lease"
+    if [ "$R_LSID" = - ]; then
+      # Acquired without --session-id: the holder may be the outgoing
+      # session or the incoming one; nothing here tells which.
+      _why="the lease is held by $R_PROVIDER \`$R_NAME\` (epoch $R_EPOCH) without a session id, so it is not known to be the incoming $_tc $_ts, and verify never binds it to a session by a registry write"
+    else
+      _why="the lease is held by $R_PROVIDER \`$R_NAME\` (session $R_LSID, epoch $R_EPOCH), not the incoming $_tc $_ts"
+    fi
+    _why="$_why: the holder releases it itself after its warm HANDOFF.md (lease.sh --home $R_DIR release --instance <its token> --epoch $R_EPOCH; the switch-out note asks it), then the incoming session acquires it with its id ($_acq). switch.sh never releases, acquires or overrides a lease"
     _mk=$(sw_markers)
     [ "$_mk" -eq 0 ] || _why="$_mk dispatch marker(s) open in $R_DIR/.operator/markers (an effect in flight or unresolved): release refuses until it ends or a human settles it (lease.sh settle); then $_why"
     return 1
@@ -286,8 +306,13 @@ sw_verify() {
   if sw_family "$_fc" && sw_family "$_tc" && [ "$_fc" != "$_tc" ]; then _xfam=1; fi
   ! sw_routed || _routed=1
   # The row is written once the handoff and approvals pass, when there is
-  # no lease or the incoming client holds it; the write alone moves no lease.
-  if [ "$_left" -eq 0 ] && { [ "$R_LEASE" = none ] || { [ "$R_LEASE" = held ] && [ "$R_PROVIDER" = "$_tc" ]; }; } &&
+  # no lease or the resolver already names the incoming session as the
+  # holder; the write alone moves no lease. Under a lease that names no
+  # session id the resolver takes the registry's session for a row of the
+  # same client and name, so a write would bind the lease to the incoming
+  # session whoever holds it: the holder must already resolve to it.
+  if [ "$_left" -eq 0 ] &&
+    { [ "$R_LEASE" = none ] || { [ "$R_LEASE" = held ] && [ "$R_PROVIDER" = "$_tc" ] && [ "$R_SID" = "$_ts" ]; }; } &&
     ! awk -F'\t' -v k="$_key" -v c="$_tc" -v s="$_ts" '$1 == k && $4 == s && $5 == c { f = 1 } END { exit !f }' "$AO_REGISTRY"; then
     _dup=$(awk -F'\t' -v k="$_key" -v s="$_ts" '$1 !~ /^#/ && $1 != k && $4 == s { print $1; exit }' "$AO_REGISTRY")
     if [ -z "$_dup" ]; then
@@ -321,11 +346,12 @@ sw_verify() {
     sw_observe "$_key"
     sw_row "$_key"
   fi
+  # A run that died after placing the note but before recording it finds
+  # it (in the inbox, claimed by the relay, or archived) and only records it.
   if [ -n "$_routed" ] && [ -z "$(st_get "$_st" note_sent)" ]; then
-    # shellcheck disable=SC2016 # backticks are Markdown in the note
-    printf 'Operator switch (the Oracle, by switch.sh; automated, not from the human): you are now the active side for %s (%s). Read HANDOFF.md first, then MANDATE.md and NOTES.md. Prove you received this: run `sh %s/switch.sh ack %s %s` from your session (or reply to the Oracle quoting %s). Triage the switch-in audit when it arrives (K-22).\n' \
-      "$_key" "$_tc" "$AO_SCRIPTS" "$_key" "$_tok" "$_tok" | ao_inbox_put "$_key" switch-in >/dev/null &&
+    if sw_note_placed || sw_note | ao_inbox_put "$_key" switch-in >/dev/null; then
       st_set "$_st" note_sent "$AO_T_EPOCH"
+    fi
   fi
   # watchdog
   _q=$(ao_quiet_until "$_key" "$R_NAME")
@@ -377,6 +403,35 @@ sw_verify() {
 Operator switch done (switch.sh verify, every step passed): $_key now runs on $_tc ($_ts). Record: $AO_STATE/switch/done/$_key.$AO_T_STAMP
 EOF
   echo "switch of $_key complete."
+}
+
+# sw_note  Print this switch's switch-in note (_key, _tc, _tok): the same
+# bytes on every run of the switch, which is what identifies it.
+sw_note() {
+  # shellcheck disable=SC2016 # backticks are Markdown in the note
+  printf 'Operator switch (the Oracle, by switch.sh; automated, not from the human): you are now the active side for %s (%s). Read HANDOFF.md first, then MANDATE.md and NOTES.md. Prove you received this: run `sh %s/switch.sh ack %s %s` from your session (or reply to the Oracle quoting %s). Triage the switch-in audit when it arrives (K-22).\n' \
+    "$_key" "$_tc" "$AO_SCRIPTS" "$_key" "$_tok" "$_tok"
+}
+
+# sw_note_placed  True when this switch's switch-in note was already placed:
+# a file named as ao_inbox_put names it (<stamp>-switch-in.md, or
+# <stamp>-switch-in-N.md beside a taken name) that is, byte for byte, the
+# note, wherever the relay may have moved it: still in the inbox, claimed in
+# its .claimed/ folder (in flight), or archived in the sent folder as
+# <stamp>-<key>-<that name>.md. A note that merely quotes the token is not it.
+sw_note_placed() {
+  _want=$(ao_tmp switch-in-note)
+  sw_note >"$_want" || return 1
+  for _f in "$AO_INBOX/$_key"/*.md "$AO_INBOX/$_key/.claimed"/*.md "$AO_INBOX/$_key/.claimed"/c.*/*.md \
+    "$AO_SENT"/*-"$_key"-*.md; do
+    [ -f "$_f" ] || continue
+    _n=${_f##*/}
+    _n=${_n%.md}
+    case ${_n##*-} in '' | *[!0-9]*) ;; *) _n=${_n%-*} ;; esac
+    case $_n in *-switch-in) ;; *) continue ;; esac
+    cmp -s "$_want" "$_f" && return 0
+  done
+  return 1
 }
 
 # sw_reply SINCE TOKEN  Print a note to the Oracle placed since SINCE that

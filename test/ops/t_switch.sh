@@ -41,11 +41,38 @@ audit_state() {
   awk -F'\t' '$1 == "alpha" { print $7 }' "$T/out"
 }
 claude_calls() { _c=$(grep -c '^== claude' "$FAKE_LOG" 2>/dev/null); echo "${_c:-0}"; }
-# shown_acquire  The last lease.sh acquire command verify printed, exactly
-# as printed (run it with: eval "run $(shown_acquire)").
-shown_acquire() {
-  sed -n "s/.*\(lease\.sh --home [^ ]* acquire --provider [a-z]* --session '[^']*' --session-id [A-Za-z0-9._-]*\).*/\1/p" "$T/out" | tail -n 1
+# shown_cmd VERB  The last `lease.sh --home HOME VERB ...` command printed in
+# $T/out, exactly as printed: the shell words after lease.sh (plain, or
+# single-quoted with '\'' for a quote), up to the first text that is not
+# one (run it with: eval "run $(shown_cmd acquire)").
+shown_cmd() {
+  awk -v verb="$1" -v q="'" '
+    BEGIN { w = "^ (" q "[^" q "]*" q "(\\\\" q q "[^" q "]*" q ")*|[A-Za-z0-9._-]+)" }
+    {
+      line = $0
+      while ((i = index(line, "lease.sh --home ")) > 0) {
+        rest = substr(line, i + 8); cmd = "lease.sh"; n = 0
+        while (match(rest, w)) {
+          n++; word[n] = substr(rest, 2, RLENGTH - 1)
+          cmd = cmd " " word[n]; rest = substr(rest, RLENGTH + 1)
+        }
+        if (n >= 3 && word[3] == verb) last = cmd
+        line = substr(line, i + 16)
+      }
+    }
+    END { if (last != "") print last }' "$T/out"
 }
+# argv_of CMD  Run CMD (a printed command line) with a recording lease.sh
+# first on PATH, in the empty $T/canary, and print each argument it got as
+# [ARG]. Nothing else runs: the shim only records.
+argv_of() {
+  mkdir -p "$T/shim" "$T/canary"
+  printf '#!/bin/sh\nfor a in "$@"; do printf "[%%s]\\n" "$a"; done\n' >"$T/shim/lease.sh"
+  chmod +x "$T/shim/lease.sh"
+  (cd "$T/canary" && PATH="$T/shim:$PATH" "$AO_TEST_SHELL" -c "$1")
+}
+# shq STRING  STRING as one single-quoted shell word (for expected text).
+shq() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 # pause_date DIR  Put a `date` first on the fixture PATH that, in a process
 # whose PAUSE_DIR is DIR, stops at its first `date -u` (ao_utc, called when
 # an audit change is numbered: after the record is read, before it is
@@ -373,6 +400,9 @@ test_roundtrip_claude_codex_claude() {
   run switch.sh check
   assert_has "$T/out" "ok: alpha on claude (sid-alpha)"
   assert_lacks "$T/out" "open switch"
+  # Registry-only routing initialized nothing in the home and left no lock.
+  assert_no_file "$T/proj/alpha/.operator"
+  assert_no_file "$T/proj/alpha/.operator.init"
 }
 
 # With the optional lease held by the outgoing side, verify must not report
@@ -390,7 +420,7 @@ test_switch_with_a_held_lease_reports_only_the_route_side_reports() {
   # The switch-out note asks the holder to release the lease itself.
   assert_eq "$(alpha_notes switch-out)" 1 "one switch-out note"
   out_note=$(ls "$T/home/inbox/alpha"/*switch-out.md)
-  assert_has "$out_note" "lease.sh --home $T/proj/alpha release --instance <your token> --epoch 1"
+  assert_has "$out_note" "lease.sh --home '$T/proj/alpha' release --instance <your token> --epoch 1"
   assert_has "$out_note" "Nobody releases it for you"
   # The outgoing session commits HANDOFF.md but keeps the lease.
   sleep 1
@@ -400,8 +430,8 @@ test_switch_with_a_held_lease_reports_only_the_route_side_reports() {
     assert_rc 1
     assert_has "$T/out" "PASS  handoff"
     assert_has "$T/out" "TODO  routing      the lease is held by claude \`Alpha Op\` (session sid-alpha, epoch 1), not the incoming codex thread-a"
-    assert_has "$T/out" "lease.sh --home $T/proj/alpha release --instance <its token> --epoch 1"
-    assert_has "$T/out" "lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha Op' --session-id thread-a"
+    assert_has "$T/out" "lease.sh --home '$T/proj/alpha' release --instance <its token> --epoch 1"
+    assert_has "$T/out" "lease.sh --home '$T/proj/alpha' acquire --provider 'codex' --session 'Alpha Op' --session-id 'thread-a'"
     assert_lacks "$T/out" "PASS  routing"
     assert_has "$T/out" "WAIT  switch-in    checked once routing passes"
     assert_has "$T/out" "WAIT  ack          sent once routing passes"
@@ -456,7 +486,7 @@ test_lease_roundtrip_claude_codex_claude() {
   # Released, not yet acquired: still no route and no phantom note.
   run switch.sh verify alpha
   assert_rc 1
-  assert_has "$T/out" "TODO  routing      the lease is released (epoch 1 ended): nothing routes until the incoming session acquires it: lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha Op' --session-id thread-a"
+  assert_has "$T/out" "TODO  routing      the lease is released (epoch 1 ended): nothing routes until the incoming session acquires it: lease.sh --home '$T/proj/alpha' acquire --provider 'codex' --session 'Alpha Op' --session-id 'thread-a'"
   assert_lacks "$T/out" "PASS  routing"
   assert_eq "$(alpha_notes switch-in)" 0 "no switch-in note while released"
   assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged while released"
@@ -566,13 +596,13 @@ test_switch_with_an_invalid_or_assigned_lease_does_not_route() {
   assert_has "$T/out" "TODO  routing      a takeover assigned the lease to codex \`Alpha-codex\` (epoch 2), which has not acquired it"
   # The command shown carries the assigned session id: the assigned name
   # differs from the registry's, so without it nothing would name thread-a.
-  assert_has "$T/out" "nothing routes until that session runs lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha-codex' --session-id thread-a; if it is not the incoming codex thread-a"
+  assert_has "$T/out" "nothing routes until that session runs lease.sh --home '$T/proj/alpha' acquire --provider 'codex' --session 'Alpha-codex' --session-id 'thread-a'; if it is not the incoming codex thread-a"
   assert_lacks "$T/out" "PASS  routing"
   assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged (assigned)"
   assert_eq "$(alpha_notes switch-in)" 0 "no switch-in note (assigned)"
   # That session runs the command exactly as shown: now it routes.
-  acq_cmd=$(shown_acquire)
-  assert_eq "$acq_cmd" "lease.sh --home $T/proj/alpha acquire --provider codex --session 'Alpha-codex' --session-id thread-a" "displayed acquire"
+  acq_cmd=$(shown_cmd acquire)
+  assert_eq "$acq_cmd" "lease.sh --home '$T/proj/alpha' acquire --provider 'codex' --session 'Alpha-codex' --session-id 'thread-a'" "displayed acquire"
   eval "run $acq_cmd"
   assert_rc 0
   assert_eq "$(lget session_id "$T/proj/alpha")" thread-a "the lease names the assigned session"
@@ -608,7 +638,7 @@ test_held_lease_without_a_session_id_is_not_rebound_by_a_registry_write() {
     assert_rc 1
     assert_has "$T/out" "PASS  handoff"
     assert_has "$T/out" "TODO  routing      the lease is held by claude \`Alpha Op\` (epoch 1) without a session id, so it is not known to be the incoming claude sid-new, and verify never binds it to a session by a registry write"
-    assert_has "$T/out" "(lease.sh --home $T/proj/alpha acquire --provider claude --session 'Alpha Op' --session-id sid-new)"
+    assert_has "$T/out" "(lease.sh --home '$T/proj/alpha' acquire --provider 'claude' --session 'Alpha Op' --session-id 'sid-new')"
     assert_lacks "$T/out" "PASS  routing"
     assert_has "$T/out" "WAIT  ack          sent once routing passes"
     assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged"
@@ -627,8 +657,8 @@ test_held_lease_without_a_session_id_is_not_rebound_by_a_registry_write() {
   assert_rc 0
   run switch.sh verify alpha
   assert_rc 1
-  acq_cmd=$(shown_acquire)
-  assert_eq "$acq_cmd" "lease.sh --home $T/proj/alpha acquire --provider claude --session 'Alpha Op' --session-id sid-new" "displayed acquire"
+  acq_cmd=$(shown_cmd acquire)
+  assert_eq "$acq_cmd" "lease.sh --home '$T/proj/alpha' acquire --provider 'claude' --session 'Alpha Op' --session-id 'sid-new'" "displayed acquire"
   eval "run $acq_cmd"
   assert_rc 0
   run switch.sh verify alpha
@@ -804,6 +834,381 @@ test_switch_in_note_is_placed_once_across_an_interruption_after_publication() {
   FAKE_MODE=sent run relay.sh
   assert_eq "$(claude_calls)" 1 "still one delivery"
   assert_no_file "$T/home/inbox/alpha/.claimed"
+}
+
+# run_with NAME=VALUE SCRIPT ARG...  As run, with NAME set for this run only.
+run_with() {
+  _e=$1 _s=$2
+  shift 2
+  env "$_e" "$AO_TEST_SHELL" "$SCRIPTS/$_s" "$@" </dev/null >"$T/out" 2>"$T/err"
+  rc=$?
+}
+# real_copies inbox|claimed|sent  alpha's switch-in notes (by their text) in
+# one place.
+real_copies() {
+  case $1 in
+    inbox) set -- "$T/home/inbox/alpha"/*.md ;;
+    claimed) set -- "$T/home/inbox/alpha/.claimed"/*.md "$T/home/inbox/alpha/.claimed"/*/*.md ;;
+    sent) set -- "$T/home/inbox/sent"/*.md ;;
+  esac
+  _c=0
+  for _f in "$@"; do [ -f "$_f" ] && grep -q 'you are now the active side for alpha' "$_f" && _c=$((_c + 1)); done
+  echo "$_c"
+}
+# relay_steps  Put a `cmp` first on the fixture PATH that, when verify is
+# about to compare alpha's switch-in note (its folder already listed), first
+# moves it on as the relay does. RELAY_STEPS, in verify's environment, names
+# the steps: claim (inbox to a fresh .claimed/c.* folder, by rename),
+# archive (claimed to the sent folder: link, then unlink) or link (the link
+# only: a relay stopped between the two). Then it compares, really.
+relay_steps() {
+  _real=$(command -v cmp)
+  cat >"$T/bin/cmp" <<EOF
+#!/bin/sh
+for f in "\$@"; do :; done
+in="$T/home/inbox/alpha" sent="$T/home/inbox/sent"
+if [ -n "\${RELAY_STEPS:-}" ] && grep -q 'you are now the active side for alpha' "\$f" 2>/dev/null; then
+  case \${f#"\$in/"} in
+    */*) ;;
+    *) case " \$RELAY_STEPS " in *" claim "*)
+      mkdir -p "\$in/.claimed" && d=\$(mktemp -d "\$in/.claimed/c.XXXXXX") && mv "\$f" "\$d/" ;;
+    esac ;;
+  esac
+  case \$f in "\$in/.claimed/c."*/*)
+    mkdir -p "\$sent"
+    case " \$RELAY_STEPS " in
+      *" archive "*) ln "\$f" "\$sent/20990101T000000-alpha-\${f##*/}" && rm -f "\$f" && rmdir "\${f%/*}" ;;
+      *" link "*) ln "\$f" "\$sent/20990101T000000-alpha-\${f##*/}" 2>/dev/null ;;
+    esac ;;
+  esac
+fi
+exec "$_real" "\$@"
+EOF
+  chmod +x "$T/bin/cmp"
+}
+# placed_switch_in  Open a switch of alpha (pinned clock), beside a decoy
+# that quotes the token under a switch-in name, and run a verify that places
+# the switch-in note but cannot record it (the switch record's folder is
+# read-only), so every later verify looks the note up again. Sets tok.
+placed_switch_in() {
+  home_repo "$T/proj/alpha"
+  AO_NOW=$(date +%s)
+  export AO_NOW
+  run switch.sh switch alpha --to claude --session sid-new
+  assert_rc 0
+  tok=$(st token)
+  printf 'Reminder: run switch.sh ack alpha %s\n' "$tok" >"$T/home/inbox/alpha/00000000T000000-switch-in.md"
+  sleep 1
+  commit_handoff
+  chmod 500 "$T/state/switch"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/err" "cannot write $T/state/switch/alpha"
+  assert_eq "$(real_copies inbox)" 1 "placed once"
+  relay_steps
+}
+# decoy_kept  The decoy is still there once, byte for byte, wherever the
+# relay took it.
+decoy_kept() {
+  _c=0
+  for _f in "$T/home/inbox/alpha"/*.md "$T/home/inbox/alpha/.claimed"/*/*.md "$T/home/inbox/sent"/*.md; do
+    [ -f "$_f" ] && [ "$(cat "$_f")" = "Reminder: run switch.sh ack alpha $tok" ] && _c=$((_c + 1))
+  done
+  assert_eq "$_c" 1 "the decoy, once and unchanged"
+}
+
+# The relay moves the note between verify's listing of a folder and its
+# comparison: each folder is listed only after the one before was compared,
+# so the note is found where it went, never placed again.
+test_switch_in_lookup_follows_the_note_the_relay_moves_mid_lookup() {
+  placed_switch_in
+  run_with RELAY_STEPS=claim switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again (claimed during the lookup)"
+  assert_eq "$(real_copies claimed)" 1 "claimed"
+  # The relay cannot publish the archive copy (the sent folder is
+  # read-only): the claimed copy stays, and is found.
+  mkdir -p "$T/home/inbox/sent"
+  chmod 500 "$T/home/inbox/sent"
+  FAKE_MODE=sent run relay.sh
+  chmod 700 "$T/home/inbox/sent"
+  assert_rc 1
+  assert_eq "$(claude_calls)" 0 "nothing delivered"
+  assert_eq "$(real_copies claimed)" 1 "left claimed"
+  assert_eq "$(real_copies sent)" 0 "not archived"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again (left claimed)"
+  run_with RELAY_STEPS=archive switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again (archived during the lookup)"
+  assert_eq "$(real_copies claimed)" 0 "no claimed copy left"
+  assert_eq "$(real_copies sent)" 1 "archived"
+  decoy_kept
+  # The record is writable again: recorded, not placed.
+  chmod 700 "$T/state/switch"
+  run switch.sh verify alpha
+  assert_rc 1
+  [ -n "$(st note_sent)" ] || _fail "note_sent not recorded"
+  assert_eq "$(real_copies inbox)" 0 "still not placed again"
+}
+
+test_switch_in_lookup_follows_one_note_through_claim_and_archive() {
+  placed_switch_in
+  run_with RELAY_STEPS='claim archive' switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again"
+  assert_eq "$(real_copies claimed)" 0 "moved on"
+  assert_eq "$(real_copies sent)" 1 "found archived"
+  decoy_kept
+  chmod 700 "$T/state/switch"
+}
+
+# A relay stopped between the archive link and the claimed copy's removal
+# leaves the note in both places; its next run archives it again (the relay
+# is at least once). Verify places none of those copies again.
+test_switch_in_lookup_across_a_relay_stopped_between_link_and_unlink() {
+  placed_switch_in
+  run_with RELAY_STEPS='claim link' switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again"
+  assert_eq "$(real_copies claimed)" 1 "still claimed"
+  assert_eq "$(real_copies sent)" 1 "and linked into the archive"
+  FAKE_MODE=sent run relay.sh
+  assert_rc 0
+  assert_eq "$(claude_calls)" 1 "one delivery"
+  assert_eq "$(real_copies claimed)" 0 "claimed copy archived"
+  assert_eq "$(real_copies sent)" 2 "archived twice by the relay"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(real_copies inbox)" 0 "not placed again (archived)"
+  decoy_kept
+  chmod 700 "$T/state/switch"
+  run switch.sh verify alpha
+  assert_rc 1
+  [ -n "$(st note_sent)" ] || _fail "note_sent not recorded"
+  assert_eq "$(real_copies inbox)" 0 "recorded, not placed"
+}
+
+# pause_mv  Put an `mv` first on the fixture PATH that, in a process whose
+# PAUSE_DIR is set, stops before its first move onto a file named PAUSE_ON
+# (verify's registry write or acquire's lease write: each after its
+# decision, inside its locks): it creates PAUSE_DIR/paused and waits for
+# PAUSE_DIR/go. Every other move, and every other process, runs at once.
+pause_mv() {
+  _real=$(command -v mv)
+  cat >"$T/bin/mv" <<EOF
+#!/bin/sh
+for last in "\$@"; do :; done
+if [ -n "\${PAUSE_DIR:-}" ] && [ "\${last##*/}" = "\${PAUSE_ON:-}" ] && [ ! -e "\$PAUSE_DIR/paused" ]; then
+  : >"\$PAUSE_DIR/paused"
+  n=0
+  while [ ! -e "\$PAUSE_DIR/go" ] && [ "\$n" -lt 300 ]; do sleep 0.1; n=\$((n + 1)); done
+fi
+exec "$_real" "\$@"
+EOF
+  chmod +x "$T/bin/mv"
+}
+# mark_waits  Put a `sleep` first on the fixture PATH that, in a process
+# whose WAIT_MARK is set, creates that file first. The lock loops sleep only
+# after finding a lock taken: the file proves that the process waited.
+mark_waits() {
+  _real=$(command -v sleep)
+  cat >"$T/bin/sleep" <<EOF
+#!/bin/sh
+[ -z "\${WAIT_MARK:-}" ] || : >"\$WAIT_MARK"
+exec "$_real" "\$@"
+EOF
+  chmod +x "$T/bin/sleep"
+}
+# race_home [init]  alpha's home without a lease (with init: lease.sh init
+# made .operator/) and an open same-client switch, claude sid-alpha ->
+# claude sid-new, whose handoff is committed: the next verify writes the
+# route.
+race_home() {
+  lease_home
+  if [ -n "${1-}" ]; then
+    run lease.sh --home "$T/proj/alpha" init
+    assert_rc 0
+  fi
+  run switch.sh switch alpha --to claude --session sid-new
+  assert_rc 0
+  sleep 1
+  commit_handoff
+  pause_mv
+  mark_waits
+  mkdir -p "$T/pause"
+}
+# race_acquire_first [init]  A first acquire with no profile and no session
+# id (by the operator's name only) is admitted first and stopped before its
+# lease write. verify waits for the home mutex, then finds the lease, and
+# never binds it to the incoming session by its registry write.
+race_acquire_first() {
+  race_home "${1-}"
+  PAUSE_DIR=$T/pause PAUSE_ON=lease AO_PROFILE=$T/no-profile "$AO_TEST_SHELL" "$SCRIPTS/lease.sh" --home "$T/proj/alpha" \
+    acquire --provider claude --session "Alpha Op" </dev/null >"$T/a.out" 2>"$T/a.err" &
+  a_pid=$!
+  wait_for "$T/pause/paused"
+  assert_eq "$(cat "$T/proj/alpha/.operator.init/pid" 2>/dev/null)" "$a_pid" "acquire holds the home mutex"
+  assert_no_file "$T/proj/alpha/.operator/lease"
+  WAIT_MARK=$T/v.waited "$AO_TEST_SHELL" "$SCRIPTS/switch.sh" verify alpha </dev/null >"$T/v.out" 2>"$T/v.err" &
+  v_pid=$!
+  wait_for "$T/v.waited"
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "no routing write while acquire holds the home"
+  : >"$T/pause/go"
+  wait "$a_pid"
+  assert_eq "$?" 0 "acquire rc ($(cat "$T/a.err"))"
+  wait "$v_pid"
+  assert_eq "$?" 1 "verify rc ($(cat "$T/v.err"))"
+  assert_eq "$(lget session_id "$T/proj/alpha")" - "the lease names no session"
+  assert_has "$T/v.out" "TODO  routing      the lease is held by claude \`Alpha Op\` (epoch 1) without a session id"
+  assert_lacks "$T/v.out" "PASS  routing"
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged"
+  run switch.sh side alpha
+  assert_eq "$(cat "$T/out")" "claude sid-alpha Alpha Op" "side stays with the registry's session"
+  assert_eq "$(alpha_notes switch-in)" 0 "no switch-in note"
+  assert_no_file "$T/proj/alpha/.operator.init"
+}
+# race_verify_first [init]  verify is admitted first and stopped before its
+# registry write, holding the home mutex (and the lease lock when
+# .operator/ exists). The outgoing session's first acquire, by its exact
+# session id and with no profile, waits before it creates anything; its
+# lease, written after, keeps that session.
+race_verify_first() {
+  race_home "${1-}"
+  PAUSE_DIR=$T/pause PAUSE_ON=REGISTRY.tsv "$AO_TEST_SHELL" "$SCRIPTS/switch.sh" verify alpha </dev/null >"$T/v.out" 2>"$T/v.err" &
+  v_pid=$!
+  wait_for "$T/pause/paused"
+  assert_eq "$(cat "$T/proj/alpha/.operator.init/pid" 2>/dev/null)" "$v_pid" "verify holds the home mutex"
+  if [ -n "${1-}" ]; then
+    assert_eq "$(cat "$T/proj/alpha/.operator/lease.lock/pid" 2>/dev/null)" "$v_pid" "verify holds the lease lock"
+  else
+    assert_no_file "$T/proj/alpha/.operator"
+  fi
+  WAIT_MARK=$T/a.waited AO_PROFILE=$T/no-profile "$AO_TEST_SHELL" "$SCRIPTS/lease.sh" --home "$T/proj/alpha" \
+    acquire --provider claude --session "Alpha Op" --session-id sid-alpha </dev/null >"$T/a.out" 2>"$T/a.err" &
+  a_pid=$!
+  wait_for "$T/a.waited"
+  assert_no_file "$T/proj/alpha/.operator/lease"
+  [ -n "${1-}" ] || assert_no_file "$T/proj/alpha/.operator"
+  : >"$T/pause/go"
+  wait "$v_pid"
+  assert_eq "$?" 1 "verify rc ($(cat "$T/v.err"))"
+  wait "$a_pid"
+  assert_eq "$?" 0 "acquire rc ($(cat "$T/a.err"))"
+  assert_has "$T/v.out" "PASS  routing      registry updated: claude sid-new"
+  assert_eq "$(lget session_id "$T/proj/alpha")" sid-alpha "the lease keeps its exact session"
+  run switch.sh side alpha
+  assert_eq "$(cat "$T/out")" "claude sid-alpha Alpha Op" "side follows the lease"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "TODO  routing      the lease is held by claude \`Alpha Op\` (session sid-alpha, epoch 1), not the incoming claude sid-new"
+  assert_no_file "$T/proj/alpha/.operator.init"
+}
+test_first_acquire_admitted_before_verify_without_operator_dir() { race_acquire_first; }
+test_first_acquire_admitted_before_verify_with_operator_dir() { race_acquire_first init; }
+test_verify_admitted_before_first_acquire_without_operator_dir() { race_verify_first; }
+test_verify_admitted_before_first_acquire_with_operator_dir() { race_verify_first init; }
+
+# A home mutex that stays (here: left by a crashed process a minute ago) is
+# never broken: acquire, init and verify fail closed and keep it.
+test_a_home_mutex_left_by_a_crash_fails_closed_and_is_kept() {
+  lease_home
+  run switch.sh switch alpha --to claude --session sid-new
+  assert_rc 0
+  sleep 1
+  commit_handoff
+  _m=$T/proj/alpha/.operator.init
+  mkdir "$_m" && echo 999999 >"$_m/pid"
+  touch -t "$(date -r $(($(date +%s) - 60)) +%Y%m%d%H%M.%S 2>/dev/null || date -d @$(($(date +%s) - 60)) +%Y%m%d%H%M.%S)" "$_m"
+  run_with AO_PROFILE="$T/no-profile" lease.sh --home "$T/proj/alpha" acquire --provider claude --session "Alpha Op" --session-id sid-new
+  assert_rc 3
+  assert_has "$T/err" "home mutex $_m is older than"
+  assert_no_file "$T/proj/alpha/.operator"
+  run lease.sh --home "$T/proj/alpha" init
+  assert_rc 3
+  assert_no_file "$T/proj/alpha/.operator"
+  run switch.sh verify alpha
+  assert_rc 3
+  assert_eq "$(reg_row)" "alpha${TAB}Alpha Op${TAB}$T/proj/alpha${TAB}sid-alpha" "registry row unchanged"
+  assert_eq "$(cat "$_m/pid")" 999999 "the mutex is kept"
+  # A human removes it: verify routes, and initializes nothing.
+  rm -r "$_m"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "PASS  routing      registry updated: claude sid-new"
+  assert_no_file "$T/proj/alpha/.operator"
+  assert_no_file "$_m"
+}
+
+# Every command verify prints for the lease runs as shown: each value is one
+# word, whatever quotes, spaces or shell syntax a home or name holds. Run
+# against a recording lease.sh, then the real one.
+test_printed_lease_commands_run_as_shown() {
+  mkdir -p "$T/canary"
+  cd "$T/canary" || return
+  H="$T/proj/crew's desk; \$(touch pwned) alpha"
+  mkdir -p "$H"
+  home_repo "$H"
+  printf 'key=alpha\n' >"$H/operator.conf"
+  printf '.operator/\n' >"$H/.gitignore"
+  git -C "$H" add -A && git -C "$H" commit -q -m conf
+  awk -F'\t' -v d="$H" 'BEGIN { OFS = "\t" } $1 == "alpha" { $3 = d } { print }' \
+    "$T/home/operators/REGISTRY.tsv" >"$T/reg" && mv "$T/reg" "$T/home/operators/REGISTRY.tsv"
+  run lease.sh --home "$H" acquire --provider claude --session "Alpha Op" --session-id sid-alpha
+  assert_rc 0
+  tok1=$(sed -n 's/^instance: //p' "$T/out")
+  run switch.sh switch alpha --to codex --session thread-a --name "Builder's Desk"
+  assert_rc 0
+  assert_has "$(ls "$T/home/inbox/alpha"/*switch-out.md)" "lease.sh --home $(shq "$H") release --instance <your token> --epoch 1"
+  sleep 1
+  printf 'handoff\n' >"$H/HANDOFF.md"
+  git -C "$H" add HANDOFF.md && git -C "$H" commit -q -m handoff
+  want=$(printf '[%s]\n' --home "$H" acquire --provider codex --session "Builder's Desk" --session-id thread-a)
+  # Held by the outgoing session.
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "release --instance <its token> --epoch 1"
+  assert_eq "$(argv_of "$(shown_cmd acquire)")" "$want" "held: acquire argv"
+  # Released.
+  run lease.sh --home "$H" note --instance "$tok1" --epoch 1
+  cp "$T/out" "$H/HANDOFF.md"
+  git -C "$H" add HANDOFF.md && git -C "$H" commit -q -m "handoff epoch 1"
+  run lease.sh --home "$H" release --instance "$tok1" --epoch 1
+  assert_rc 0
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "the lease is released (epoch 1 ended)"
+  acq=$(shown_cmd acquire)
+  assert_eq "$(argv_of "$acq")" "$want" "released: acquire argv"
+  # Assigned by a takeover that recorded no session id (fixture: the lease
+  # as takeover writes it): the id is asked for in words, not shown as a
+  # value to run.
+  cp "$H/.operator/lease" "$T/lease.released"
+  sed -e 's/^state=.*/state=assigned/' -e 's/^instance=.*/instance=-/' -e 's/^provider=.*/provider=codex/' \
+    -e "s/^session=.*/session=Builder's Desk/" -e 's/^session_id=.*/session_id=-/' "$T/lease.released" >"$H/.operator/lease"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "--session $(shq "Builder's Desk"), adding --session-id with its own session id (the takeover recorded none)"
+  assert_eq "$(argv_of "$(shown_cmd acquire)")" "$(printf '[%s]\n' --home "$H" acquire --provider codex --session "Builder's Desk")" "assigned without an id: acquire argv"
+  assert_eq "$(argv_of "$(shown_cmd status)")" "$(printf '[%s]\n' --home "$H" status)" "status argv"
+  sed 's/^session_id=.*/session_id=thread-a/' "$H/.operator/lease" >"$T/lease.assigned" && cp "$T/lease.assigned" "$H/.operator/lease"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_eq "$(argv_of "$(shown_cmd acquire)")" "$want" "assigned: acquire argv"
+  # The incoming session runs the released state's acquire as shown, with
+  # the real lease.sh: routing passes, to that exact session.
+  cp "$T/lease.released" "$H/.operator/lease"
+  eval "run $acq"
+  assert_rc 0
+  assert_eq "$(lget session "$H")" "Builder's Desk" "lease session name"
+  assert_eq "$(lget session_id "$H")" thread-a "lease session id"
+  run switch.sh verify alpha
+  assert_rc 1
+  assert_has "$T/out" "PASS  routing      registry updated; lease held by codex \`Builder's Desk\` (epoch 2): thread-a"
+  assert_eq "$(reg_row)" "alpha${TAB}Builder's Desk${TAB}$H${TAB}thread-a${TAB}codex" "registry row"
+  # Nothing in a home or name ran as shell syntax.
+  assert_eq "$(ls -A "$T/canary")" "" "canary folder stays empty"
 }
 
 test_side_check_holds_and_the_oracle_lock() {

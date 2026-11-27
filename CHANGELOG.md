@@ -14,7 +14,15 @@
   that names no session id is never bound to the incoming session by a
   registry write, and the acquire command shown carries the session id. A
   retried `verify` finds a switch-in note it already placed (inbox, claimed
-  or archived) instead of placing another. `verify`, `cross-review.sh` and
+  or archived) instead of placing another, also when the relay moves it
+  during the lookup: each folder is listed only after the previous one was
+  compared, in the relay's order. `verify` resolves and writes the route
+  under the home's new mutex (`.operator.init/`, beside `.operator/`) and,
+  when `.operator/` exists, its lease lock; `lease.sh init` and `acquire`,
+  also without a profile, take the same mutex first, so a first lease
+  cannot be bound to the incoming session by a registry write made while
+  it was acquired. The `lease.sh` commands `verify` prints quote every
+  value and run as shown. `verify`, `cross-review.sh` and
   `lease.sh audit-done` update the audit record under one per-operator
   lock, re-reading the registry row; `audit-done` records nothing if
   another change was numbered meanwhile.

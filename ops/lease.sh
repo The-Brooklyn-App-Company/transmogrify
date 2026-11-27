@@ -485,7 +485,9 @@ holder_id() {
 # ---------------------------------------------------------------- verbs
 
 do_init() {
+  ao_home_mutex "$H_HOME" || exit "$AO_E_BUSY"
   ao_home_init
+  ao_home_unmutex
   if git -C "$H_HOME" rev-parse --git-dir >/dev/null 2>&1 &&
     ! git -C "$H_HOME" check-ignore -q .operator/lease 2>/dev/null; then
     ao_warn "$H_HOME/.operator/ is not git-ignored; add '.operator/' to .gitignore"
@@ -495,6 +497,10 @@ do_init() {
 
 do_acquire() {
   check_provider
+  # The home mutex, before .operator/ is created and before the lease lock,
+  # with or without a profile: switch.sh verify holds the same pair while
+  # it resolves and writes the operator's route.
+  ao_home_mutex "$H_HOME" || exit "$AO_E_BUSY"
   ao_home_init
   lock
   ao_lease_load
@@ -535,6 +541,7 @@ do_acquire() {
   fi
   if [ -n "$_replay" ]; then
     ao_lease_unlock
+    ao_home_unmutex
     echo "acquired: $H_KEY (replay; you already hold it)"
     echo "epoch: $L_epoch"
     echo "generation: $L_generation"
@@ -549,6 +556,7 @@ do_acquire() {
   ao_lease_write || ao_die "$AO_E_FAIL" "cannot write $H_LEASE"
   L_PRESENT=1
   ao_lease_unlock
+  ao_home_unmutex
   echo "acquired: $H_KEY by $o_provider \`$o_session\`"
   echo "epoch: $L_epoch"
   echo "generation: $L_generation"

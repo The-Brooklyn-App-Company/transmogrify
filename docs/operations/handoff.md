@@ -14,6 +14,14 @@ passes only once the incoming session holds it: the outgoing holder runs
 `release` (the switch-out note asks it), then the incoming session runs
 `acquire --session-id <its id>`. `switch.sh` never releases, acquires or
 overrides a lease; a released, assigned or unreadable lease routes nothing.
+The `lease.sh` commands `verify` prints quote every value (home, provider,
+session name and id) as one shell word, so they run as shown; an id it does
+not know is asked for in words, never shown as a value. A `verify` retried
+after an interruption finds the switch-in note it placed, in the inbox,
+claimed by the relay or archived, as long as a copy stays in one of those
+(the archive is not pruned before the retry), and places no other. That
+is not exactly-once delivery: the relay delivers at least once and may
+archive a note twice.
 
 An operator may have a session on each client (Claude Code, Codex): one
 **holder** and one **standby**. The holder works; the standby redirects.
@@ -74,6 +82,19 @@ unlock --timers-off --sessions-stopped` after checking that nothing runs.
 final check to the removal, and refuses a lock that was replaced while the
 human confirmed. A guard that stays taken also fails closed; a human removes
 it after checking that no lease verb runs.
+
+**Home mutex.** `.operator.init/`, beside `.operator/`, keeps a first lease
+from slipping in while `switch.sh verify` routes the operator. `lease.sh
+init` and `acquire` (with or without a profile) take it before they create
+`.operator/` and hold it, then the lease lock, to their last write. `verify`
+takes the registry lock, then this mutex, then the lease lock when
+`.operator/` exists, resolves the route again under them, and holds them
+through its registry write and audit observation; no verb takes them in
+the reverse order. `verify` creates nothing else in the home: an operator
+without a lease keeps no `.operator/`. The directory exists only while one
+of these runs (it can show as untracked in `git status` meanwhile). One
+older than 10 s fails closed (exit 3) and is never removed by a script; a
+human removes it after checking that nothing runs.
 
 **Dispatch markers.** Before any effect, `dispatch-begin` validates the
 holder and creates the marker in one step under the lock; `dispatch-end`

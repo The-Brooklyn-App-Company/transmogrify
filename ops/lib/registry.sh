@@ -79,7 +79,8 @@ ao_operator_resolve() {
 # incoming session triages and commits it, and `lease.sh audit-done
 # --report PATH` records it (path and commit) and clears the gate.
 #
-# <state_dir>/audit/<key> is written only by cross-review.sh:
+# <state_dir>/audit/<key> is written only by ao_audit_observe (cross-review.sh,
+# and switch.sh verify for the move it routes):
 #   provider=  the family last seen    from=, to=  the last family change
 #   change=    its number (1, 2, ...; empty: no change seen yet)
 #   since=     when it was seen (UTC)
@@ -87,6 +88,59 @@ ao_operator_resolve() {
 #   change=    the change it audits    since=, report=, commit=, at=
 # A registry audit is pending while change= is set and differs from the
 # .done file's change=. Both files are flat key=value, parsed literally.
+# Their writers run under different process locks (switch.sh `registry`,
+# cross-review.sh `cross-review`, lease.sh the home's lease lock), so every
+# write also holds the record lock (_ao_audit_lock) and re-reads what it
+# changes under it.
+
+# AO_AUDIT_LOCK_WAIT  Seconds a writer waits for the record lock.
+AO_AUDIT_LOCK_WAIT=10
+
+# _ao_audit_lock KEY  Take KEY's audit record lock, waiting up to
+# AO_AUDIT_LOCK_WAIT seconds; false (with a message) when it stays busy. A
+# kernel lock on <state_dir>/locks/audit-KEY.lk through descriptor 8, with
+# the tool ao_lock uses; descriptor 9 and AO_LOCK stay the caller's process
+# lock, which this never touches. Without flock or lockf (AO_LOCK_TOOL=mkdir)
+# it is a directory claimed with ao_mkdir_excl, never broken: a writer that
+# died holding it leaves it, and writes fail closed until a human removes it.
+_ao_audit_lock() {
+  _ao_al_dir=''
+  mkdir -p "$AO_STATE/locks" || return 1
+  _ao_al_tool=${AO_LOCK_TOOL:-}
+  if [ -z "$_ao_al_tool" ]; then
+    if command -v flock >/dev/null 2>&1; then _ao_al_tool=flock
+    elif command -v lockf >/dev/null 2>&1; then _ao_al_tool=lockf
+    else _ao_al_tool='mkdir'; fi
+  fi
+  case $_ao_al_tool in
+    flock | lockf)
+      _ao_al_f=$AO_STATE/locks/audit-$1.lk
+      exec 8>>"$_ao_al_f" || return 1
+      if [ "$_ao_al_tool" = flock ]; then flock -w "$AO_AUDIT_LOCK_WAIT" 8; else lockf -s -t "$AO_AUDIT_LOCK_WAIT" 8; fi 2>/dev/null && return 0
+      exec 8>&-
+      ao_msg "the switch-in audit record of $1 stayed locked by another command for ${AO_AUDIT_LOCK_WAIT}s ($_ao_al_f); try again"
+      return 1 ;;
+    *)
+      _ao_al_f=$AO_STATE/locks/audit-$1.lock
+      _ao_al_n=0
+      until ao_mkdir_excl "$_ao_al_f"; do
+        _ao_al_n=$((_ao_al_n + 1))
+        if [ "$_ao_al_n" -gt "$AO_AUDIT_LOCK_WAIT" ]; then
+          ao_msg "the switch-in audit record of $1 stayed locked for ${AO_AUDIT_LOCK_WAIT}s ($_ao_al_f, holder $(cat "$_ao_al_f/pid" 2>/dev/null || echo unknown)); if no command runs, a human removes that directory"
+          return 1
+        fi
+        sleep 1
+      done
+      printf '%s\n' "$$" >"$_ao_al_f/pid"
+      _ao_al_dir=$_ao_al_f ;;
+  esac
+}
+
+# _ao_audit_unlock  Release the record lock _ao_audit_lock took.
+_ao_audit_unlock() {
+  if [ -n "$_ao_al_dir" ]; then ao_rmdir_claimed "$_ao_al_dir"; else exec 8>&-; fi
+  _ao_al_dir=''
+}
 
 # ao_is_family CLIENT  True for a model family (claude, codex).
 ao_is_family() {
@@ -227,14 +281,39 @@ ao_audit_resolve() {
 }
 
 # ao_audit_observe  Record a registry family change for the current row
-# (cross-review.sh only, under its lock). The baseline is the last model
-# family seen (a file-only or custom transport leaves it alone). A move to
-# the other family starts a pending audit, unless a lease audits that very
-# move (its previous provider is the baseline); otherwise the baseline just
-# follows. A row's first sighting takes its baseline from a 0.2.0
-# cross-review client marker when there is one. An invalid record is never
-# overwritten (returns 1). Then re-resolves the audit state.
+# (cross-review.sh, and switch.sh verify for the move it routes). Under the
+# record lock it reads the row again from the registry and resolves it
+# (registry, lease), then reads the record, so the update starts from the
+# current provider and the current change number, never from what the
+# caller resolved before the lock (another command may have routed the row
+# or numbered a change meanwhile). The baseline is the last model family
+# seen (a file-only or custom transport leaves it alone). A move to the other
+# family starts a pending audit, unless a lease audits that very move (its
+# previous provider is the baseline); otherwise the baseline just follows. A
+# row's first sighting takes its baseline from a 0.2.0 cross-review client
+# marker when there is one. An invalid record, a busy lock or a row that
+# is gone writes nothing (returns 1). The OP_* variables are left as resolved
+# under the lock, with the audit state re-resolved.
 ao_audit_observe() {
+  _ao_audit_lock "$OP_KEY" || return 1
+  _ao_audit_row_fresh && _ao_audit_observe_locked
+  _ao_ao_rc=$?
+  _ao_audit_unlock
+  return "$_ao_ao_rc"
+}
+
+# _ao_audit_row_fresh  Read OP_KEY's row from the registry again and
+# resolve it (ao_operator_resolve); false when the row is gone.
+_ao_audit_row_fresh() {
+  _ao_fr=$(awk -F'\t' -v k="$OP_KEY" '$1 == k { print; exit }' "$AO_REGISTRY" 2>/dev/null) && [ -n "$_ao_fr" ] || return 1
+  IFS="$AO_TAB" read -r _ao_fk _ao_fn _ao_fd _ao_fs _ao_fc _ao_frest <<EOF
+$_ao_fr
+EOF
+  [ "${_ao_fk-}" = "$OP_KEY" ] && [ -n "${_ao_fn-}" ] || return 1
+  ao_operator_resolve "$_ao_fk" "$_ao_fn" "${_ao_fd:--}" "${_ao_fs:--}" "${_ao_fc:-}"
+}
+
+_ao_audit_observe_locked() {
   _ao_af=$(ao_audit_file "$OP_KEY")
   _ao_old=$AO_STATE/cross-review/$OP_KEY.client
   ao_audit_read "$OP_KEY"
@@ -261,6 +340,34 @@ ao_audit_observe() {
 _ao_audit_put() {
   printf 'provider=%s\nfrom=%s\nto=%s\nchange=%s\nsince=%s\n' "$A_provider" "$A_from" "$A_to" "$A_change" "$A_since" |
     ao_write_atomic "$1"
+}
+
+# ao_audit_complete KEY CHANGE SINCE REPORT COMMIT AT  Record the audit of
+# registry change CHANGE (seen at SINCE) in <state_dir>/audit/KEY.done, at
+# AT (lease.sh audit-done, after its own checks). Under the record lock the
+# record is read again: it is written only while that very change is still
+# the pending one. Returns 0 when written; 1 when the lock stays busy or the
+# write fails; 2 when the record is invalid; 3 when the change is no longer
+# pending as checked (another change was numbered, or it was recorded
+# meanwhile). A_* are left as read under the lock.
+ao_audit_complete() {
+  _ao_audit_lock "$1" || return 1
+  ao_audit_read "$1"
+  case $? in
+    0)
+      if [ "$A_change" = "$2" ] && [ "$A_since" = "$3" ] && [ "$A_done" != "$2" ]; then
+        printf 'change=%s\nsince=%s\nreport=%s\ncommit=%s\nat=%s\n' "$2" "$3" "$4" "$5" "$6" |
+          ao_write_atomic "$(ao_audit_file "$1" .done)"
+        _ao_ac_rc=$?
+        [ "$_ao_ac_rc" -eq 0 ] || _ao_ac_rc=1
+      else
+        _ao_ac_rc=3
+      fi ;;
+    1) _ao_ac_rc=3 ;;
+    *) _ao_ac_rc=2 ;;
+  esac
+  _ao_audit_unlock
+  return "$_ao_ac_rc"
 }
 
 # ao_hold_active FILE  True while FILE is a hold that names its owner,

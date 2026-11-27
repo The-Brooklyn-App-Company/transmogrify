@@ -462,9 +462,15 @@ do_audit_done() {
     L_audit="done" L_audit_note=$_short L_audit_report=$o_report
     ao_lease_write || ao_die "$AO_E_FAIL" "cannot write $H_LEASE"
   else
-    printf 'change=%s\nsince=%s\nreport=%s\ncommit=%s\nat=%s\n' "$A_change" "$A_since" "$o_report" "$_short" "$(ao_utc "$AO_T_EPOCH")" |
-      ao_write_atomic "$(ao_audit_file "$H_KEY" .done)" ||
-      ao_die "$AO_E_FAIL" "cannot record the audit in $(ao_audit_file "$H_KEY" .done)"
+    # Under the audit record lock, and only while this change is still the
+    # pending one (cross-review.sh or switch.sh verify may number another).
+    ao_audit_complete "$H_KEY" "$A_change" "$A_since" "$o_report" "$_short" "$(ao_utc "$AO_T_EPOCH")"
+    case $? in
+      0) ;;
+      2) ao_lease_unlock; refuse "switch-in audit record $(ao_audit_file "$H_KEY") became unreadable or invalid: failing closed; a human must inspect it" ;;
+      3) ao_lease_unlock; refuse "the registry switch-in audit changed while audit-done ran (another change was numbered, or it was recorded meanwhile): nothing recorded; run lease.sh audit-brief and audit-done again" ;;
+      *) ao_die "$AO_E_FAIL" "cannot record the audit in $(ao_audit_file "$H_KEY" .done)" ;;
+    esac
   fi
   ao_lease_unlock
   echo "switch-in audit recorded ($a_kind, $a_trans): $o_report at $_short. New work may start."
@@ -479,7 +485,9 @@ holder_id() {
 # ---------------------------------------------------------------- verbs
 
 do_init() {
+  ao_home_mutex "$H_HOME" || exit "$AO_E_BUSY"
   ao_home_init
+  ao_home_unmutex
   if git -C "$H_HOME" rev-parse --git-dir >/dev/null 2>&1 &&
     ! git -C "$H_HOME" check-ignore -q .operator/lease 2>/dev/null; then
     ao_warn "$H_HOME/.operator/ is not git-ignored; add '.operator/' to .gitignore"
@@ -489,6 +497,10 @@ do_init() {
 
 do_acquire() {
   check_provider
+  # The home mutex, before .operator/ is created and before the lease lock,
+  # with or without a profile: switch.sh verify holds the same pair while
+  # it resolves and writes the operator's route.
+  ao_home_mutex "$H_HOME" || exit "$AO_E_BUSY"
   ao_home_init
   lock
   ao_lease_load
@@ -529,6 +541,7 @@ do_acquire() {
   fi
   if [ -n "$_replay" ]; then
     ao_lease_unlock
+    ao_home_unmutex
     echo "acquired: $H_KEY (replay; you already hold it)"
     echo "epoch: $L_epoch"
     echo "generation: $L_generation"
@@ -543,6 +556,7 @@ do_acquire() {
   ao_lease_write || ao_die "$AO_E_FAIL" "cannot write $H_LEASE"
   L_PRESENT=1
   ao_lease_unlock
+  ao_home_unmutex
   echo "acquired: $H_KEY by $o_provider \`$o_session\`"
   echo "epoch: $L_epoch"
   echo "generation: $L_generation"

@@ -13,6 +13,8 @@
 # and a git-ignored, machine-local .operator/ directory:
 #   .operator/lease          the lease, written only by ops/lease.sh
 #   .operator/lease.lock/    the lease lock (mkdir); never broken by a script
+# and, beside it, .operator.init/ (the home mutex, ao_home_mutex) while
+# lease.sh init or acquire, or switch.sh verify, runs.
 #   .operator/inbox/{tmp,new,cur,done}/   the mailbox (mail.sh)
 #   .operator/markers/       dispatch markers; settled/ keeps settled ones
 #   .operator/forwarded/     one entry per forwarded human turn (dedupe)
@@ -367,10 +369,50 @@ ao_lease_unlock() {
   ao_lease_unguard
 }
 
-# ao_lease_traps  Release the lease lock on every exit path this process
-# controls (die, signal, normal exit). A SIGKILL leaves it: fail closed.
+# ao_home_mutex HOME  Take HOME/.operator.init (ao_mkdir_excl), the home's
+# initialization mutex. It sits beside the optional .operator/, so it exists
+# for a home that has none yet. lease.sh init and acquire hold it from
+# before they create .operator/ to their last lease write; switch.sh verify
+# holds it, then the lease lock when .operator/ exists, from its routing
+# resolve to its last registry write and observation. Order: registry lock,
+# this mutex, lease lock, audit record lock; never the reverse. Waits while
+# it is younger than AO_LEASE_LOCK_MAX seconds; an older one (stuck, or left
+# by a crash) is never broken: false with a message, and a human removes it
+# after checking that nothing runs.
+AO_HOME_MUTEX=
+ao_home_mutex() {
+  _ao_hm=$1/.operator.init
+  _ao_absent=0
+  until ao_mkdir_excl "$_ao_hm"; do
+    if ! _ao_hmt=$(ao_mtime "$_ao_hm" 2>/dev/null); then
+      # No mutex to wait for, yet mkdir failed: not contention.
+      _ao_absent=$((_ao_absent + 1))
+      [ "$_ao_absent" -lt 3 ] || ao_die "$AO_E_FAIL" "cannot create $_ao_hm (permissions?)"
+      continue
+    fi
+    if [ $(($(date +%s) - _ao_hmt)) -gt "$AO_LEASE_LOCK_MAX" ]; then
+      ao_msg "home mutex $_ao_hm is older than ${AO_LEASE_LOCK_MAX}s (holder $(cat "$_ao_hm/pid" 2>/dev/null || echo unknown)): failing closed. A human checks that no lease.sh or switch.sh verify runs for this home, then removes that directory (rm -r)"
+      return 1
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$$" >"$_ao_hm/pid"
+  AO_HOME_MUTEX=$_ao_hm
+}
+
+# ao_home_unmutex  Release the home mutex if this process holds it.
+ao_home_unmutex() {
+  if [ -n "$AO_HOME_MUTEX" ] && [ "$(cat "$AO_HOME_MUTEX/pid" 2>/dev/null)" = "$$" ]; then
+    ao_rmdir_claimed "$AO_HOME_MUTEX"
+  fi
+  AO_HOME_MUTEX=
+}
+
+# ao_lease_traps  Release the lease lock, then the home mutex, on every exit
+# path this process controls (die, signal, normal exit). A SIGKILL leaves
+# them: fail closed.
 ao_lease_traps() {
-  trap 'ao_lease_unlock; ao_cleanup' EXIT
+  trap 'ao_lease_unlock; ao_home_unmutex; ao_cleanup' EXIT
 }
 
 # ---------------------------------------------------------------- markers

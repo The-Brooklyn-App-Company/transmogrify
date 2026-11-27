@@ -84,13 +84,13 @@ ops/switch.sh mark web labels --evidence 'sidebar listing shows "Web"'
 | Step | What passes it | Who |
 | --- | --- | --- |
 | handoff | The outgoing session committed a warm `HANDOFF.md` in the home after the switch opened (`switch` asks it by an inbox note). Gone already: `switch.sh mark KEY handoff --cold REASON` | Outgoing session |
-| routing | The registry row names the incoming client and session; `verify` writes it once the handoff passes, then sends the incoming session a switch-in note with a one-time token | Script |
+| routing | The resolver (the registry row, overridden by an optional [lease](handoff.md)) delivers to the incoming client and session, and no hold stops delivery. `verify` writes the row once the handoff passes; a lease moves only when its holder runs `lease.sh release` (the switch-out note asks it) and the incoming session runs `lease.sh acquire`. Only then does `verify` send the incoming session a switch-in note with a one-time token | Script; lease: outgoing, then incoming session |
 | watchdog | No quiet-list entry silences the operator; no timed job in `JOBS.tsv` names the old session | Script checks; you fix |
 | labels | Incoming session titled with the operator's name; outgoing retitled or archived | `mark --evidence` |
 | pins-claude | Claude sidebar as in the table above | `mark --evidence` (passes by itself when no side is Claude) |
 | pins-codex | Codex sidebar as in the table above | `mark --evidence` (passes by itself when no side is Codex) |
 | models | The incoming session was created with the model and effort in `operator.conf` for its client | `mark --evidence` |
-| switch-in | A move to the other model family has its switch-in audit recorded ([K-22](../../kit/KIT.md)) | Incoming session (`lease.sh audit-done`) |
+| switch-in | A move to the other model family has its switch-in audit recorded ([K-22](../../kit/KIT.md)), checked once routing passes. Without a lease, `verify` records the move as the next numbered registry change when it routes, on every leg; a lease records it at `acquire` | Incoming session (`lease.sh audit-done`) |
 | ack | The incoming session ran `switch.sh ack KEY TOKEN` (from Codex, its thread id must match), or a note to the Oracle quotes the token | Incoming session |
 
 In-app marks carry evidence: the app's own readback, or `gap: <why>` where
